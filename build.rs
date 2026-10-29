@@ -1,0 +1,289 @@
+#![allow(clippy::unwrap_used, clippy::panic)]
+// Modified for openpacketmon (2026), see NOTICE. Based on `build.rs` of Sniffnet
+// (https://github.com/GyulyVGC/sniffnet), Copyright (c) 2022 Giuliano Bellini, MIT OR Apache-2.0.
+
+use std::borrow::Cow;
+use std::collections::HashSet;
+use std::env;
+use std::fs::File;
+use std::io::{BufRead, BufReader, BufWriter, Write};
+use std::path::Path;
+
+use sniffnet_packet_parser::Protocol;
+
+include!("./src/networking/types/service_query.rs");
+
+const SERVICES_LIST_PATH: &str = "./resources/services/services.txt";
+const SERVICE_CATEGORIES_LIST_PATH: &str = "./resources/services/categories.txt";
+
+fn main() {
+    println!("cargo:rerun-if-changed={SERVICES_LIST_PATH}");
+    println!("cargo:rerun-if-changed={SERVICE_CATEGORIES_LIST_PATH}");
+
+    let service_names = build_services_phf();
+    build_service_categories_phf(service_names);
+}
+
+fn build_services_phf() -> HashSet<String> {
+    let out_path = Path::new(&env::var("OUT_DIR").unwrap()).join("services.rs");
+    let mut output = BufWriter::new(File::create(out_path).unwrap());
+
+    let mut services_map = phf_codegen::Map::new();
+    let mut service_names = HashSet::new();
+
+    let input = BufReader::new(File::open(SERVICES_LIST_PATH).unwrap());
+    let mut num_entries = 0;
+    for line_res in input.lines() {
+        // we want to panic if one of the lines is err...
+        let line = line_res.unwrap();
+        // skip comment or blank lines
+        if line.trim().is_empty() || line.trim().starts_with('#') {
+            continue;
+        }
+        let mut parts = line.split('\t');
+        // we want to panic if one of the service names is invalid
+        let name = parts.next().unwrap().trim();
+        let val = Cow::Owned(get_valid_service_fmt_const(name));
+        service_names.insert(name.to_owned());
+        // we want to panic if port is not a u16, or protocol is not TCP or UDP
+        let key = get_valid_service_query(parts.next().unwrap());
+        assert!(parts.next().is_none());
+        services_map.entry(key, val);
+        num_entries += 1;
+    }
+    // the IANA registry has about 11 500 ports with a service name
+    assert!(num_entries > 10_000, "Too few services: {num_entries}");
+
+    writeln!(
+        &mut output,
+        "#[allow(clippy::unreadable_literal)]\n\
+        static SERVICES: phf::Map<ServiceQuery, Service> = {};",
+        services_map.build()
+    )
+    .unwrap();
+    service_names
+}
+
+fn build_service_categories_phf(mut service_names: HashSet<String>) {
+    let out_path = Path::new(&env::var("OUT_DIR").unwrap()).join("service_categories.rs");
+    let mut output = BufWriter::new(File::create(out_path).unwrap());
+
+    let mut categories_map = phf_codegen::Map::new();
+
+    let input = BufReader::new(File::open(SERVICE_CATEGORIES_LIST_PATH).unwrap());
+    let mut num_entries = 0;
+    for line_res in input.lines() {
+        // we want to panic if one of the lines is err...
+        let line = line_res.unwrap();
+        // skip comment or blank lines
+        if line.trim().is_empty() || line.trim().starts_with('#') {
+            continue;
+        }
+        let mut parts = line.split('\t');
+        // we want to panic if one of the service categories is invalid
+        let name = parts.next().unwrap().trim();
+        let val = Cow::Owned(get_valid_service_category_fmt_const(
+            parts.next().unwrap().trim(),
+        ));
+        // we want to panic if there is a duplicate or unexpected service name
+        assert!(
+            service_names.remove(name),
+            "Duplicate or unexpected service: {name}"
+        );
+        assert!(parts.next().is_none());
+        categories_map.entry(name.to_owned(), val);
+        num_entries += 1;
+    }
+    assert!(
+        service_names.is_empty(),
+        "Services without categories: {service_names:?}"
+    );
+    assert!(
+        num_entries > 5_000,
+        "Too few service categories: {num_entries}"
+    );
+
+    writeln!(
+        &mut output,
+        "#[allow(clippy::unreadable_literal)]\n\
+        static SERVICE_CATEGORIES: phf::Map<&'static str, ServiceCategory> = {};",
+        categories_map.build()
+    )
+    .unwrap();
+}
+
+fn get_valid_service_category_fmt_const(s: &str) -> String {
+    let category = match s {
+        "web" => "Web",
+        "email" => "Email",
+        "chat" => "Chat",
+        "media" => "Media",
+        "files" => "Files",
+        "storage" => "Storage",
+        "database" => "Database",
+        "remote" => "Remote",
+        "management" => "Management",
+        "discovery" => "Discovery",
+        "network" => "Network",
+        "vpn" => "Vpn",
+        "identity" => "Identity",
+        "printing" => "Printing",
+        "gaming" => "Gaming",
+        "industrial" => "Industrial",
+        "development" => "Development",
+        "middleware" => "Middleware",
+        "security" => "Security",
+        "licensing" => "Licensing",
+        "other" => "Other",
+        invalid => panic!("Invalid service category found: {invalid}"),
+    };
+    format!("ServiceCategory::{category}")
+}
+
+fn get_valid_service_fmt_const(s: &str) -> String {
+    match s.trim() {
+        invalid
+            if ["", "unknown", "-"].contains(&invalid)
+                || !invalid.is_ascii()
+                || invalid.starts_with('#')
+                || invalid.contains(' ')
+                || invalid.contains('?') =>
+        {
+            panic!("Invalid service name found: {invalid}")
+        }
+        #[cfg(debug_assertions)]
+        inappropriate
+            if rustrict::Censor::from_str(inappropriate)
+                .with_trie(&SAFE_WORDS_FOR_SERVICE_NAME)
+                .analyze()
+                .is(rustrict::Type::INAPPROPRIATE) =>
+        {
+            panic!("Inappropriate service name found: {inappropriate}")
+        }
+        name => format!("Service::Name(\"{name}\")"),
+    }
+}
+
+fn get_valid_service_query(s: &str) -> ServiceQuery {
+    let mut parts = s.split('/');
+    let port = parts.next().unwrap().parse::<u16>().unwrap();
+    let protocol_str = parts.next().unwrap();
+    let protocol = match protocol_str {
+        "tcp" => Protocol::Tcp,
+        "udp" => Protocol::Udp,
+        invalid => panic!("Invalid protocol found: {invalid}"),
+    };
+    assert!(parts.next().is_none());
+    ServiceQuery(port, protocol)
+}
+
+#[cfg(debug_assertions)]
+static SAFE_WORDS_FOR_SERVICE_NAME: std::sync::LazyLock<rustrict::Trie> =
+    std::sync::LazyLock::new(|| {
+        let mut safe_words = rustrict::Trie::default();
+        for word in [
+            "npp",
+            "emfis-cntl",
+            "ardus-cntl",
+            "pmip6-cntl",
+            "mpp",
+            "ipp",
+            "vpp",
+            "epp",
+            "kink",
+            "kvm-via-ip",
+            "dpp",
+            "slinkysearch",
+            "alta-ana-lm",
+            "vpps-qua",
+            "vpps-via",
+            "ibm-pps",
+            "ppsms",
+            "ppsuitemsg",
+            "icpps",
+            "rap-listen",
+            "slslavemon",
+            "snip-slave",
+            "cadabra-lm",
+            "pay-per-view",
+            "sixtrak",
+            "cvmon",
+            "houdini-lm",
+            "dic-aida",
+            "p2pq",
+            "bigbrother",
+            "bintec-admin",
+            "zymed-zpp",
+            "cvmmon",
+            "btpp2sectrans",
+            "conclave-cpp",
+            "btpp2audctr1",
+            "tclprodebugger",
+            "bintec-capi",
+            "bintec-tapi",
+            "dicom-iscl",
+            "dicom-tls",
+            "nmsigport",
+            "ppp",
+            "tl1-telnet",
+            "opcon-xps",
+            "netwatcher-mon",
+            "netwatcher-db",
+            "xnm-ssl",
+            "edm-mgr-cntrl",
+            "isoft-p2p",
+            "must-p2p",
+            "p2pgroup",
+            "quasar-server",
+            "int-rcv-cntrl",
+            "faxstfx-port",
+            "sunlps-http",
+            "fagordnc",
+            "p2pcommunity",
+            "minger",
+            "assuria-slm",
+            "wcpp",
+            "plcy-net-svcs",
+            "assyst-dr",
+            "mobile-p2p",
+            "assuria-ins",
+            "taep-as-svc",
+            "nlg-data",
+            "dj-ice",
+            "x500ms",
+            "X11:7",
+            "p2p-sip",
+            "p4p-portal",
+            "bmc-perf-agent",
+            "ntz-p2p-storage",
+            "citrixupp",
+            "freezexservice",
+            "p2pevolvenet",
+            "papachi-p2p-srv",
+            "espeasy-p2p",
+            "pim-port",
+            "vp2p",
+            "dicom",
+            "icpp",
+            "sauterdongle",
+            "vocaltec-hos",
+            "BackOrifice",
+            "dhanalakshmi",
+            "3gpp-w1ap",
+            "pmsm-webrctl",
+            "bif-p2p",
+            "as-servermap",
+            "nm-asses-admin",
+            "ias-session",
+            "smar-se-port1",
+            "smar-se-port2",
+            "canon-cpp-disc",
+            "3gpp-monp",
+            "emc-pp-mgmtsvc",
+            "3gpp-cbsp",
+            "bitcoin",
+        ] {
+            safe_words.set(word, rustrict::Type::SAFE);
+        }
+        safe_words
+    });

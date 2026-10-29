@@ -1,0 +1,25 @@
+# Modified for openpacketmon (2026), see NOTICE. Based on `.gitattributes` of Sniffnet
+# (https://github.com/GyulyVGC/sniffnet), Copyright (c) 2022 Giuliano Bellini, MIT OR Apache-2.0.
+
+*                   text eol=lf
+.*                  text eol=lf
+
+*.bmp               binary
+*.png               binary
+*.icns              binary
+*.ico               binary
+*.ttf               binary
+*.mp3               binary
+*.rtf               binary
+*.mmdb              binary
+*.pdf               binary
+*.jpg               binary
+*.jpeg              binary
+*.gif               binary
+*.webp              binary
+*.woff2             binary
+*.pcap              binary
+*.pcapng            binary
+
+*.rs                diff=rust
+*.md                diff=markdown

@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <!-- openpacketmon favicon: simplified logo mark (ring, packet, pulse) for small sizes -->
+  <defs>
+    <linearGradient id="ring" x1="0" y1="1" x2="1" y2="0">
+      <stop offset="0" stop-color="#1e88e5"/>
+      <stop offset="0.55" stop-color="#22d3ee"/>
+      <stop offset="1" stop-color="#3ddc84"/>
+    </linearGradient>
+  </defs>
+  <rect width="64" height="64" rx="13" fill="#161b22"/>
+  <circle cx="32" cy="32" r="24.5" fill="none" stroke="url(#ring)" stroke-width="5"/>
+  <path d="M6 34H12L14.5 26.5L17.5 41L20 34H22M42 34H44L46.5 26.5L49.5 41L52 34H58" fill="none"
+        stroke="#3ddc84" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M32 19L43 25L32 31L21 25Z" fill="#5eead4"/>
+  <path d="M21 25L32 31V44L21 38Z" fill="#1e88e5"/>
+  <path d="M32 31L43 25V38L32 44Z" fill="#22b8cf"/>
+</svg>

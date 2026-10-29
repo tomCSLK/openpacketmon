@@ -1,0 +1,55 @@
+# cargo deny --workspace check: licenses, sources, duplicate crates and RustSec advisories of the dependencies of
+# openpacketmon and openpacketmon-app (without --workspace only those of openpacketmon are checked).
+# https://embarkstudios.github.io/cargo-deny/
+
+[graph]
+# openpacketmon is built for Linux only for now
+targets = ["x86_64-unknown-linux-gnu"]
+
+[advisories]
+# report unmaintained and unsound crates anywhere in the tree, as cargo audit does
+unmaintained = "all"
+unsound = "all"
+# Vulnerabilities always fail. Unmaintained and unsound crates fail as well, except these known ones that only
+# arrive through other crates; they are checked again when those crates are updated.
+ignore = [
+    { id = "RUSTSEC-2026-0374", reason = "basic-toml (unmaintained) only through askama_derive, at compile time" },
+    { id = "RUSTSEC-2024-0370", reason = "proc-macro-error (unmaintained) only through glib-macros 0.18 (GTK 3 of the tray icon), at compile time" },
+    { id = "RUSTSEC-2024-0429", reason = "glib 0.18 (GTK 3 of the tray icon): openpacketmon does not use VariantStrIter" },
+]
+
+[licenses]
+# Permissive licenses only; MPL-2.0 (option-ext) is fine as long as its files are used unchanged.
+# Where a crate offers a choice (e.g. self_cell: Apache-2.0 OR GPL-2.0-only), cargo deny takes an allowed one.
+allow = [
+    "0BSD",
+    "Apache-2.0",
+    "Apache-2.0 WITH LLVM-exception",
+    "BSD-2-Clause",
+    "BSD-3-Clause",
+    "BSL-1.0",
+    "CC0-1.0",
+    "ISC",
+    "MIT",
+    "MIT-0",
+    "MPL-2.0",
+    "Unicode-3.0",
+    "Unicode-DFS-2016",
+    "Unlicense",
+    "Zlib",
+]
+confidence-threshold = 0.9
+# the workspace crates are not published
+private = { ignore = true }
+
+[bans]
+# Several versions of a crate only warn: they come from dependencies (e.g. GTK 3 and the TLS stack) and are
+# removed when those are updated.
+multiple-versions = "warn"
+wildcards = "deny"
+allow-wildcard-paths = true
+
+[sources]
+unknown-registry = "deny"
+unknown-git = "deny"
+allow-registry = ["https://github.com/rust-lang/crates.io-index"]

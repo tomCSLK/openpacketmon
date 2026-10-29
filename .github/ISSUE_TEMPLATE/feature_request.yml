@@ -1,0 +1,16 @@
+name: Feature request
+description: Suggest a protocol, a view or an improvement.
+labels: [enhancement]
+body:
+  - type: textarea
+    id: need
+    attributes:
+      label: What do you want to see or do?
+      description: Describe the problem first; a solution is welcome but optional.
+    validations:
+      required: true
+  - type: textarea
+    id: more
+    attributes:
+      label: Anything else
+      description: For a protocol, the specification (RFC) if you know it.

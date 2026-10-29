@@ -1,0 +1,29 @@
+# Modified for openpacketmon (2026), see NOTICE. Based on `lib/sniffnet-packet-parser/Cargo.toml` of Sniffnet
+# (https://github.com/GyulyVGC/sniffnet), Copyright (c) 2022 Giuliano Bellini, MIT OR Apache-2.0.
+
+[package]
+name = "sniffnet-packet-parser"
+version = "0.2.1"
+description = "Network packet parser from Sniffnet, used by openpacketmon"
+readme = "README.md"
+keywords = ["network", "packet", "sniffer", "parser", "pcap"]
+categories = ["parser-implementations", "network-programming"]
+authors.workspace = true
+edition.workspace = true
+homepage.workspace = true
+repository.workspace = true
+license.workspace = true
+publish = false
+
+[features]
+default = ["full"]
+# without this only `Protocol` is available
+# (needed in sniffnet's build.rs for cross-compilation without pcap)
+full = ["dep:etherparse", "dep:pcap"]
+
+[dependencies]
+etherparse = { workspace = true, optional = true }
+pcap = { workspace = true, optional = true }
+
+[lints]
+workspace = true

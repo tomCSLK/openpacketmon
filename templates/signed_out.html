@@ -1,0 +1,8 @@
+{% extends "public.html" %}
+{% block title %}{{ t.get("signed-out-title") }} · openpacketmon{% endblock %}
+{% block card %}
+<h1>{{ t.get("signed-out-title") }}</h1>
+<p>{{ t.get("signed-out-text") }}</p>
+<p><code>openpacketmon</code></p>
+<p class="muted small">{{ t.get("signed-out-hint") }}</p>
+{% endblock %}

@@ -1,0 +1,65 @@
+{% extends "app.html" %}
+{% block title %}{{ t.get("nav-packets") }} · openpacketmon{% endblock %}
+{% block page_head %}<script src="/static/packets.js" defer></script>{% endblock %}
+{% block page_class %} wide{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h1>{{ t.get("nav-packets") }}</h1>
+    <p class="subtitle">{{ t.get("packets-subtitle") }}</p>
+  </div>
+  {% if foot.is_some() %}<div class="actions"><a class="button secondary" href="{{ statistics }}">{{ t.get("nav-statistics") }}</a><a class="button secondary" href="{{ download }}" download>{% if filter.trim().is_empty() %}{{ t.get("packets-download") }}{% else %}{{ t.get("packets-download-filtered") }}{% endif %}</a></div>{% endif %}
+</div>
+{% if !running %}<p class="notice">{{ t.get("no-capture") }} <a href="/">{{ t.get("no-capture-start") }}</a></p>
+{% else if !unavailable.is_empty() %}<p class="notice">{{ unavailable }}</p>{% endif %}
+<form method="get" action="/packets" class="filter-bar" data-filter-form>
+  <input type="search" name="f" value="{{ filter }}" placeholder="{{ t.get("packets-filter-placeholder") }}" aria-label="{{ t.get("packets-filter") }}"
+    autocomplete="off" spellcheck="false" data-filter-input{% if error.is_some() %} class="invalid"{% else if !filter.trim().is_empty() %} class="valid"{% endif %}>
+  <button type="submit">{{ t.get("apply") }}</button>
+  {% if !filter.is_empty() %}<a class="button secondary" href="/packets">{{ t.get("filter-reset") }}</a>{% endif %}
+</form>
+<p class="filter-error" data-filter-error{% if error.is_none() %} hidden{% endif %}>{% if let Some(e) = error %}{{ e }}{% endif %}</p>
+<details class="filter-help">
+  <summary>{{ t.get("packets-filter-help") }}</summary>
+  <div class="filter-help-body">
+    <p>{{ t.get("packets-filter-help-text") }}</p>
+    <p class="filter-examples">{% for e in examples %}<a href="/packets?f={{ e|urlencode }}"><code>{{ e }}</code></a> {% endfor %}</p>
+    <p><strong>{{ t.get("packets-filter-protocols") }}</strong> <code>{{ protocols }}</code></p>
+    <p><strong>{{ t.get("packets-filter-fields") }}</strong> <code class="names">{{ fields }}</code></p>
+    <p><strong>{{ t.get("packets-colors") }}</strong>
+      <span class="legend"><span class="c-bad">{{ t.get("packets-color-bad") }}</span><span class="c-tcp-control">{{ t.get("packets-color-tcp") }}</span><span class="c-dns">DNS</span><span class="c-local">{{ t.get("packets-color-local") }}</span><span class="c-tls">TLS/QUIC</span><span class="c-http">HTTP</span><span class="c-icmp">ICMP</span><span class="c-udp">UDP</span></span></p>
+  </div>
+</details>
+{% if list %}
+<p class="notice" data-goto-note hidden></p>
+<section class="card flush packet-list" data-packets data-filter="{{ filter.trim() }}"{% if let Some(n) = goto %} data-goto="{{ n }}"{% endif %}{% if running %} data-running{% endif %}>
+  <div class="card-head">
+    <h2 data-packets-head>{{ t.get("packets-loading") }}</h2>
+    <div class="card-tools">
+      <button type="button" class="secondary small live-toggle" data-live-toggle aria-pressed="true" title="{{ t.get("packets-follow-hint") }}"{% if !running %} hidden{% endif %}><span class="live-dot"></span><span>{{ t.get("packets-live") }}</span></button>
+      <label class="inline"><input type="checkbox" data-colors checked> {{ t.get("packets-colors") }}</label>
+      <form method="get" action="/packets" class="pager-goto" data-goto-form>
+        {% if !filter.trim().is_empty() %}<input type="hidden" name="f" value="{{ filter.trim() }}">{% endif %}
+        <label>{{ t.get("packets-goto") }} <input type="number" name="goto" min="1" class="page-input" placeholder="{{ t.get("packets-goto-placeholder") }}" title="{{ t.get("packets-goto-key") }}" data-goto-input></label>
+      </form>
+    </div>
+  </div>
+  <div class="vlist" data-packets-scroller tabindex="0" aria-label="{{ t.get("nav-packets") }}">
+    <div class="vlist-view">
+      <table class="packets colored" data-packets-table>
+        <colgroup><col class="c-no"><col class="c-time"><col class="c-addr"><col class="c-dir"><col class="c-addr"><col class="c-proto"><col class="c-len"><col></colgroup>
+        <thead><tr>
+          <th class="right">{{ t.get("packet-number") }}</th><th class="right">{{ t.get("packet-time") }}</th><th>{{ t.get("conn-source") }}</th><th></th><th>{{ t.get("conn-destination") }}</th>
+          <th>{{ t.get("conn-protocol") }}</th><th class="right">{{ t.get("packet-length") }}</th><th>{{ t.get("packet-info") }}</th>
+        </tr></thead>
+        <tbody data-packets-rows></tbody>
+      </table>
+      <p class="empty" data-packets-empty hidden>{% if !filter.trim().is_empty() %}{{ t.get("packets-none-filtered") }}{% else %}{{ t.get("packets-empty") }}{% endif %}</p>
+    </div>
+    <div class="vlist-spacer" data-packets-spacer></div>
+  </div>
+  <noscript><p class="empty">{{ t.get("packets-noscript") }}</p></noscript>
+  {% if let Some(f) = foot %}<p class="card-foot hint" data-packets-foot>{{ f }}</p>{% endif %}
+</section>
+{% endif %}
+{% endblock %}

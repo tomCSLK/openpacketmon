@@ -1,0 +1,61 @@
+{% extends "app.html" %}
+{% block title %}{{ t.get("connection-title") }} · openpacketmon{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <p class="breadcrumb"><a href="/connections">{{ t.get("nav-connections") }}</a></p>
+    <h1><code>{{ title }}</code></h1>
+  </div>
+  {# jumps to lists: the packets and statistics of this connection, then the connections of its remote side #}
+  <div class="actions">
+    {% if let Some(href) = packets %}<a class="button secondary" href="{{ href }}">{{ t.get("connection-packets") }}</a>{% endif %}
+    {% if let Some(href) = statistics %}<a class="button secondary" href="{{ href }}">{{ t.get("connection-statistics") }}</a><span class="actions-sep" aria-hidden="true"></span>{% endif %}
+    <a class="button secondary" href="/connections?{{ address_search }}">{{ t.get("connection-address-connections") }}</a>
+    {% if !search.is_empty() %}<a class="button secondary" href="/connections?{{ search }}">{{ t.get("connection-host-connections") }}</a>{% endif %}
+  </div>
+</div>
+<div class="cols" data-fragment="connection">
+  <section class="card">
+    <div class="card-head"><h2>{{ t.get("connection-title") }}</h2></div>
+    <div class="card-body">
+      <dl class="facts">
+      {% for f in facts %}<dt>{{ f.label }}</dt><dd>{% if f.is_html %}{{ f.value|safe }}{% else %}{{ f.value }}{% endif %}</dd>{% endfor %}
+      </dl>
+      {% if !message_types.is_empty() %}
+      <h3>{{ t.get("conn-message-types") }}</h3>
+      <dl class="facts">{% for (name, n) in message_types %}<dt>{{ name }}</dt><dd>{{ n }}</dd>{% endfor %}</dl>
+      {% endif %}
+    </div>
+  </section>
+  <section class="card">
+    <div class="card-head"><h2>{{ t.get("connection-remote") }}</h2></div>
+    <div class="card-body">
+      <dl class="facts">
+        <dt>{{ t.get("host-address") }}</dt><dd class="address-fav"><code>{{ remote }}</code>
+          <form method="post" action="/favorites">
+            <input type="hidden" name="csrf_token" value="{{ layout.csrf_token }}">
+            <input type="hidden" name="kind" value="address">
+            <input type="hidden" name="key" value="{{ remote }}">
+            <input type="hidden" name="add" value="{% if remote_favorite %}0{% else %}1{% endif %}">
+            <input type="hidden" name="back" value="/connection?{{ self_query }}">
+            <button type="submit" class="star{% if remote_favorite %} on{% endif %}" aria-pressed="{{ remote_favorite }}" title="{% if remote_favorite %}{{ t.get("favorite-address-remove") }}{% else %}{{ t.get("favorite-address-add") }}{% endif %}">
+              <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.5l2.6 5.3 5.9.9-4.25 4.1 1 5.8L12 16.9l-5.25 2.7 1-5.8L3.5 9.7l5.9-.9z"/></svg>
+            </button>
+          </form></dd>
+        {% for f in host_facts %}<dt>{{ f.label }}</dt><dd>{{ f.value }}</dd>{% endfor %}
+        {% if latency_supported || latency.is_some() %}
+        <dt>{{ t.get("latency") }}</dt><dd class="inline-action">{% if let Some(latency) = latency %}{{ latency }}{% else %}<span class="faint">–</span>{% endif %}
+          {% if latency_supported %}
+          <form method="post" action="/connection/latency">
+            <input type="hidden" name="csrf_token" value="{{ layout.csrf_token }}">
+            <input type="hidden" name="ip" value="{{ remote }}">
+            <input type="hidden" name="back" value="/connection?{{ self_query }}">
+            <button type="submit" class="secondary small"{% if measuring %} disabled{% endif %}>{{ t.get("latency-measure") }}</button>
+          </form>
+          {% endif %}</dd>
+        {% endif %}
+      </dl>
+    </div>
+  </section>
+</div>
+{% endblock %}

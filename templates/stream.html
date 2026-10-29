@@ -1,0 +1,40 @@
+{% extends "app.html" %}
+{% block title %}{{ t.get("stream-title") }} · openpacketmon{% endblock %}
+{% block page_class %} wide{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <p class="breadcrumb"><a href="/packet?n={{ number }}">{{ t.get1("packet-title", "number", number) }}</a></p>
+    <h1>{{ t.get("stream-title") }}</h1>
+    <p class="subtitle"><code>{{ title }}</code></p>
+  </div>
+  <div class="actions">
+    <a class="button secondary" href="{{ packets_href }}">{{ t.get("stream-packets") }}</a>
+  </div>
+</div>
+{% if headers_only %}<p class="notice">{{ t.get("stream-headers-only") }}</p>{% endif %}
+{% if cut %}<p class="notice">{{ t.get("stream-cut") }}</p>{% endif %}
+<section class="card flush">
+  <div class="card-head">
+    <h2 class="stream-sides"><span class="stream-client">{{ client }} → {{ server }}: {{ client_counts }}</span> <span class="stream-server">{{ server }} → {{ client }}: {{ server_counts }}</span></h2>
+    <div class="card-tools">
+      <span class="segmented">
+        <a class="button small{% if view != "text" %} secondary{% endif %}" href="{{ base }}&side={{ side }}">{{ t.get("stream-text") }}</a>
+        <a class="button small{% if view != "hex" %} secondary{% endif %}" href="{{ base }}&view=hex&side={{ side }}">Hex</a>
+      </span>
+      <span class="segmented">
+        <a class="button small{% if side != "both" %} secondary{% endif %}" href="{{ base }}&view={{ view }}">{{ t.get("stream-both") }}</a>
+        <a class="button small{% if side != "client" %} secondary{% endif %}" href="{{ base }}&view={{ view }}&side=client">{{ client }} →</a>
+        <a class="button small{% if side != "server" %} secondary{% endif %}" href="{{ base }}&view={{ view }}&side=server">← {{ server }}</a>
+      </span>
+    </div>
+  </div>
+  {% if chunks.is_empty() %}
+  <p class="empty">{{ t.get("stream-empty") }}</p>
+  {% else %}
+  <div class="stream">
+  {% for c in chunks %}{% if let Some(g) = c.gap %}<div class="stream-gap">{{ g }}</div>{% endif %}<pre class="{% if c.client %}stream-client{% else %}stream-server{% endif %}" title="{{ t.get1("packet-title", "number", c.packet) }}">{{ c.text }}</pre>{% endfor %}
+  </div>
+  {% endif %}
+</section>
+{% endblock %}

@@ -1,0 +1,15 @@
+# systemd user service: keeps openpacketmon running in the background for the signed-in user.
+#   systemctl --user enable --now openpacketmon
+# The start menu entry (openpacketmon-app) then only opens its window. No NoNewPrivileges= here: it would
+# disable the capture capabilities that the package sets on /usr/bin/openpacketmon.
+[Unit]
+Description=openpacketmon network traffic monitor (browser UI on 127.0.0.1)
+Documentation=https://github.com/tomCSLK/openpacketmon
+
+[Service]
+ExecStart=/usr/bin/openpacketmon --no-browser
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=default.target

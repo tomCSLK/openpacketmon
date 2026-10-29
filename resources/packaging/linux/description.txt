@@ -1,0 +1,14 @@
+openpacketmon runs as a local service and shows its interface in its own window with a tray icon,
+or in the browser (127.0.0.1 only).
+Based on Sniffnet.
+Features:
+Choose a network adapter, a capture file (PCAP/PCAPNG) or an IPFIX collector as the source;
+Filter the observed traffic with BPF expressions and write it to a PCAP file;
+View overall statistics and a live chart of the traffic (bytes, bits or packets per second);
+Get domain names, network providers (AS) and countries of the remote hosts;
+See which programs exchange traffic;
+Search, sort and inspect every network connection;
+List single packets with their layers and bytes and download them as PCAP;
+Mark hosts, services and programs as favorites;
+Get notified about data thresholds, favorites and blacklisted addresses (also via webhook);
+Light and dark design, English and German.

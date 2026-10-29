@@ -1,0 +1,396 @@
+# Texts of the pages (templates/ and src/web/). German is the source language.
+
+## Frame and navigation
+nav-main = Main navigation
+nav-traffic = Traffic
+nav-overview = Overview
+nav-connections = Connections
+nav-packets = Packets
+nav-statistics = Statistics
+nav-hosts = Hosts
+nav-services = Services
+nav-programs = Programs
+nav-notifications = Notifications
+nav-setup = Setup
+nav-capture = Capture
+nav-settings = Settings
+nav-theme = Theme
+nav-theme-toggle = Toggle theme
+source-code = Source code
+licenses = Licenses
+based-on-sniffnet = based on Sniffnet
+update-available = Version { $version } available
+back = Back
+apply = Apply
+save = Save
+unknown = unknown
+not-applicable = not applicable
+show-all = Show all
+unit = Unit
+unit-bytes = Bytes
+unit-bits = Bits
+unit-packets = Packets
+sort = Order
+sort-desc = Largest first
+sort-asc = Smallest first
+sort-recent = Most recent first
+only-favorites = Favorites only
+favorite = Favorite
+favorite-add = Add to favorites
+favorite-remove = Remove from favorites
+favorite-address-add = Add address to favorites
+favorite-address-remove = Remove address from favorites
+no-capture = No capture is running.
+no-capture-start = Start a capture
+geo-missing = Without a geolocation database, countries and network operators stay empty.
+geo-missing-link = Download it in the settings
+flash-settings-saved = Settings saved.
+flash-geo-downloaded = Geolocation databases downloaded. They apply to addresses found from now on; restart the capture for the earlier ones.
+flash-notifications-cleared = Notifications cleared.
+flash-capture-stopped = Capture stopped, its data has been discarded.
+
+## Sign-in and errors
+signed-out-title = Not signed in
+signed-out-text = Open openpacketmon from the application menu or with this command, and the browser signs in by itself:
+signed-out-hint = The start link with the access key is valid while openpacketmon runs and can only be read by your user.
+error-title = Error
+error-forbidden = The request was refused (expired form or a foreign page). Reload the page and try again.
+error-not-found = This page does not exist (any more). A connection disappears, for example, when the capture is stopped.
+
+## Capture
+capture-title = Capture
+capture-subtitle = Choose which traffic to analyze.
+capture-source = Source
+source-device = Network adapter
+source-file = Capture file
+source-ipfix = IPFIX collector
+capture-adapters = Network adapters
+capture-adapters-hint = The curves show the packets of the last 30 seconds, so the adapter with traffic is easy to spot.
+capture-adapter = Adapter
+capture-addresses = Addresses
+capture-activity = Packets (30 s)
+capture-no-adapters = No network adapters found.
+capture-no-adapters-hint = openpacketmon needs the right to capture packets (setcap cap_net_raw,cap_net_admin=eip, set up by the package).
+capture-export-enable = Also write the packets to a PCAP file
+capture-export-dir = Folder
+capture-export-name = File name
+capture-packets-full = Whole packets
+capture-packets-headers = Headers only
+capture-packets-off = Off
+capture-packets-hint = Stored packets are shown on the pages Packets, Packet details and Follow stream and can be downloaded as PCAP. Whole packets take more memory (512 MiB at most); only with them are contents like the TLS server name (SNI) and Follow stream complete. "Headers only" keeps the first 128 bytes of each packet.
+capture-packets-full-max = whole packets, { $max } packets at most
+capture-packets-headers-max = headers only (128 bytes per packet), { $max } packets at most
+capture-file-path = Path of the file (PCAP or PCAPNG)
+capture-file-hint = The file is read on this computer; the path must be readable by your user.
+capture-ipfix-addr = Address
+capture-ipfix-port = UDP port
+capture-ipfix-hint = openpacketmon receives flow data (IPFIX) from routers or switches. Leave empty for all addresses and port 4739.
+capture-filter = Filter
+capture-bpf = BPF filter (optional)
+capture-bpf-hint = Only matching packets are analyzed, e.g. "tcp port 443" or "host 192.168.1.1" (same syntax as tcpdump).
+capture-start = Start capture
+capture-running = Capture running
+capture-export = PCAP file
+capture-link-type = Link type
+capture-listening = Listening on
+capture-dropped = Dropped packets
+capture-dropped-text = { $adapter } by the adapter, { $app } by openpacketmon (buffer full)
+capture-to-overview = Go to overview
+capture-pause = Pause
+capture-resume = Resume
+capture-stop = Stop
+capture-stop-hint = Stopping discards the collected data.
+capture-error = The capture could not be started: { $error }
+capture-error-unknown = The capture could not be started.
+capture-file-missing = Enter the path of the capture file.
+capture-adapter-missing = Choose a network adapter from the list.
+capture-ipfix-undecodable = The IPFIX data received cannot be decoded at the moment (the exporter's template is still missing).
+capture-state-running = running
+capture-state-paused = paused
+capture-state-finished = file read completely
+capture-state-error = error
+
+## Overview
+tile-total = Total data
+tile-in = Incoming
+tile-out = Outgoing
+tile-connections = Connections
+tile-hosts = Hosts
+tile-dropped = Dropped packets
+chart-title = Traffic per second
+chart-empty = No data yet.
+top-hosts = Top hosts
+top-services = Top services
+top-programs = Top programs
+
+## Hosts, services, programs
+hosts-subtitle = Remote hosts with domain, autonomous system and country.
+services-subtitle = Services by port and protocol.
+programs-subtitle = Programs of this computer that cause traffic.
+programs-unsupported = Programs are only identified when capturing from a network adapter.
+entries-count = { $count ->
+    [one] 1 entry
+   *[other] { $count } entries
+}
+entries-empty = No entries yet.
+entries-filter = Name contains …
+entries-truncated = Showing { $shown } of { $total } entries.
+entry-name = Name
+entry-traffic = Traffic
+entry-in = Incoming
+entry-out = Outgoing
+entry-total = Total
+tag-local = local
+tag-loopback = loopback
+tag-bogon = bogon: { $kind }
+tag-multicast = multicast
+tag-broadcast = broadcast
+category-web = Web
+category-email = Email
+category-chat = Chat & Messaging
+category-media = Voice & Media
+category-files = File Transfer & Sharing
+category-storage = Storage & Backup
+category-database = Databases & Caches
+category-remote = Remote Access & Execution
+category-management = Monitoring & Administration
+category-discovery = Naming & Service Discovery
+category-network = Network Infrastructure
+category-vpn = VPNs, Tunnels & Proxies
+category-identity = Identity & Directory
+category-printing = Printing & Scanning
+category-gaming = Gaming
+category-industrial = Industrial & Automation
+category-development = Software Development
+category-middleware = Middleware
+category-security = Security
+category-licensing = Software Licensing
+category-other = Other
+
+## Connections
+connections-subtitle = All connections of the capture, with filter and pages.
+filter-reset = Reset
+connections-none = No connections
+connections-filter = Connection filter
+connections-filter-placeholder = Connection filter, e.g. ip.addr == 192.168.1.20 or port == 443 or domain contains google
+connections-filter-help = Help on the connection filter
+connections-filter-help-text = The same language as the display filter of the packets, with fields of the connections. A protocol alone (tcp, udp, icmp, arp, ipv6) selects the connections of that protocol; favorite alone the connections of favorite hosts, programs and addresses. Comparisons: == != < <= > >= contains and in {"{"}80 443{"}"}, combined with and, or, not and parentheses. Text ignores case, addresses also match networks (ip.addr == 192.168.1.0/24). remote is the other end, domain the name of the host (also reverse DNS), as.name and country come from the geolocation, program looks in name and path, direction is incoming or outgoing. Examples:
+connections-range = Connections { $from }–{ $to }
+connections-of = of { $total } ({ $data })
+connections-empty = No connections yet.
+connections-none-filtered = No connection matches the filter.
+rows-per-page = Rows per page
+pages = Pages
+page-label = Page
+page-of-total = of { $pages }
+page-first = First
+page-last = Last
+page-prev = Previous
+page-next = Next
+conn-source = Source
+conn-source-mac = Source MAC
+conn-destination = Destination
+conn-destination-mac = Destination MAC
+conn-protocol = Protocol
+conn-direction = Direction
+conn-service = Service
+conn-program = Program
+conn-host = Remote host
+conn-packets = Packets
+conn-data = Data
+conn-first = First packet
+conn-last = Last packet
+conn-vlan = VLAN
+conn-exporter = Exporter
+conn-message-types = Message types
+direction-in = incoming
+direction-out = outgoing
+connection-title = Connection
+connection-remote = Remote host
+connection-host-connections = Connections of the host
+connection-address-connections = Connections of the address
+connection-packets = Packets
+connection-statistics = Statistics
+
+# Packets
+packets-subtitle = The stored packets of the capture with their layers and bytes.
+packets-download = Download as PCAP
+packets-download-filtered = Download selection as PCAP
+packets-unavailable-source = IPFIX captures have no single packets.
+packets-disabled = The packet store is switched off. It can be switched on in the settings for the next capture.
+packets-none-filtered = No packet matches the filter.
+packets-empty = No packets yet.
+packets-loading = Loading packets …
+packets-follow-hint = At the end the list follows the new packets; scrolling up stops it.
+packets-noscript = The packet list needs JavaScript.
+packets-goto = Go to packet
+packets-goto-placeholder = No.
+packets-goto-key = Type a packet number and press Enter (Ctrl+G)
+packets-kept = { $count } packets stored
+packets-dropped = { $count } older ones dropped
+packets-headers-only = headers only
+packets-filter = Display filter
+packets-filter-placeholder = Display filter, e.g. dns or tls.sni contains amazon or ip.addr == 192.168.1.20
+packets-filter-help = Help for the display filter
+packets-filter-help-text = A protocol alone (dns, tcp) selects the packets that contain it; a field alone (tls.sni, tcp.flags.syn) the packets that have it. Comparisons: == != < <= > >= contains and in {"{"}80 443{"}"}. Combine with and, or, not and parentheses. Text ignores case, addresses also match networks (ip.addr == 192.168.1.0/24). domain looks in DNS names, TLS SNI and the HTTP host. The TCP analysis adds tcp.analysis.* (e.g. tcp.analysis.flags for all problems, tcp.analysis.retransmission); times like dns.time or tcp.analysis.ack_rtt in seconds (0.1) or with a unit (100ms, 800us). Examples:
+packets-filter-protocols = Protocols:
+packets-filter-fields = Fields:
+packets-colors = Colors
+packets-color-bad = Errors/resets/TCP problems
+packets-color-tcp = TCP setup/teardown
+packets-color-local = ARP/DHCP/SSDP/NTP
+packets-live = Live
+filter-error-at = Error at position { $pos }: { $message }
+filter-error-unknown = unknown field or protocol "{ $name }"
+filter-error-missing = a field or value is missing here
+filter-error-value = "{ $value }" does not fit { $field }
+filter-error-operator = "{ $op }" does not work with { $field }
+filter-error-unexpected = "{ $text }" is not expected here (and/or missing?)
+filter-error-close = the parenthesis is not closed
+filter-error-string = the quotation mark is not closed
+filter-error-complex = the filter is too long or too deeply nested
+packet-number = No.
+packet-time = Time (s)
+packet-length = Length
+packet-info = Info
+packet-title = Packet { $number }
+packet-prev = Previous
+packet-next = Next
+packet-connection = Go to connection
+stream-title = Follow stream
+stream-packets = Packets of this connection
+stream-text = Text
+stream-both = Both directions
+stream-counts = { $bytes } in { $packets } packets
+stream-gap = … { $bytes } bytes missing (not captured or already dropped) …
+stream-empty = This connection has no payload in the stored packets.
+stream-headers-only = Only headers are stored, so the payload is missing.
+stream-cut = Showing the first MiB; the PCAP download contains everything.
+packet-stream = Follow stream
+packet-filter-conversation = Filter: this connection
+packet-truncated = The packet was not captured completely.
+packet-truncated-headers = Only the headers of this packet are stored (setting "Headers only").
+packet-layers = Layers
+packet-bytes = Bytes
+packet-hex-cut = Showing the first { $bytes } bytes; the PCAP download contains the whole packet.
+packet-assembled = Assembled with packets { $packets }: the bytes from { $offset } on come from these packets.
+packet-acks = ← ACK for packet { $packet } (after { $time })
+packet-acked-by = → acknowledged in packet { $packet } (after { $time })
+packet-answers = ← response to packet { $packet } (after { $time })
+packet-answered-by = → answered in packet { $packet } (after { $time })
+host-address = Address
+host-rdns = Reverse DNS
+host-asn = Autonomous system
+host-country = Country
+latency = Latency
+latency-measure = measure
+latency-measuring = measuring …
+latency-ms = { $ms } ms
+latency-failed = Measurement failed: { $error }
+
+## Notifications
+notifications-subtitle = Events of the running capture.
+notifications-settings = Notification settings
+notifications-clear = Clear all
+notifications-none-active = No notification is switched on.
+notifications-count = { $count ->
+    [one] 1 notification
+   *[other] { $count } notifications
+}
+notifications-kept = showing the latest { $count }
+notifications-empty = No notifications yet.
+notification-favorite = Traffic of a favorite
+notification-favorite-text = { $name }: { $data }
+
+## Settings
+settings-subtitle = Apply to all captures.
+settings-display = Display
+settings-language = Language
+language-browser = Same as the browser
+settings-page-size = Connections per page
+settings-sound = Sound
+settings-favorite-notification = Notify when a favorite exchanges data
+settings-favorite-hint = Favorites are hosts and programs (star in the lists) and single IP addresses. A notification comes as soon as a favorite exchanges data.
+settings-favorite-addresses = Favorite IP addresses
+settings-favorite-addresses-hint = One address per line (IPv4 or IPv6). Also with the star on the page of a connection.
+settings-addresses-invalid = Not saved, no IP address: { $words }
+settings-volume = Volume
+settings-sound-hint = The sound plays in open openpacketmon pages once you have clicked into the page.
+settings-geo = Geolocation
+settings-geo-country = Countries
+settings-geo-asn = Network operators (AS)
+settings-geo-none = no database
+settings-geo-built = built { $date } ({ $days ->
+    [one] one day ago
+   *[other] { $days } days ago
+})
+settings-geo-old = – outdated, please download again
+settings-geo-download = Download geolocation databases from DB-IP
+settings-geo-downloading = Downloading …
+settings-geo-download-hint = Downloads the free databases “IP to Country Lite” and “IP to ASN Lite” (CC BY 4.0, about 10 MB together) from db-ip.com to { $dir }. Only then does openpacketmon contact db-ip.com; a new edition comes out every month. The data applies to addresses found afterwards; restart the capture for the earlier ones.
+settings-geo-failed = Download failed (no connection to db-ip.com or an unexpected file). The log of openpacketmon has the details.
+settings-geo-busy = The geolocation databases are already being downloaded.
+settings-mmdb-country = Own country database (MMDB, optional)
+settings-mmdb-asn = Own ASN database (MMDB, optional)
+settings-mmdb-hint = Path to a file of your own, e.g. MaxMind GeoLite2 or IPinfo Lite. Leave empty: the data downloaded from DB-IP, otherwise the files of geoipupdate in /var/lib/GeoIP.
+settings-packet-store = Packet store
+settings-packets-enabled = Store packets (packet list, packet details, PCAP download)
+settings-packets-max = Packets at most
+settings-packets-headers = Store headers only (the first 128 bytes of each packet)
+settings-packets-hint = Applies from the next capture (can also be chosen on the Capture page). With "Headers only", contents like the TLS server name (SNI) are partly missing and Follow stream is incomplete. The packets are kept in memory only, 512 MiB at most; the oldest ones are dropped first.
+settings-desktop = Desktop
+settings-autostart = Start in the tray at sign-in
+settings-autostart-hint = Starts openpacketmon with the desktop session as an icon in the tray; the icon opens the window. The capture goes on when the window is closed.
+settings-updates = Updates
+settings-update-checks = Check for a new version at startup
+settings-update-hint = Asks GitHub for the latest version of openpacketmon; no data about your network is sent.
+sound-gulp = Gulp
+sound-pop = Pop
+sound-swhoosh = Swoosh
+sound-none = No sound
+
+# quit
+quit-title = Program
+quit-hint = Quits openpacketmon: the running capture ends, the settings stay saved. If openpacketmon runs as a service (systemctl --user), it only starts again with “systemctl --user start openpacketmon”.
+quit-button = Quit openpacketmon
+quit-done-title = openpacketmon has quit
+quit-done-text = You can close this window. To start again, open openpacketmon from the application menu or run this command:
+
+# Window and tray icon (openpacketmon-app)
+app-open = Open openpacketmon
+app-browser = Open in the browser
+app-quit = Quit openpacketmon
+app-saved = Saved to { $path }
+
+## Statistics
+stats-subtitle = Protocols, TCP problems and response times of the stored packets, for all of them or those of the display filter.
+stats-show-packets = Show packets
+stats-filter-placeholder = Display filter, e.g. ip.addr == 192.168.1.20 or tcp.port == 443 (empty: all packets)
+stats-packets = Packets
+stats-bytes = Bytes
+stats-duration = Time span
+stats-packet-rate = Avg. packets
+stats-bit-rate = Avg. data rate
+stats-per-second = { $value }/s
+stats-chart = Traffic of the selection
+stats-hierarchy = Protocol hierarchy
+stats-hierarchy-hint = Each line counts the packets that contain the protocol, with their whole length. A click shows the packets.
+stats-empty = No packets.
+stats-findings = TCP analysis
+stats-findings-hint = Retransmissions, gaps and duplicate ACKs point to packet loss, a zero window to an overloaded receiver. A click shows the packets.
+stats-retransmission = Retransmitted segments
+stats-lost-segment = Gaps (previous segment missing)
+stats-out-of-order = Segments out of order
+stats-duplicate-ack = Duplicate ACKs
+stats-zero-window = Zero windows (receiver full)
+stats-reset = Resets (RST)
+stats-keep-alive = Keep-alives
+stats-window-update = Window updates
+stats-times = Response times
+stats-times-hint = TCP handshake: SYN to the ACK of the client. ACK: time until a segment is acknowledged (measured at this computer). DNS: query to response.
+stats-count = Count
+stats-average = Average
+stats-max = Maximum
+stats-handshake = TCP handshake
+stats-ack-rtt = TCP acknowledgment (ACK)
+stats-dns-time = DNS response

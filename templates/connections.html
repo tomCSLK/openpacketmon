@@ -1,0 +1,81 @@
+{% extends "app.html" %}
+{% block title %}{{ t.get("nav-connections") }} · openpacketmon{% endblock %}
+{% block page_class %} wide{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h1>{{ t.get("nav-connections") }}</h1>
+    <p class="subtitle">{{ t.get("connections-subtitle") }}</p>
+  </div>
+  <div class="actions">{% include "unit_select.html" %}</div>
+</div>
+{% if !running %}<p class="notice">{{ t.get("no-capture") }} <a href="/">{{ t.get("no-capture-start") }}</a></p>{% endif %}
+<form method="get" action="/connections" class="filter-bar" data-filter-form>
+  <input type="search" name="f" value="{{ query.f }}" placeholder="{{ t.get("connections-filter-placeholder") }}" aria-label="{{ t.get("connections-filter") }}"
+    autocomplete="off" spellcheck="false" data-filter-input data-filter-kind="connections"{% if error.is_some() %} class="invalid"{% else if filtered %} class="valid"{% endif %}>
+  <select name="sort" aria-label="{{ t.get("sort") }}">
+    <option value=""{% if query.sort.is_empty() %} selected{% endif %}>{{ t.get("sort-recent") }}</option>
+    <option value="desc"{% if query.sort == "desc" %} selected{% endif %}>{{ t.get("sort-desc") }}</option>
+    <option value="asc"{% if query.sort == "asc" %} selected{% endif %}>{{ t.get("sort-asc") }}</option>
+  </select>
+  {% if let Some(size) = query.size %}<input type="hidden" name="size" value="{{ size }}">{% endif %}
+  <button type="submit">{{ t.get("apply") }}</button>
+  {% if filtered || !query.sort.is_empty() %}<a class="button secondary" href="/connections">{{ t.get("filter-reset") }}</a>{% endif %}
+</form>
+<p class="filter-error" data-filter-error{% if error.is_none() %} hidden{% endif %}>{% if let Some(e) = error %}{{ e }}{% endif %}</p>
+<details class="filter-help">
+  <summary>{{ t.get("connections-filter-help") }}</summary>
+  <div class="filter-help-body">
+    <p>{{ t.get("connections-filter-help-text") }}</p>
+    <p class="filter-examples">{% for e in examples %}<a href="/connections?f={{ e|urlencode }}"><code>{{ e }}</code></a> {% endfor %}</p>
+    <p><strong>{{ t.get("packets-filter-protocols") }}</strong> <code>{{ protocols }}</code></p>
+    <p><strong>{{ t.get("packets-filter-fields") }}</strong> <code class="names">{{ fields }}</code></p>
+  </div>
+</details>
+<section class="card flush" data-fragment="connections">
+  <div class="card-head">
+    <h2>{% if total == 0 %}{{ t.get("connections-none") }}{% else %}{{ t.get2("connections-range", "from", first_row, "to", last_row) }} {{ t.get2("connections-of", "total", total, "data", matching_data.as_str()) }}{% endif %}</h2>
+    <form method="get" action="/connections" class="card-tools">
+      {% for (name, value) in hidden_filters %}<input type="hidden" name="{{ name }}" value="{{ value }}">{% endfor %}
+      <label class="rows-select">{{ t.get("rows-per-page") }}
+        <select name="size" data-autosubmit>{% for (size, selected) in sizes %}<option value="{{ size }}"{% if selected %} selected{% endif %}>{{ size }}</option>{% endfor %}</select>
+      </label>
+      <noscript><button type="submit" class="secondary small">{{ t.get("apply") }}</button></noscript>
+    </form>
+  </div>
+  {% if rows.is_empty() %}
+  <p class="empty">{% if filtered %}{{ t.get("connections-none-filtered") }}{% else %}{{ t.get("connections-empty") }}{% endif %}</p>
+  {% else %}
+  <div class="table-wrap">
+  <table class="connections">
+    <thead><tr>
+      <th>{{ t.get("conn-source") }}</th><th></th><th>{{ t.get("conn-destination") }}</th><th>{{ t.get("conn-protocol") }}</th><th>{{ t.get("conn-service") }}</th>
+      {% if programs %}<th>{{ t.get("conn-program") }}</th>{% endif %}
+      <th>{{ t.get("conn-host") }}</th><th class="right">{{ t.get("conn-packets") }}</th><th class="right">{{ t.get("conn-data") }}</th><th class="right">{{ t.get("conn-last") }}</th>
+    </tr></thead>
+    <tbody>
+    {% for r in rows %}
+      <tr>
+        <td class="nowrap"><a href="{{ r.href }}"><code>{{ r.src }}</code></a></td>
+        <td class="dir{% if r.outgoing %} out{% endif %}" title="{% if r.outgoing %}{{ t.get("direction-out") }}{% else %}{{ t.get("direction-in") }}{% endif %}">→</td>
+        <td class="nowrap"><a href="{{ r.href }}"><code>{{ r.dst }}</code></a></td>
+        <td>{{ r.proto }}</td>
+        {% if r.service_na %}<td class="faint" title="{{ r.service }}">–</td>{% else %}<td class="nowrap">{{ r.service }}</td>{% endif %}
+        {% if programs %}{% if r.program_na %}<td class="faint" title="{{ r.program }}">–</td>{% else %}<td class="clip" title="{{ r.program }}">{{ r.program }}</td>{% endif %}{% endif %}
+        <td class="clip" title="{{ r.host }}{% if !r.host_sub.is_empty() %} · {{ r.host_sub }}{% endif %}">{{ r.host }}{% if !r.host_sub.is_empty() %}<span class="sub">{{ r.host_sub }}</span>{% endif %}</td>
+        <td class="right num nowrap">{{ r.packets }}</td>
+        <td class="right num nowrap">{{ r.data }}</td>
+        <td class="right nowrap small">{{ r.last|safe }}</td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  </div>
+  {% endif %}
+  {% if pages > 1 %}
+  <nav class="pager" aria-label="{{ t.get("pages") }}">
+  {% include "pager.html" %}
+  </nav>
+  {% endif %}
+</section>
+{% endblock %}

@@ -1,0 +1,95 @@
+openpacketmon
+Copyright (c) 2026 Thomas Cieslik
+
+openpacketmon is a fork of Sniffnet (https://github.com/GyulyVGC/sniffnet),
+Copyright (c) 2022 Giuliano Bellini and the Sniffnet contributors,
+licensed under the MIT License or the Apache License, Version 2.0, at your option
+(LICENSE-MIT, LICENSE-APACHE). openpacketmon is licensed the same way.
+
+It starts from Sniffnet commit ab4bf739d464 (2026-10-20, after Sniffnet v1.5.1).
+Sniffnet's desktop interface, charts, sounds, fonts, icons, translations,
+built-in MaxMind GeoLite2 databases and project files were removed; the browser interface, the window program, the
+packet store, the dissectors, the display filter, the TCP analysis and the
+statistics are new. CHANGELOG.md describes the changes.
+
+Files of Sniffnet that were changed for openpacketmon
+-----------------------------------------------------
+
+As required by section 4(b) of the Apache License, these files carry a notice at
+their top that they were modified ("Modified for openpacketmon"):
+
+  .gitattributes
+  .gitignore
+  Cargo.toml
+  build.rs
+  lib/sniffnet-packet-parser/Cargo.toml
+  resources/packaging/linux/openpacketmon.desktop  (from resources/packaging/linux/sniffnet.desktop)
+  resources/packaging/linux/scripts/postinst
+  resources/services/categories.txt
+  src/cli/mod.rs
+  src/config/conf.rs  (from src/gui/types/conf.rs)
+  src/config/config_device.rs  (from src/networking/types/config_device.rs)
+  src/config/config_updates.rs  (from src/gui/types/config_updates.rs)
+  src/config/export_pcap.rs  (from src/gui/types/export_pcap.rs)
+  src/config/favorite.rs  (from src/gui/types/favorite.rs)
+  src/config/filters.rs  (from src/gui/types/filters.rs)
+  src/config/ipfix_socket.rs  (from src/gui/types/ipfix_socket.rs)
+  src/config/mod.rs  (from src/gui/types/mod.rs)
+  src/config/settings.rs  (from src/gui/types/settings.rs)
+  src/countries/mod.rs
+  src/engine/state.rs  (from src/gui/sniffer.rs)
+  src/engine/traffic_history.rs  (from src/chart/types/traffic_chart.rs)
+  src/main.rs
+  src/mmdb/asn.rs
+  src/mmdb/country.rs
+  src/mmdb/mod.rs
+  src/mmdb/types/mmdb_reader.rs
+  src/networking/capture.rs
+  src/networking/ipfix/collect.rs
+  src/networking/manage_packets.rs
+  src/networking/parse_packets.rs
+  src/networking/traffic_preview.rs
+  src/networking/types/capture_context.rs
+  src/networking/types/data_representation.rs
+  src/networking/types/host.rs
+  src/networking/types/info_address_port_pair.rs
+  src/networking/types/info_traffic.rs
+  src/networking/types/mod.rs
+  src/networking/types/program.rs
+  src/networking/types/program_lookup.rs
+  src/networking/types/service.rs
+  src/networking/types/service_category.rs
+  src/notifications/notify_and_log.rs
+  src/notifications/types/logged_notification.rs
+  src/notifications/types/notifications.rs
+  src/notifications/types/sound.rs
+  src/report/mod.rs
+  src/report/types/mod.rs
+  src/report/types/sort_type.rs
+  src/utils/check_updates.rs
+  src/utils/formatted_strings.rs
+  src/utils/types/mod.rs
+  src/utils/types/timestamp.rs
+
+These changed files cannot carry such a line (licenses, generated or plain text
+files); they are listed here instead:
+
+  CHANGELOG.md
+  Cargo.lock
+  LICENSE-MIT
+  README.md
+  resources/packaging/LICENSE
+  resources/packaging/linux/description.txt
+
+This file has the same name as in Sniffnet but none of its content: Sniffnet
+took it from nmap (Nmap Public Source License), openpacketmon generates it with
+dev/update-services.py from the IANA Service Name and Transport Protocol Port
+Number Registry (public domain, CC0 1.0):
+
+  resources/services/services.txt
+
+All other files of Sniffnet that are part of openpacketmon are unchanged; files
+without a notice and not listed above are new in openpacketmon.
+
+Third-party software and data used by openpacketmon are listed in
+THIRD-PARTY-LICENSES.txt.

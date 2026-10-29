@@ -1,0 +1,20 @@
+[package]
+name = "openpacketmon-app"
+version = "0.2.5"
+description = "Window and tray icon for openpacketmon"
+authors.workspace = true
+edition.workspace = true
+homepage.workspace = true
+repository.workspace = true
+license.workspace = true
+publish = false
+
+[lints]
+workspace = true
+
+[dependencies]
+png = "0.18.1"
+serde_json = "1.0.154"
+tao = { version = "0.37.2", default-features = false, features = ["rwh_06", "x11"] }
+tray-icon = "0.26.1"
+wry = "0.57.1"

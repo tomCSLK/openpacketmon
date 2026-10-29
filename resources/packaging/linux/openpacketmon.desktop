@@ -1,0 +1,14 @@
+# Modified for openpacketmon (2026), see NOTICE. Based on `resources/packaging/linux/sniffnet.desktop` of Sniffnet
+# (https://github.com/GyulyVGC/sniffnet), Copyright (c) 2022 Giuliano Bellini, MIT OR Apache-2.0.
+
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=openpacketmon
+Comment=Monitor your network traffic
+Categories=Network;Utility;
+Icon=openpacketmon
+Exec=/usr/bin/openpacketmon-app
+StartupWMClass=openpacketmon-app
+Terminal=false
+Keywords=traffic;inspect;monitor;internet;network;packet;

@@ -1,0 +1,51 @@
+{% extends "app.html" %}
+{% block title %}{{ t.get1("packet-title", "number", number) }} · openpacketmon{% endblock %}
+{% block page_head %}<script src="/static/packets.js" defer></script>{% endblock %}
+{% block page_class %} wide{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <p class="breadcrumb"><a href="{{ back }}">{{ t.get("nav-packets") }}</a></p>
+    <h1>{{ t.get1("packet-title", "number", number) }} <span class="tag">{{ protocol }}</span></h1>
+    <p class="subtitle">{{ info }} · {{ time|safe }}</p>
+  </div>
+  <div class="actions">
+    {% if let Some(href) = prev %}<a class="button secondary" href="{{ href }}">{{ t.get("packet-prev") }}</a>{% endif %}
+    {% if let Some(href) = next %}<a class="button secondary" href="{{ href }}">{{ t.get("packet-next") }}</a>{% endif %}
+    {% if let Some(href) = stream %}<a class="button secondary" href="{{ href }}">{{ t.get("packet-stream") }}</a>{% endif %}
+    {% if let Some(href) = conversation %}<a class="button secondary" href="{{ href }}">{{ t.get("packet-filter-conversation") }}</a>{% endif %}
+    {% if let Some(href) = connection %}<a class="button secondary" href="{{ href }}">{{ t.get("packet-connection") }}</a>{% endif %}
+  </div>
+</div>
+{% if !related.is_empty() %}<p class="related">{% for (label, href) in related %}<a href="{{ href }}">{{ label }}</a>{% endfor %}</p>{% endif %}
+{% if let Some(note) = assembled %}<p class="notice">{{ note }}</p>{% endif %}
+{% if truncated %}<p class="notice">{% if headers_only %}{{ t.get("packet-truncated-headers") }}{% else %}{{ t.get("packet-truncated") }}{% endif %}</p>{% endif %}
+<div class="packet-view">
+  <section class="card">
+    <div class="card-head"><h2>{{ t.get("packet-layers") }}</h2></div>
+    <div class="card-body layers">
+    {% for layer in layers %}
+      <details class="layer" open>
+        <summary data-range="{{ layer.range.start }}-{{ layer.range.end }}">{{ layer.title }}</summary>
+        <ul>
+        {% for f in layer.fields %}
+          <li><span class="field" data-range="{{ f.range.start }}-{{ f.range.end }}"><span class="fname">{{ f.name }}</span>{% if !f.value.is_empty() %}: {{ f.value }}{% endif %}</span>
+          {% if !f.children.is_empty() %}<ul>{% for c in f.children %}<li><span class="field" data-range="{{ c.range.start }}-{{ c.range.end }}"><span class="fname">{{ c.name }}</span>{% if !c.value.is_empty() %}: {{ c.value }}{% endif %}</span>
+            {% if !c.children.is_empty() %}<ul>{% for g in c.children %}<li><span class="field" data-range="{{ g.range.start }}-{{ g.range.end }}"><span class="fname">{{ g.name }}</span>{% if !g.value.is_empty() %}: {{ g.value }}{% endif %}</span></li>{% endfor %}</ul>{% endif %}</li>{% endfor %}</ul>{% endif %}
+          </li>
+        {% endfor %}
+        </ul>
+      </details>
+    {% endfor %}
+    </div>
+  </section>
+  <section class="card">
+    <div class="card-head"><h2>{{ t.get("packet-bytes") }}</h2></div>
+    <div class="card-body hex" aria-label="{{ t.get("packet-bytes") }}">
+    {% for line in hex %}<div class="hex-line"><span class="hex-off">{{ line.offset }}</span><span class="hex-bytes">{% for (i, b) in line.bytes %}<span data-i="{{ i }}">{{ b }}</span>{% endfor %}</span><span class="hex-text">{% for (i, c) in line.text %}<span data-i="{{ i }}">{{ c }}</span>{% endfor %}</span></div>
+    {% endfor %}
+    {% if let Some(note) = hex_cut %}<p class="hint">{{ note }}</p>{% endif %}
+    </div>
+  </section>
+</div>
+{% endblock %}

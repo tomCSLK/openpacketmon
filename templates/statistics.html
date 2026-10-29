@@ -1,0 +1,89 @@
+{% extends "app.html" %}
+{% block title %}{{ t.get("nav-statistics") }} · openpacketmon{% endblock %}
+{% block page_class %} wide{% endblock %}
+{% block page_head %}<link rel="stylesheet" href="/static/vendor/uplot/uPlot.min.css"><script src="/static/vendor/uplot/uPlot.iife.min.js" defer></script><script src="/static/packets.js" defer></script><script src="/static/statistics.js" defer></script>{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h1>{{ t.get("nav-statistics") }}</h1>
+    <p class="subtitle">{{ t.get("stats-subtitle") }}</p>
+  </div>
+  <div class="actions"><a class="button secondary" href="{{ packets_href }}">{{ t.get("stats-show-packets") }}</a></div>
+</div>
+{% if !running %}<p class="notice">{{ t.get("no-capture") }} <a href="/">{{ t.get("no-capture-start") }}</a></p>
+{% else if !unavailable.is_empty() %}<p class="notice">{{ unavailable }}</p>{% endif %}
+<form method="get" action="/statistics" class="filter-bar" data-filter-form>
+  <input type="search" name="f" value="{{ filter }}" placeholder="{{ t.get("stats-filter-placeholder") }}" aria-label="{{ t.get("packets-filter") }}"
+    autocomplete="off" spellcheck="false" data-filter-input{% if error.is_some() %} class="invalid"{% else if !filter.trim().is_empty() %} class="valid"{% endif %}>
+  <button type="submit">{{ t.get("apply") }}</button>
+  {% if !filter.is_empty() %}<a class="button secondary" href="/statistics">{{ t.get("filter-reset") }}</a>{% endif %}
+</form>
+<p class="filter-error" data-filter-error{% if error.is_none() %} hidden{% endif %}>{% if let Some(e) = error %}{{ e }}{% endif %}</p>
+{% if error.is_none() %}
+<div class="stats">
+  <div class="tiles"{% if live %} data-fragment="stats-tiles"{% endif %}>
+    {% for (label, value) in summary %}
+    <div class="tile"><div class="tile-value">{{ value }}</div><div class="tile-label">{{ label }}</div></div>
+    {% endfor %}
+  </div>
+  <section class="card">
+    <div class="card-head"><h2>{{ t.get("stats-chart") }}</h2>
+      <div class="segmented small" role="group" aria-label="{{ t.get("unit") }}" data-stats-unit>
+        <button type="button" data-unit="bits" aria-pressed="true">{{ t.get("unit-bits") }}</button>
+        <button type="button" data-unit="packets" aria-pressed="false">{{ t.get("unit-packets") }}</button>
+      </div>
+    </div>
+    <div class="card-body"><div id="stats-chart" data-empty="{{ t.get("chart-empty") }}"></div></div>
+    <script type="application/json" id="stats-data"{% if live %} data-fragment="stats-data"{% endif %}>{{ chart|safe }}</script>
+  </section>
+  <section class="card flush"{% if live %} data-fragment="stats-hierarchy"{% endif %}>
+    <div class="card-head"><h2>{{ t.get("stats-hierarchy") }}</h2></div>
+    {% if empty %}<p class="empty">{{ t.get("stats-empty") }}</p>{% else %}
+    <div class="table-wrap">
+    <table class="hierarchy">
+      <thead><tr><th>{{ t.get("conn-protocol") }}</th><th class="right">{{ t.get("stats-packets") }}</th><th class="right">%</th><th class="bar-col"></th><th class="right">{{ t.get("stats-bytes") }}</th><th class="right">%</th></tr></thead>
+      <tbody>
+      {% for r in hierarchy %}
+        <tr><td class="depth-{{ r.depth }}"><a href="{{ r.href }}"><code>{{ r.name }}</code></a></td>
+          <td class="right nowrap num">{{ r.packets }}</td><td class="right nowrap num muted">{{ r.packets_share }}</td>
+          <td class="bar-col"><svg class="bar" viewBox="0 0 100 8" preserveAspectRatio="none" aria-hidden="true"><rect class="bar-in" width="{{ r.bar }}" height="8"/></svg></td>
+          <td class="right nowrap num">{{ r.bytes }}</td><td class="right nowrap num muted">{{ r.bytes_share }}</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    </div>
+    <p class="card-foot hint">{{ t.get("stats-hierarchy-hint") }}</p>
+    {% endif %}
+  </section>
+  <div class="cols">
+    <section class="card flush"{% if live %} data-fragment="stats-findings"{% endif %}>
+      <div class="card-head"><h2>{{ t.get("stats-findings") }}</h2></div>
+      <div class="table-wrap">
+      <table class="findings">
+        <tbody>
+        {% for f in findings %}
+          <tr{% if f.problem && f.href.is_some() %} class="problem"{% endif %}><td>{% if let Some(href) = f.href %}<a href="{{ href }}">{{ f.label }}</a>{% else %}{{ f.label }}{% endif %}</td><td class="right nowrap num">{{ f.count }}</td></tr>
+        {% endfor %}
+        </tbody>
+      </table>
+      </div>
+      <p class="card-foot hint">{{ t.get("stats-findings-hint") }}</p>
+    </section>
+    <section class="card flush"{% if live %} data-fragment="stats-times"{% endif %}>
+      <div class="card-head"><h2>{{ t.get("stats-times") }}</h2></div>
+      <div class="table-wrap">
+      <table class="times">
+        <thead><tr><th></th><th class="right">{{ t.get("stats-count") }}</th><th class="right">{{ t.get("stats-average") }}</th><th class="right">{{ t.get("stats-max") }}</th></tr></thead>
+        <tbody>
+        {% for r in times %}
+          <tr><td>{% if let Some(href) = r.href %}<a href="{{ href }}">{{ r.label }}</a>{% else %}{{ r.label }}{% endif %}</td><td class="right nowrap num">{{ r.count }}</td><td class="right nowrap num">{{ r.average }}</td><td class="right nowrap num">{{ r.max }}</td></tr>
+        {% endfor %}
+        </tbody>
+      </table>
+      </div>
+      <p class="card-foot hint">{{ t.get("stats-times-hint") }}</p>
+    </section>
+  </div>
+</div>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,37 @@
+{% extends "app.html" %}
+{% block title %}{{ title }} · openpacketmon{% endblock %}
+{% block page_class %} wide{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h1>{{ title }}</h1>
+    <p class="subtitle">{{ subtitle }}</p>
+  </div>
+  <div class="actions">{% include "unit_select.html" %}</div>
+</div>
+{% if !running %}<p class="notice">{{ t.get("no-capture") }} <a href="/">{{ t.get("no-capture-start") }}</a></p>{% endif %}
+{% if unsupported %}<p class="notice">{{ t.get("programs-unsupported") }}</p>{% endif %}
+{% if kind == "host" && layout.geo_missing %}<p class="notice">{{ t.get("geo-missing") }} <a href="/settings#geo">{{ t.get("geo-missing-link") }}</a></p>{% endif %}
+<section class="card flush">
+  <div class="card-head">
+    <h2>{{ t.get1("entries-count", "count", total) }}</h2>
+    <form method="get" action="/{{ kind }}s" class="card-tools search">
+      <input type="search" name="q" value="{{ q }}" placeholder="{{ t.get("entries-filter") }}" aria-label="{{ t.get("entries-filter") }}">
+      <select name="sort" aria-label="{{ t.get("sort") }}">
+        <option value="desc"{% if !ascending %} selected{% endif %}>{{ t.get("sort-desc") }}</option>
+        <option value="asc"{% if ascending %} selected{% endif %}>{{ t.get("sort-asc") }}</option>
+      </select>
+      {% if kind != "service" %}<label class="inline"><input type="checkbox" name="favorites" value="1"{% if only_favorites %} checked{% endif %}> {{ t.get("only-favorites") }}</label>{% endif %}
+      <button type="submit" class="secondary small">{{ t.get("apply") }}</button>
+    </form>
+  </div>
+  <div data-fragment="entries">
+  {% if rows.is_empty() %}
+    <p class="empty">{{ t.get("entries-empty") }}</p>
+  {% else %}
+    <div class="table-wrap">{% include "entry_table.html" %}</div>
+    {% if total > rows.len() %}<p class="muted small card-body">{{ t.get2("entries-truncated", "shown", rows.len(), "total", total) }}</p>{% endif %}
+  {% endif %}
+  </div>
+</section>
+{% endblock %}

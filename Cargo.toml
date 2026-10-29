@@ -1,0 +1,161 @@
+# Modified for openpacketmon (2026), see NOTICE. Based on `Cargo.toml` of Sniffnet
+# (https://github.com/GyulyVGC/sniffnet), Copyright (c) 2022 Giuliano Bellini, MIT OR Apache-2.0.
+
+[package]
+name = "openpacketmon"
+version = "0.2.5"
+description = "Network traffic monitor with a browser UI, based on Sniffnet"
+readme = "README.md"
+keywords = ["network", "packet", "traffic", "monitor", "pcap"]
+categories = ["network-programming", "visualization"]
+authors.workspace = true
+edition.workspace = true
+homepage.workspace = true
+repository.workspace = true
+license.workspace = true
+publish = false
+
+#═══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+
+[profile.release]
+opt-level = 3
+lto = true
+strip = true
+codegen-units = 1
+
+#═══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+
+[lints]
+workspace = true
+
+#═══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+
+[dependencies]
+
+sniffnet-packet-parser = { path = "lib/sniffnet-packet-parser", version = "0.2.1" }
+
+pcap.workspace = true
+
+async-channel = "2.5.0"
+askama = "0.16.1"
+axum = { version = "0.8.9", default-features = false, features = ["form", "http1", "json", "query", "tokio"] }
+clap = { version = "4.6.7", features = ["derive"] }
+confy = "2.0.0"
+ctrlc = { version = "3.5.2", features = ["termination"] }
+dns-lookup = "4.0.2"
+flate2 = "1.1.10"
+fluent-bundle = "0.16.0"
+hyper = { version = "1.12.0", features = ["http1", "server"] }
+hyper-util = { version = "0.1.21", features = ["tokio", "service"] }
+ipnet = "2.12.2"
+jiff = "0.2.38"
+listeners = "0.6.1"
+maxminddb = "0.32.0"
+nom = "8.0.0"
+phf = "0.14.0"
+phf_shared = "0.14.0"
+rand = "0.9.5"
+rust-embed = { version = "8.13.0", features = ["mime-guess"] }
+reqwest = { version = "0.13.5", features = ["json"] }
+semver = "1.0.28"
+serde = { version = "1.0.229", features = ["derive"] }
+serde_json = { version = "1.0.154", features = ["preserve_order"] }
+subtle = "2.6.1"
+surge-ping = "0.9.1"
+tokio = { version = "1.53.3", features = ["macros", "fs", "rt-multi-thread", "signal", "sync", "time", "net"] }
+toml = "1.1.8"
+tower-http = { version = "0.6.11", features = ["set-header"] }
+unic-langid = "0.9.6"
+
+#───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+[dev-dependencies]
+rstest = "0.27.0"
+serde_test = "1.0.177"
+serial_test = { version = "4.0.1", default-features = false }
+tower = { version = "0.5.3", features = ["util"] }
+http-body-util = "0.1.5"
+
+#───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+[build-dependencies]
+
+sniffnet-packet-parser = { path = "lib/sniffnet-packet-parser", version = "0.2.1", default-features = false }
+
+phf_codegen = "0.14.0"
+phf_shared = "0.14.0"
+rustrict = { version = "0.7.39", default-features = false, features = ["censor"] }
+
+#═══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+
+[package.metadata.deb]
+section = "Network"
+license-file = "resources/packaging/LICENSE"
+extended-description-file = "resources/packaging/linux/description.txt"
+maintainer-scripts = "resources/packaging/linux/scripts/"
+depends = "libpcap0.8, libgtk-3-0, libwebkit2gtk-4.1-0"
+recommends = "libayatana-appindicator3-1"
+assets = [
+    ["target/release/openpacketmon", "/usr/bin/", "755"],
+    ["target/release/openpacketmon-app", "/usr/bin/", "755"],
+    ["resources/packaging/linux/openpacketmon.desktop", "/usr/share/applications/", "644"],
+    ["resources/packaging/linux/openpacketmon.service", "/usr/lib/systemd/user/", "644"],
+    ["NOTICE", "/usr/share/doc/openpacketmon/", "644"],
+    ["THIRD-PARTY-LICENSES.txt", "/usr/share/doc/openpacketmon/", "644"],
+    ["resources/packaging/linux/graphics/openpacketmon_8x8.png", "/usr/share/icons/hicolor/8x8/apps/openpacketmon.png", "644"],
+    ["resources/packaging/linux/graphics/openpacketmon_16x16.png", "/usr/share/icons/hicolor/16x16/apps/openpacketmon.png", "644"],
+    ["resources/packaging/linux/graphics/openpacketmon_22x22.png", "/usr/share/icons/hicolor/22x22/apps/openpacketmon.png", "644"],
+    ["resources/packaging/linux/graphics/openpacketmon_24x24.png", "/usr/share/icons/hicolor/24x24/apps/openpacketmon.png", "644"],
+    ["resources/packaging/linux/graphics/openpacketmon_32x32.png", "/usr/share/icons/hicolor/32x32/apps/openpacketmon.png", "644"],
+    ["resources/packaging/linux/graphics/openpacketmon_36x36.png", "/usr/share/icons/hicolor/36x36/apps/openpacketmon.png", "644"],
+    ["resources/packaging/linux/graphics/openpacketmon_42x42.png", "/usr/share/icons/hicolor/42x42/apps/openpacketmon.png", "644"],
+    ["resources/packaging/linux/graphics/openpacketmon_48x48.png", "/usr/share/icons/hicolor/48x48/apps/openpacketmon.png", "644"],
+    ["resources/packaging/linux/graphics/openpacketmon_64x64.png", "/usr/share/icons/hicolor/64x64/apps/openpacketmon.png", "644"],
+    ["resources/packaging/linux/graphics/openpacketmon_72x72.png", "/usr/share/icons/hicolor/72x72/apps/openpacketmon.png", "644"],
+    ["resources/packaging/linux/graphics/openpacketmon_96x96.png", "/usr/share/icons/hicolor/96x96/apps/openpacketmon.png", "644"],
+    ["resources/packaging/linux/graphics/openpacketmon_128x128.png", "/usr/share/icons/hicolor/128x128/apps/openpacketmon.png", "644"],
+    ["resources/packaging/linux/graphics/openpacketmon_160x160.png", "/usr/share/icons/hicolor/160x160/apps/openpacketmon.png", "644"],
+    ["resources/packaging/linux/graphics/openpacketmon_192x192.png", "/usr/share/icons/hicolor/192x192/apps/openpacketmon.png", "644"],
+    ["resources/packaging/linux/graphics/openpacketmon_256x256.png", "/usr/share/icons/hicolor/256x256/apps/openpacketmon.png", "644"],
+    ["resources/packaging/linux/graphics/openpacketmon_384x384.png", "/usr/share/icons/hicolor/384x384/apps/openpacketmon.png", "644"],
+    ["resources/packaging/linux/graphics/openpacketmon_512x512.png", "/usr/share/icons/hicolor/512x512/apps/openpacketmon.png", "644"],
+    ["resources/packaging/linux/graphics/openpacketmon_1024x1024.png", "/usr/share/icons/hicolor/1024x1024/apps/openpacketmon.png", "644"]
+]
+
+#═══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+
+[workspace]
+members = [".", "app", "lib/sniffnet-packet-parser"]
+default-members = [".", "app", "lib/sniffnet-packet-parser"]
+
+#───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+[workspace.package]
+authors = ["Thomas Cieslik", "Giuliano Bellini <gyulyvgc99@gmail.com> (Sniffnet)"]
+edition = "2024"
+homepage = "https://github.com/tomCSLK/openpacketmon"
+repository = "https://github.com/tomCSLK/openpacketmon"
+license = "MIT OR Apache-2.0"
+
+#───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+[workspace.dependencies]
+etherparse = "0.21.0"
+pcap = "2.5.0"
+
+#───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+[workspace.lints.rust]
+unsafe_code = "forbid"
+
+[workspace.lints.clippy]
+pedantic = { level = "warn", priority = -1 }
+unwrap_used = "warn"
+expect_used = "warn"
+panic = "warn"
+todo = "warn"
+unimplemented = "warn"
+unreachable = "warn"
+dbg_macro = "warn"
+print_stdout = "warn"
+print_stderr = "warn"

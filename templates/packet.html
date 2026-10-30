@@ -10,11 +10,16 @@
     <p class="subtitle">{{ info }} · {{ time|safe }}</p>
   </div>
   <div class="actions">
-    {% if let Some(href) = prev %}<a class="button secondary" href="{{ href }}">{{ t.get("packet-prev") }}</a>{% endif %}
-    {% if let Some(href) = next %}<a class="button secondary" href="{{ href }}">{{ t.get("packet-next") }}</a>{% endif %}
-    {% if let Some(href) = stream %}<a class="button secondary" href="{{ href }}">{{ t.get("packet-stream") }}</a>{% endif %}
-    {% if let Some(href) = conversation %}<a class="button secondary" href="{{ href }}">{{ t.get("packet-filter-conversation") }}</a>{% endif %}
-    {% if let Some(href) = connection %}<a class="button secondary" href="{{ href }}">{{ t.get("packet-connection") }}</a>{% endif %}
+    {# browsing the list, then the jumps to what belongs to the connection of the packet #}
+    <span class="segmented">
+      {% if let Some(href) = prev %}<a class="button secondary" href="{{ href }}">‹ {{ t.get("packet-prev") }}</a>{% else %}<span class="button secondary" aria-disabled="true">‹ {{ t.get("packet-prev") }}</span>{% endif %}
+      {% if let Some(href) = next %}<a class="button secondary" href="{{ href }}">{{ t.get("packet-next") }} ›</a>{% else %}<span class="button secondary" aria-disabled="true">{{ t.get("packet-next") }} ›</span>{% endif %}
+    </span>
+    {% if let Some(href) = connection %}<span class="actions-sep" aria-hidden="true"></span><span class="actions-label">{{ t.get("packet-connection-label") }}</span>
+    {% if let Some(packets) = conversation %}<a class="button secondary" href="{{ packets }}" title="{{ t.get("connection-packets-hint") }}">{{ t.get("nav-packets") }}</a>{% endif %}
+    {% if let Some(statistics) = statistics %}<a class="button secondary" href="{{ statistics }}" title="{{ t.get("connection-statistics-hint") }}">{{ t.get("nav-statistics") }}</a>{% endif %}
+    {% if let Some(stream) = stream %}<a class="button secondary" href="{{ stream }}" title="{{ t.get("stream-title") }}">{{ t.get("packet-stream") }}</a>{% endif %}
+    <a class="button secondary" href="{{ href }}">{{ t.get("packet-connection") }}</a>{% endif %}
   </div>
 </div>
 {% if !related.is_empty() %}<p class="related">{% for (label, href) in related %}<a href="{{ href }}">{{ label }}</a>{% endfor %}</p>{% endif %}

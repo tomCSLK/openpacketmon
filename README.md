@@ -6,10 +6,21 @@ openpacketmon shows what your computer is talking to on the network: hosts, coun
 charts. It runs as a small local service on your own computer and is operated from the browser, in the style of
 [opennetmon](https://github.com/tomCSLK/opennetmon). The web server only listens on 127.0.0.1.
 
-> **Status: work in progress.** The project is being rebuilt from Sniffnet. The browser UI is in place; there are no
-> releases yet.
+> **Status: early version.** Expect rough edges, and please report what you find.
 
-Platform: Linux (Ubuntu, Zorin OS and other Debian-based systems) for now.
+Platform: Linux on x86-64 for now. The package is made for Ubuntu 24.04 or newer, Debian 13 or newer and systems based on
+them; it needs glibc 2.39 or newer.
+
+## Installation
+
+Download the `.deb` from the [latest release](https://github.com/tomCSLK/openpacketmon/releases/latest) and install it:
+
+```sh
+sudo apt install ./openpacketmon_*.deb
+```
+
+The package also grants the capture capabilities, see [Security](#security). A new version is installed the same way;
+openpacketmon shows when one is available.
 
 ## Based on Sniffnet
 
@@ -94,6 +105,12 @@ free [DB-IP](https://db-ip.com) databases "IP to Country Lite" and "IP to ASN Li
 every month. Alternatively openpacketmon uses MaxMind GeoLite2 files kept up to date by `geoipupdate` in `/var/lib/GeoIP`,
 or any MMDB file chosen in the settings (MaxMind, DB-IP or IPinfo format). Without a database, countries and network
 operators stay empty.
+
+### Network access of openpacketmon itself
+
+At startup openpacketmon asks the GitHub API for the latest version; no data about your network is sent, and *Settings →
+Updates* switches this off. Apart from that it only contacts the network for the download above, for reverse DNS lookups of
+the addresses it sees, and for the latency measurement you start on a connection page.
 
 ### Security
 

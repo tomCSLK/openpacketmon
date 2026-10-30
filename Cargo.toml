@@ -3,7 +3,7 @@
 
 [package]
 name = "openpacketmon"
-version = "0.2.5"
+version = "0.2.6"
 description = "Network traffic monitor with a browser UI, based on Sniffnet"
 readme = "README.md"
 keywords = ["network", "packet", "traffic", "monitor", "pcap"]
@@ -93,7 +93,8 @@ section = "Network"
 license-file = "resources/packaging/LICENSE"
 extended-description-file = "resources/packaging/linux/description.txt"
 maintainer-scripts = "resources/packaging/linux/scripts/"
-depends = "libpcap0.8, libgtk-3-0, libwebkit2gtk-4.1-0"
+# $auto takes libc6 and the libraries with the versions the binaries were built against; postinst needs setcap
+depends = "$auto, libcap2-bin"
 recommends = "libayatana-appindicator3-1"
 assets = [
     ["target/release/openpacketmon", "/usr/bin/", "755"],

@@ -167,6 +167,8 @@ struct StatisticsPage {
     running: bool,
     unavailable: String,
     filter: String,
+    /// The connection the filter selects: its two ends and its page
+    connection: Option<(String, String)>,
     error: Option<String>,
     /// The statistics change while packets come
     live: bool,
@@ -401,7 +403,7 @@ pub async fn page(
     Query(query): Query<PacketQuery>,
 ) -> Response {
     let t = i18n::current();
-    let (layout, running, unavailable, store, finished) = {
+    let (layout, running, unavailable, store, finished, connection) = {
         let engine = state.engine.lock();
         (
             Layout::new(&engine, &session),
@@ -409,6 +411,7 @@ pub async fn page(
             crate::web::packets::unavailable(t, &engine),
             engine.packets.clone(),
             engine.traffic_history.no_more_packets(),
+            crate::web::packets::filtered_connection(&engine, &query.f),
         )
     };
     let parsed = Filter::parse(&query.f);
@@ -455,6 +458,7 @@ pub async fn page(
         live: running && !finished && store.is_some() && error.is_none(),
         unavailable,
         filter: query.f.clone(),
+        connection,
         error,
         summary,
         hierarchy: hierarchy(t, &totals, &paths, &page_filter),

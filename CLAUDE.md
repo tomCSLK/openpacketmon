@@ -82,7 +82,16 @@ Netzwerkverkehrs-Monitor in Rust (iced-GUI, libpcap). Maßgeblich für Stand, Li
   **4.9 erledigt** (2026-10-29): alte Historie als Bundle in `~/Dokumente/openpacketmon-history-bis-2026-10-29.bundle`,
   altes Repo privat als `tomCSLK/openpacketmon-old`, neues privates `tomCSLK/openpacketmon` mit einem Anfangs-Commit;
   Tag `upstream-base` nur noch im Bundle, Zweig `design-muster` nur lokal. Details `PLAN.md` 4.9.
-  Offen: 4.10 umschalten.
+- **4.10 vorbereitet, Haltepunkt** (2026-10-30, `PLAN.md` 4.10): Der IPFIX-Befund steckt weiter in Sniffnet und wurde an
+  `security@sniffnet.app` gemeldet. **Repo bleibt privat, bis Sniffnet geantwortet hat oder ein Termin vereinbart ist.**
+  `.deb` mit `depends = "$auto, libcap2-bin"`, neues `dev/release.sh` (Release-Titel `vX.Y.Z`, sonst bleibt die
+  Update-Prüfung stumm; noch nicht ausgeführt), README und CHANGELOG für das erste Release überarbeitet.
+- **Bedienung nachgebessert** (2026-10-30, `PLAN.md` Phase 3 Punkt 16): Verbindungsseite ohne
+  Knopfleiste, Sprünge direkt in den Zeilen („Pakete 77 · anzeigen · Statistik“, `Fact.links`); Paketdetails mit
+  Blätter-Gruppe und „Verbindung: Pakete, Statistik, Stream, Details“; Hinweis auf die Verbindung über Pakete und
+  Statistik (`packets::filtered_connection`, `templates/connection_note.html`); Richtungsumschalter von Stream folgen
+  repariert; Keep-Alives auch ohne gesehenen Verbindungsaufbau, neuer Befund `tcp.analysis.keep_alive_ack`.
+  Test-Paket **0.2.6** gebaut.
 - Name **openpacketmon** und Logo festgelegt (2026-10-28). Nächste Schritte: Nachbesserungen aus dem Nutzertest (`PLAN.md` Phase 3),
   Phase 4 (vor dem Öffentlich-Schalten), Ideen aus `PLAN.md` 5.2 – jeweils erst nach Freigabe. Phase 5.1 **„kleines Wireshark“** ist mit Stufe 4 abgeschlossen.
 - Wireshark ist GPL: daraus nie Code, Zerleger oder Filtergrammatik übernehmen.

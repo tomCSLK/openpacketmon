@@ -12,6 +12,7 @@
 </div>
 {% if !running %}<p class="notice">{{ t.get("no-capture") }} <a href="/">{{ t.get("no-capture-start") }}</a></p>
 {% else if !unavailable.is_empty() %}<p class="notice">{{ unavailable }}</p>{% endif %}
+{% include "connection_note.html" %}
 <form method="get" action="/statistics" class="filter-bar" data-filter-form>
   <input type="search" name="f" value="{{ filter }}" placeholder="{{ t.get("stats-filter-placeholder") }}" aria-label="{{ t.get("packets-filter") }}"
     autocomplete="off" spellcheck="false" data-filter-input{% if error.is_some() %} class="invalid"{% else if !filter.trim().is_empty() %} class="valid"{% endif %}>

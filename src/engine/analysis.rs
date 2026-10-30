@@ -34,13 +34,15 @@ pub mod flag {
     pub const WINDOW_UPDATE: u16 = 1 << 6;
     /// The connection is reset (RST)
     pub const RESET: u16 = 1 << 7;
+    /// The answer to a keep-alive
+    pub const KEEP_ALIVE_ACK: u16 = 1 << 8;
     /// Flags that point to a problem of the connection
     pub const PROBLEMS: u16 =
         RETRANSMISSION | OUT_OF_ORDER | LOST_SEGMENT | DUPLICATE_ACK | ZERO_WINDOW;
 }
 
 /// The findings with their display filter field and the label of the packet list and details
-pub const FLAGS: [(u16, &str, &str); 7] = [
+pub const FLAGS: [(u16, &str, &str); 8] = [
     (
         flag::RETRANSMISSION,
         "tcp.analysis.retransmission",
@@ -70,6 +72,11 @@ pub const FLAGS: [(u16, &str, &str); 7] = [
         flag::KEEP_ALIVE,
         "tcp.analysis.keep_alive",
         "TCP Keep-Alive",
+    ),
+    (
+        flag::KEEP_ALIVE_ACK,
+        "tcp.analysis.keep_alive_ack",
+        "TCP Keep-Alive ACK",
     ),
     (
         flag::WINDOW_UPDATE,
@@ -152,6 +159,8 @@ struct Side {
     last_ack: Option<(u32, u16)>,
     /// Segments without an ACK yet: end of the segment, packet number, time
     unacked: VecDeque<(u32, u64, i64)>,
+    /// The last segment was a keep-alive: the acknowledgment that answers it
+    keep_alive: Option<u32>,
 }
 
 /// The values of a TCP segment the analysis needs
@@ -282,7 +291,8 @@ impl Analysis {
         if !flow.handshake(i, number, time, t, record) {
             return;
         }
-        flow.sides[i].sequence(t, record);
+        let peer_ack = flow.sides[1 - i].last_ack.map(|(ack, _)| ack);
+        flow.sides[i].sequence(t, peer_ack, record);
         if t.window == 0 && !t.syn && !t.fin && !t.rst {
             record.flags |= flag::ZERO_WINDOW;
         }
@@ -375,6 +385,7 @@ impl Flow {
         t: &Segment,
         record: &mut PacketAnalysis,
     ) {
+        let answer = self.sides[1 - i].keep_alive.take() == Some(t.ack_number);
         let side = &mut self.sides[i];
         let pure_ack = t.ack
             && t.len == 0
@@ -382,7 +393,9 @@ impl Flow {
             && !t.fin
             && !t.rst
             && record.flags & flag::KEEP_ALIVE == 0;
-        if pure_ack
+        if pure_ack && answer {
+            record.flags |= flag::KEEP_ALIVE_ACK;
+        } else if pure_ack
             && let Some((ack, window)) = side.last_ack
             && ack == t.ack_number
         {
@@ -425,17 +438,31 @@ impl Flow {
 
 impl Side {
     /// Compares the sequence number with the one expected: keep-alive, gap, late segment or
-    /// retransmission
-    fn sequence(&mut self, t: &Segment, record: &mut PacketAnalysis) {
+    /// retransmission; `peer_ack` is the last acknowledgment of the other side, which tells a
+    /// keep-alive when the start of the connection was not captured
+    fn sequence(&mut self, t: &Segment, peer_ack: Option<u32>, record: &mut PacketAnalysis) {
         let seg = t.len + u32::from(t.syn) + u32::from(t.fin);
         let end = t.seq.wrapping_add(seg);
+        let probe = t.len <= 1 && !t.syn && !t.fin && !t.rst;
+        self.keep_alive = None;
+        if probe
+            && let Some(ack) = peer_ack
+            && diff(t.seq, ack) == -1
+            && self.next.is_none_or(|next| diff(next, ack) <= 0)
+        {
+            record.flags |= flag::KEEP_ALIVE;
+            self.keep_alive = Some(ack);
+            self.next = Some(ack);
+            return;
+        }
         let Some(next) = self.next else {
             self.next = Some(end);
             return;
         };
         let ahead = diff(t.seq, next);
-        if t.len <= 1 && !t.syn && !t.fin && !t.rst && ahead == -1 {
+        if probe && ahead == -1 {
             record.flags |= flag::KEEP_ALIVE;
+            self.keep_alive = Some(next);
             return;
         }
         if seg == 0 {

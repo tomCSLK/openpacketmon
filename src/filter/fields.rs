@@ -130,6 +130,11 @@ pub const FIELDS: &[(&str, &[&str], Kind)] = &[
     ),
     ("tcp.analysis.keep_alive", &["tcp.analysis.keep_alive"], Num),
     (
+        "tcp.analysis.keep_alive_ack",
+        &["tcp.analysis.keep_alive_ack"],
+        Num,
+    ),
+    (
         "tcp.analysis.window_update",
         &["tcp.analysis.window_update"],
         Num,

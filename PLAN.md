@@ -483,6 +483,50 @@ für Dienste entfallen; die **Mini-Ansicht entfällt**. Umsetzung am 2026-10-29:
     der Gegenstelle („Latenz: – [messen]“, kleiner Knopf), nur bei Live-Mitschnitt (mit PCAP-Import im Test nicht
     sichtbar, also noch im echten Betrieb prüfen).
 
+16. ✅ **Bedienung der Sprünge zu Paketen und Statistik** (Rückmeldung 2026-10-30 zu 0.2.5, erledigt 2026-10-30,
+    Freigabe „Setze A bis F um“; im Vorschlag gab es nur A bis E): „Bedienung schlechter geworden, seit die Knöpfe geändert wurden; ich kann nicht mehr direkt zu den
+    dargestellten Paketen gehen; die Statistik soll dazukommen.“ Geprüft mit einer Testinstanz (Live, 1000/1400 px):
+    - **Verbindungsseite:** Die Leiste über den Karten heißt nur „Pakete“, „Statistik“, „Verbindungen der Adresse“,
+      „Verbindungen des Hosts“ – „Pakete“/„Statistik“ lesen sich wie die Menüpunkte links, nicht wie „die 77 Pakete
+      dieser Verbindung“. Der Bezug zur Zahl „Pakete 77“ in der Karte fehlt (vor Punkt 15 stand der Knopf in der Karte).
+      Die vier Knöpfe sehen gleich aus, beziehen sich aber auf zwei Dinge (Verbindung bzw. Gegenstelle).
+    - **Paketdetails:** fünf gleichwertige Knöpfe, Blättern (Vorheriges/Nächstes) und Sprünge gemischt; bei 1000 px
+      bricht „Zur Verbindung“ allein in die zweite Zeile (dasselbe „gewürfelt“ wie vorher). Statistik fehlt.
+    - **Pakete/Statistik einer Verbindung:** zeigen nur den langen Filterausdruck, keinen Hinweis „Verbindung …“ und
+      keinen Weg zurück zur Verbindung.
+    - **Stream folgen:** der Richtungsumschalter bricht unsauber in zwei Zeilen um (Darstellungsfehler).
+    - **Nebenbefund TCP-Analyse:** Keep-Alives einer schon laufenden Verbindung (Client `Seq` = bestätigte Nummer − 1,
+      `Len=0`, jede Sekunde) und ihre Antworten werden als „TCP Dup ACK“ rot markiert. Richtig wäre „Keep-Alive“ bzw.
+      „Keep-Alive ACK“ (RFC 9293 3.8.4), ohne Fehlerfarbe.
+    Vorschlag:
+    - A) Verbindungsseite: Leiste oben entfällt, Sprünge in die Zeilen, auf die sie sich beziehen: „Pakete 77 ·
+      anzeigen · Statistik“ (Karte Verbindung), „Adresse … ☆ · Verbindungen“ und „Host … · Verbindungen“ (Karte
+      Gegenstelle); kleine Textlinks wie „messen“ bei der Latenz.
+    - B) Paketdetails: links „‹ Vorheriges | Nächstes ›“ als Knopfgruppe, rechts mit Trennstrich die Sprünge zur
+      Verbindung: Pakete, Statistik (neu), Stream, Verbindung; in einer Zeile bis 1000 px.
+    - C) Pakete und Statistik mit dem Filter einer Verbindung: Hinweis „Verbindung 1.2.3.4:443 ⇄ … · zur Verbindung“
+      über der Liste (Parameter `conn=` neben `f=`).
+    - D) Richtungsumschalter von „Stream folgen“ reparieren. E) Keep-Alive-Erkennung in `src/engine/analysis.rs`
+      auch ohne gesehenen Verbindungsaufbau (Sequenznummer = letzte Bestätigung der Gegenseite − 1), mit Test.
+
+    **Umgesetzt (2026-10-30), mit diesen Abweichungen vom Vorschlag:**
+    - A wie vorgeschlagen (`Fact.links`). Der Host-Link steht in der Zeile „Reverse DNS“, weil es keine Zeile „Host“ gibt.
+      Die Zahl „Pakete“ zählt nur die Richtung der Verbindungszeile, „anzeigen“ zeigt beide Richtungen; das sagt der
+      Tooltip des Links.
+    - B: Die Sprünge stehen hinter dem Wort „Verbindung:“ (Pakete, Statistik, Stream, Details), damit „Pakete“ und
+      „Statistik“ nicht wie die Menüpunkte wirken. Bei 1000 px bleibt alles in einer Zeile; am Anfang oder Ende der
+      Liste ist „Vorheriges“ bzw. „Nächstes“ ausgegraut, die Leiste springt also nicht.
+    - C ohne Parameter `conn=`: Der Server erkennt den Filter selbst (`packets::filtered_connection`, gleicher Text wie
+      `conversation_filter`). So erscheint der Hinweis auf jedem Weg (Pakete ↔ Statistik, Browser-Zurück, Paketdetails)
+      und verschwindet, sobald der Filter geändert wird.
+    - D: Die Knöpfe heißen „Client → Server“/„Server → Client“ (Adressen im Tooltip), sonst passen lange IPv6-Adressen
+      nicht; die Werkzeuge rutschen bei Platzmangel unter die Richtungszeilen.
+    - E: dazu neuer Befund „TCP Keep-Alive ACK“ (Filterfeld `tcp.analysis.keep_alive_ack`, keine Fehlerfarbe). Die
+      Antwort auf einen Keep-Alive war auch bei gesehenem Verbindungsaufbau als Dup ACK markiert; außerdem meldeten
+      Daten nach einem Keep-Alive am Mitschnittbeginn eine falsche Lücke (behoben, weil `next` nachgezogen wird).
+    Geprüft: 2 neue Tests, Headless-Chrome mit erzeugter PCAP bei 1000/1400 px, hell/dunkel (Latenz-Zeile nur bei
+    Live-Mitschnitt, dort nicht erneut geprüft). Test-Paket **0.2.6** gebaut (2026-10-30).
+
 #### Fenster-Programm `openpacketmon-app` (Variante B, erledigt am 2026-10-28)
 
 Wunsch des Nutzers: eigenständige App statt Browser, mit Symbol im Infobereich. Umsetzung:
@@ -825,12 +869,35 @@ Voraussetzung: 4.1–4.8 erledigt, committet, CI grün, Arbeitsbaum sauber.
 
 #### 4.10 Umschalten und erstes öffentliches Release
 
-- Repo-Einstellungen: Beschreibung, Themen (`network-monitor`, `packet-capture`, `rust`, `linux`), „Private
-  vulnerability reporting“ an, Branch-Schutz für `main` (optional), Wiki/Projects aus.
+**Haltepunkt (2026-10-30):** Der IPFIX-Befund aus 4.8 steckt weiter in Sniffnet (`collect.rs` in `main` @ `931d7ede`
+unverändert, der ganze IPFIX-Pfad gleich). Am 2026-10-30 per E-Mail an `security@sniffnet.app` gemeldet (Weg laut deren
+`SECURITY.md`), mit dem Versprechen, das Repo bis zu ihrer Antwort privat zu lassen, weil Code, Test und 4.8 den Fund
+offenlegen. Messung auf unserem Code ohne die Korrektur (Release ohne LTO): 11,7 s CPU je 65-KB-Datagramm, 2000 Vorlagen
+377 MiB. Sniffnet selbst wurde nicht gebaut. Die übrigen Befunde aus 4.8 liegen im neuen Code, nicht im Original.
+**Nicht umschalten, bevor Sniffnet geantwortet hat oder ein Termin vereinbart ist.** `dev/release.sh --publish` hält bei
+einem privaten Repo an.
+
+Vorbereitet (2026-10-30):
+- `.deb`: `depends = "$auto, libcap2-bin"`. Vorher fehlte `libc6`, das Paket ließ sich auf zu alten Systemen fehlerfrei
+  installieren und startete dann nicht (gebaut unter Zorin 18.1/Ubuntu-24.04-Basis: glibc ≥ 2.39). Prüflauf: `libc6
+  (>= 2.39)`, `libcap2-bin`, `libgtk-3-0t64`, `libwebkit2gtk-4.1-0 (>= 2.35.1)` u. a.
+- `dev/release.sh` nach dem Vorbild von opennetmon, nur `.deb`, `THIRD-PARTY-LICENSES.txt`, `SHA256SUMS` (kein tar.gz,
+  das Fenster-Programm braucht ohnehin WebKitGTK). **Der Release-Titel ist `vX.Y.Z`**, weil die Update-Prüfung den Namen als
+  Version liest. Noch nicht ausgeführt (nur Syntax geprüft); der Trockenlauf folgt.
+- README (Status, Installation, Netzzugriffe des Programms), CHANGELOG zu einer Liste „was anders ist als bei Sniffnet“
+  verdichtet. Vor dem Release wird `[Unreleased]` zu `[X.Y.Z]`, das Skript prüft das.
+- Geklärt: Die Töne erzeugt der Browser per Oszillator (`static/live.js`), keine Tondateien im Repo.
+
+Noch offen:
+- Nutzertest 0.2.6 abschließen; Version nennt der Nutzer.
+- Herkunft der Vorlage `../design-system` klären (Phase 3 Punkt 7, nur Farbwerte übernommen).
+- Trockenlauf `dev/release.sh`, Installationstest auf sauberem Ubuntu 24.04 und Debian 13.
+- Repo-Einstellungen: Themen (`network-monitor`, `packet-capture`, `rust`, `linux`), Force-Push auf `main` sperren.
+  Beschreibung gesetzt, Wiki/Projects aus.
 - Sichtbarkeit auf **öffentlich** (macht der Nutzer oder nach ausdrücklicher Freigabe per `gh repo edit
-  --visibility public --accept-visibility-change-consequences`).
-- Erstes Release mit `.deb` und `THIRD-PARTY-LICENSES.txt` – Version nennt der Nutzer; dafür ein Release-Skript wie
-  `dev/release.sh` bei opennetmon (eigener Schritt, erst nach Freigabe).
+  --visibility public --accept-visibility-change-consequences`). Direkt danach „Private vulnerability reporting“ an: Die API
+  antwortet beim privaten Repo mit 404, und `SECURITY.md` verweist darauf.
+- Release: `dev/release.sh --publish --notes <datei>`, danach `cargo test test_fetch_latest_release_from_github -- --ignored`.
 
 #### Reihenfolge und Aufwand
 

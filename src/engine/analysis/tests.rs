@@ -136,6 +136,43 @@ fn retransmissions_lost_and_late_segments() {
 }
 
 #[test]
+fn keep_alives_and_their_answers() {
+    let mut packets = handshake();
+    packets.extend([
+        (30, segment(false, 501, 101, "A", 64000, &[])),
+        (40, segment(true, 100, 501, "A", 64000, &[])),
+        (41, segment(false, 501, 101, "A", 64000, &[])),
+        // a real duplicate ACK is still one
+        (50, segment(false, 501, 101, "A", 64000, &[])),
+    ]);
+    let r = run(packets);
+    assert_eq!(r[4].flags, flag::KEEP_ALIVE);
+    assert_eq!(r[5].flags, flag::KEEP_ALIVE_ACK);
+    assert_eq!(r[6].flags, flag::DUPLICATE_ACK);
+}
+
+#[test]
+fn keep_alives_of_a_connection_already_running() {
+    let r = run(vec![
+        (0, segment(true, 999, 500, "A", 64000, &[])),
+        (10, segment(false, 500, 1000, "A", 64000, &[])),
+        (1000, segment(true, 999, 500, "A", 64000, &[])),
+        (1010, segment(false, 500, 1000, "A", 64000, &[])),
+        (2000, segment(true, 999, 500, "A", 64000, &[0])),
+        (2010, segment(false, 500, 1000, "A", 64000, &[])),
+        // the data goes on behind the keep-alives, nothing was lost
+        (3000, segment(true, 1000, 500, "PA", 64000, b"abc")),
+    ]);
+    assert_eq!(r[0].flags, 0);
+    assert_eq!(r[1].flags, 0);
+    assert_eq!(r[2].flags, flag::KEEP_ALIVE);
+    assert_eq!(r[3].flags, flag::KEEP_ALIVE_ACK);
+    assert_eq!(r[4].flags, flag::KEEP_ALIVE);
+    assert_eq!(r[5].flags, flag::KEEP_ALIVE_ACK);
+    assert_eq!(r[6].flags, 0);
+}
+
+#[test]
 fn duplicate_acks_window_updates_and_zero_windows() {
     let mut packets = handshake();
     packets.extend([

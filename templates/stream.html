@@ -15,7 +15,7 @@
 {% if headers_only %}<p class="notice">{{ t.get("stream-headers-only") }}</p>{% endif %}
 {% if cut %}<p class="notice">{{ t.get("stream-cut") }}</p>{% endif %}
 <section class="card flush">
-  <div class="card-head">
+  <div class="card-head stream-head">
     <h2 class="stream-sides"><span class="stream-client">{{ client }} → {{ server }}: {{ client_counts }}</span> <span class="stream-server">{{ server }} → {{ client }}: {{ server_counts }}</span></h2>
     <div class="card-tools">
       <span class="segmented">
@@ -24,8 +24,8 @@
       </span>
       <span class="segmented">
         <a class="button small{% if side != "both" %} secondary{% endif %}" href="{{ base }}&view={{ view }}">{{ t.get("stream-both") }}</a>
-        <a class="button small{% if side != "client" %} secondary{% endif %}" href="{{ base }}&view={{ view }}&side=client">{{ client }} →</a>
-        <a class="button small{% if side != "server" %} secondary{% endif %}" href="{{ base }}&view={{ view }}&side=server">← {{ server }}</a>
+        <a class="button small{% if side != "client" %} secondary{% endif %}" href="{{ base }}&view={{ view }}&side=client" title="{{ client }} → {{ server }}">{{ t.get("stream-client-side") }}</a>
+        <a class="button small{% if side != "server" %} secondary{% endif %}" href="{{ base }}&view={{ view }}&side=server" title="{{ server }} → {{ client }}">{{ t.get("stream-server-side") }}</a>
       </span>
     </div>
   </div>

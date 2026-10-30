@@ -337,12 +337,21 @@ fn find_connection<'a>(
     })
 }
 
+/// A jump from a value of the details page to the list it belongs to
+pub struct FactLink {
+    pub label: String,
+    /// Says where the link leads
+    pub title: String,
+    pub href: String,
+}
+
 /// A labelled value of the details page
 pub struct Fact {
     pub label: String,
     pub value: String,
     /// `value` is markup made by this program (a time), not text
     pub is_html: bool,
+    pub links: Vec<FactLink>,
 }
 
 impl Fact {
@@ -351,6 +360,7 @@ impl Fact {
             label,
             value,
             is_html: false,
+            links: Vec::new(),
         }
     }
 
@@ -359,7 +369,13 @@ impl Fact {
             label,
             value: format::time_html(ts),
             is_html: true,
+            links: Vec::new(),
         }
+    }
+
+    fn with_links(mut self, links: Vec<FactLink>) -> Self {
+        self.links = links;
+        self
     }
 }
 
@@ -378,13 +394,9 @@ struct ConnectionPage {
     latency_supported: bool,
     measuring: bool,
     self_query: String,
-    search: String,
     /// Connections of the remote address
     address_search: String,
     remote_favorite: bool,
-    /// Packets are kept: links to the packets and the statistics of this connection (with a display filter)
-    packets: Option<String>,
-    statistics: Option<String>,
 }
 
 fn latency_text(t: Lang, status: Option<&LatencyStatus>) -> Option<String> {
@@ -399,12 +411,22 @@ fn latency_text(t: Lang, status: Option<&LatencyStatus>) -> Option<String> {
     })
 }
 
-/// Name, AS and country of the remote host, and the list of its connections
-fn remote_host(t: Lang, engine: &EngineState, remote: IpAddr) -> (Vec<Fact>, String) {
+/// Name, AS and country of the remote host, with a link to its connections
+fn remote_host(t: Lang, engine: &EngineState, remote: IpAddr) -> Vec<Fact> {
     let Some((rdns, host)) = engine.addresses_resolved.get(&remote) else {
-        return (Vec::new(), String::new());
+        return Vec::new();
     };
-    let mut facts = vec![Fact::text(t.get("host-rdns"), rdns.clone())];
+    let filter = FavoriteItem::Host((host.clone(), DataInfoHost::default())).connection_filter();
+    let mut facts = vec![
+        Fact::text(t.get("host-rdns"), rdns.clone()).with_links(vec![FactLink {
+            label: t.get("connection-list"),
+            title: t.get("connection-host-connections"),
+            href: format!(
+                "/connections?{}",
+                crate::web::entries::search_query(&filter)
+            ),
+        }]),
+    ];
     if !host.asn.name.is_empty() {
         facts.push(Fact::text(
             t.get("host-asn"),
@@ -414,8 +436,25 @@ fn remote_host(t: Lang, engine: &EngineState, remote: IpAddr) -> (Vec<Fact>, Str
     if host.country != crate::countries::types::country::Country::ZZ {
         facts.push(Fact::text(t.get("host-country"), host.country.to_string()));
     }
-    let filter = FavoriteItem::Host((host.clone(), DataInfoHost::default())).connection_filter();
-    (facts, crate::web::entries::search_query(&filter))
+    facts
+}
+
+/// Links from the number of packets of a connection to the packets and their statistics, with
+/// the display filter of the connection
+fn packet_links(t: Lang, key: &AddressPortPair) -> Vec<FactLink> {
+    let filter = encode(&crate::web::packets::conversation_filter(key));
+    vec![
+        FactLink {
+            label: t.get("connection-packets"),
+            title: t.get("connection-packets-hint"),
+            href: format!("/packets?f={filter}"),
+        },
+        FactLink {
+            label: t.get("connection-statistics"),
+            title: t.get("connection-statistics-hint"),
+            href: format!("/statistics?f={filter}"),
+        },
+    ]
 }
 
 /// `GET /connection?src=…`: details of one connection
@@ -430,6 +469,11 @@ pub async fn detail(
     let remote = get_address_to_lookup(key, info.traffic_direction);
     let data = info.data_info();
     let bytes = DataRepr::bytes(false);
+    let packet_links = if engine.packets.is_some() {
+        packet_links(t, key)
+    } else {
+        Vec::new()
+    };
     let mut facts = vec![
         Fact::text(
             t.get("conn-source"),
@@ -459,7 +503,7 @@ pub async fn detail(
                 other => program_label(t, other),
             },
         ),
-        Fact::text(t.get("conn-packets"), format::count(t, info.packets)),
+        Fact::text(t.get("conn-packets"), format::count(t, info.packets)).with_links(packet_links),
         Fact::text(t.get("conn-data"), format::bytes(t, data.tot_data(bytes))),
         Fact::time(t.get("conn-first"), info.initial_timestamp),
         Fact::time(t.get("conn-last"), info.final_timestamp),
@@ -470,7 +514,7 @@ pub async fn detail(
     if let Some(exporter) = key.exporter {
         facts.push(Fact::text(t.get("conn-exporter"), exporter.to_string()));
     }
-    let (host_facts, search) = remote_host(t, &engine, remote);
+    let host_facts = remote_host(t, &engine, remote);
     let mut message_types: Vec<(String, String)> = info
         .message_types
         .iter()
@@ -478,10 +522,6 @@ pub async fn detail(
         .collect();
     message_types.sort();
     let status = engine.latency_statuses.get(&remote);
-    let packet_filter = engine
-        .packets
-        .is_some()
-        .then(|| encode(&crate::web::packets::conversation_filter(key)));
     let page = ConnectionPage {
         t,
         layout: Layout::new(&engine, &session),
@@ -499,11 +539,8 @@ pub async fn detail(
             && !matches!(key.protocol, Protocol::Arp),
         measuring: matches!(status, Some(LatencyStatus::Measuring)),
         self_query: connection_query(key),
-        search,
         address_search: crate::web::entries::search_query(&format!("ip.addr == {remote}")),
         remote_favorite: engine.conf.favorites.contains_address(&remote),
-        packets: packet_filter.as_ref().map(|f| format!("/packets?f={f}")),
-        statistics: packet_filter.map(|f| format!("/statistics?f={f}")),
     };
     Ok(render(&page))
 }

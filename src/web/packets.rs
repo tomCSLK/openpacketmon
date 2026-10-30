@@ -17,6 +17,7 @@ use sniffnet_packet_parser::{LinkType, Protocol};
 use crate::dissect::{self, Dissection, Field, Layer};
 use crate::engine::analysis::{self, PacketAnalysis};
 use crate::engine::packets::{PacketStore, SharedPacketStore, StoredPacket};
+use crate::engine::state::EngineState;
 use crate::filter::{self, ErrorKind, Filter};
 use crate::networking::types::address_port_pair::AddressPortPair;
 use crate::networking::types::traffic_direction::TrafficDirection;
@@ -145,6 +146,37 @@ pub fn conversation_filter(key: &AddressPortPair) -> String {
     let there = side(key.src_ip, key.src_port, key.dst_ip, key.dst_port);
     let back = side(key.dst_ip, key.dst_port, key.src_ip, key.src_port);
     format!("{proto} and (({there}) or ({back}))")
+}
+
+/// The connection a display filter selects, if it is the filter of [`conversation_filter`]
+fn filtered_conversation<'a>(
+    mut keys: impl Iterator<Item = &'a AddressPortPair>,
+    filter: &str,
+) -> Option<&'a AddressPortPair> {
+    let filter = filter.trim();
+    // the source address comes first, so most connections are ruled out without any text
+    let source: IpAddr = filter
+        .split(" == ")
+        .nth(1)?
+        .split(' ')
+        .next()?
+        .parse()
+        .ok()?;
+    keys.find(|key| key.src_ip == source && conversation_filter(key) == filter)
+}
+
+/// The two ends and the page of the connection a display filter selects, for the note above
+/// its packets and statistics
+pub fn filtered_connection(engine: &EngineState, filter: &str) -> Option<(String, String)> {
+    let key = filtered_conversation(engine.info_traffic.map.keys(), filter)?;
+    Some((
+        format!(
+            "{} ⇄ {}",
+            format::socket(&key.src_ip, key.src_port),
+            format::socket(&key.dst_ip, key.dst_port)
+        ),
+        format!("/connection?{}", connection_query(key)),
+    ))
 }
 
 /// The filter of the list and the packet to show, as given in the address
@@ -415,6 +447,8 @@ struct PacketsPage {
     unavailable: String,
     /// The display filter as typed
     filter: String,
+    /// The connection the filter selects: its two ends and its page
+    connection: Option<(String, String)>,
     error: Option<String>,
     /// The list can be shown (packets kept, filter valid)
     list: bool,
@@ -445,13 +479,14 @@ pub async fn list(
     Query(query): Query<PacketQuery>,
 ) -> Response {
     let t = i18n::current();
-    let (layout, running, unavailable, store) = {
+    let (layout, running, unavailable, store, connection) = {
         let engine = state.engine.lock();
         (
             Layout::new(&engine, &session),
             engine.is_running(),
             unavailable(t, &engine),
             engine.packets.clone(),
+            filtered_connection(&engine, &query.f),
         )
     };
     let error = Filter::parse(&query.f).err().map(|e| filter_error(t, &e));
@@ -462,6 +497,7 @@ pub async fn list(
         running,
         unavailable,
         filter: query.f.clone(),
+        connection,
         list: store.is_some() && error.is_none(),
         error,
         goto: query.goto,
@@ -621,9 +657,11 @@ struct PacketPage {
     assembled: Option<String>,
     time: String,
     connection: Option<String>,
-    /// Follow the stream and filter the connection (TCP and UDP)
+    /// Follow the stream (TCP and UDP)
     stream: Option<String>,
+    /// The packets and the statistics of the connection
     conversation: Option<String>,
+    statistics: Option<String>,
     back: String,
     prev: Option<String>,
     next: Option<String>,
@@ -782,6 +820,10 @@ pub async fn detail(
             .conn
             .as_ref()
             .map(|(key, _)| format!("/packets?f={}", encode(&conversation_filter(key)))),
+        statistics: packet
+            .conn
+            .as_ref()
+            .map(|(key, _)| format!("/statistics?f={}", encode(&conversation_filter(key)))),
         prev: query.n.checked_sub(1).and_then(neighbor),
         next: neighbor(query.n + 1),
         related: related
@@ -909,6 +951,11 @@ mod tests {
              and tcp.dstport == 443) or (ip.src == 10.0.0.2 and ip.dst == 192.168.1.10 \
              and tcp.srcport == 443 and tcp.dstport == 51000))"
         );
+        assert!(filtered_conversation([&key].into_iter(), &format!(" {text} ")).is_some());
+        assert!(filtered_conversation([&key].into_iter(), &format!("{text} and dns")).is_none());
+        assert!(filtered_conversation([&key].into_iter(), "ip.src == 10.0.0.2").is_none());
+        assert!(filtered_conversation([&key].into_iter(), "not == a filter").is_none());
+        assert!(filtered_conversation([&key].into_iter(), "").is_none());
         let filter = Filter::parse(&text).unwrap().unwrap();
         let mut store = PacketStore::new(PacketStoreConf::default(), ETH);
         let ts = Timestamp::new(1, 0);

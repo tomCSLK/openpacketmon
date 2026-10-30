@@ -89,7 +89,15 @@ Netzwerkverkehrs-Monitor in Rust (iced-GUI, libpcap). Maßgeblich für Stand, Li
   Commit `55f5213`, CI grün; Test-Paket **0.2.7** (nur die korrigierten Abhängigkeiten dazu). Entschieden: nach der Antwort
   von Sniffnet umschalten und **0.3.0** veröffentlichen. Die vollständige Liste der offenen Schritte steht in `PLAN.md` 4.10.
   Nutzertest 0.2.7 läuft seit 2026-10-30. Herkunft der Vorlage `../design-system` geklärt: eigene Idee, mit Claude Design erstellt.
-- **Windows-Version** (vorgesehen, Beginn erst nach dem Release 0.3.0): Alles für die Fortsetzung auf einem Windows-Rechner
+  Vorgemerkt aus dem Test: **Zurück-Knopf** fehlt an vielen Stellen, im Fenster-Programm gibt es gar keinen (`PLAN.md` Phase 3
+  Punkt 17); kommt noch vor 0.3.0, Umsetzung nach dem laufenden Test. Ebenso **Statistik-Knopf auf der Seite Verbindungen**, der
+  die Suchleiste übernimmt (Punkt 18; die Statistik braucht dafür den Verbindungsfilter, ihr Anzeigefilter kennt `country`,
+  `program` usw. nicht).
+- **Reihenfolge nach dem Release** (Nutzer, 2026-10-31): 0.3.0 → MCP-Anbindung → Windows-Version.
+- **MCP-Anbindung** (`PLAN.md` 5.4): Claude soll den Mitschnitt abfragen können, etwa beim Untersuchen von Geräten im Heimnetz.
+  Paketinhalte sind dabei ungeprüfte Eingaben für das Sprachmodell. Von Anfang an plattformneutral schreiben, damit sie unter
+  Windows ohne Umbau läuft.
+- **Windows-Version** (vorgesehen, Beginn nach 0.3.0 und MCP, enthält MCP also schon): Alles für die Fortsetzung auf einem Windows-Rechner
   steht in `docs/windows.md` (Software, Einrichten, Linux-Bindungen im Code, Tests, Installer, Code-Signatur, CI, Reihenfolge).
   Der Installer soll, wenn möglich, signiert werden: zuerst SignPath Foundation, sonst OV-Zertifikat.
 - **Bedienung nachgebessert** (2026-10-30, `PLAN.md` Phase 3 Punkt 16): Verbindungsseite ohne

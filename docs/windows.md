@@ -9,8 +9,9 @@ möglich (die Abhängigkeiten `ring` und `aws-lc-sys` brauchen einen C-Compiler 
 der Fehler liefert also erst der erste `cargo check` unter Windows.
 
 **Feste Vorgaben:** Npcap wird **nie mitgeliefert**, der Nutzer installiert es selbst (proprietäre Lizenz). Wireshark-Code
-bleibt tabu. Die Arbeitsregeln in `CLAUDE.md` gelten unverändert. Die Arbeit beginnt **erst nach dem Release 0.3.0**, und der
-Installer soll, wenn möglich, signiert werden (Nutzer, 2026-10-30).
+bleibt tabu. Die Arbeitsregeln in `CLAUDE.md` gelten unverändert. Die Arbeit beginnt **erst nach dem Release 0.3.0 und nach
+der MCP-Anbindung** (`PLAN.md` 5.4), die Windows-Version enthält MCP also schon. Der Installer soll, wenn möglich, signiert
+werden (Nutzer, 2026-10-30/31).
 
 ## 1. Was auf dem Windows-Rechner installiert sein muss
 
@@ -135,6 +136,7 @@ nie als Administrator laufen müssen.
    keine Nachfrage aus.
 7. Sicherheit: Der Sicherheitstest aus `PLAN.md` 4.8 für die geänderten Stellen, vor allem die Rechte der Startlink-Datei.
 8. Sauberes System: Installer, Deinstallation, Update über eine ältere Version.
+9. MCP-Anbindung (`PLAN.md` 5.4): `openpacketmon.exe mcp` mit Claude Code unter Windows, Anmeldung über den Startlink.
 
 ## 6. Installer und Release
 
@@ -196,5 +198,6 @@ Was SignPath verlangt und was das für uns heißt:
 7. Installer, Test auf sauberem System, README, erstes Windows-Release, zunächst unsigniert.
 8. Signatur beantragen (Abschnitt 6.1), danach signierte Installer.
 
-**Beginn (Nutzer, 2026-10-30):** erst nach dem Release 0.3.0. Bis dahin gilt auch auf dem Windows-Rechner der Haltepunkt aus
-`PLAN.md` 4.10.
+**Beginn (Nutzer, 2026-10-30/31):** Reihenfolge 0.3.0 → MCP-Anbindung → Windows. Bis zum Release gilt auch auf dem Windows-Rechner
+der Haltepunkt aus `PLAN.md` 4.10. Die Abschnitte 4 und 5 stammen aus der Zeit vor MCP: Beim Beginn die Liste um das ergänzen, was
+seitdem dazugekommen ist.

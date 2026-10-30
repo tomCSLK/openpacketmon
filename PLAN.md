@@ -528,6 +528,37 @@ für Dienste entfallen; die **Mini-Ansicht entfällt**. Umsetzung am 2026-10-29:
     Geprüft: 2 neue Tests, Headless-Chrome mit erzeugter PCAP bei 1000/1400 px, hell/dunkel (Latenz-Zeile nur bei
     Live-Mitschnitt, dort nicht erneut geprüft). Test-Paket **0.2.6** gebaut (2026-10-30).
 
+17. ⬜ **Zurück-Knopf fehlt** (Rückmeldung 2026-10-30 zu 0.2.7, vorgemerkt, noch nicht umgesetzt; Wunsch des Nutzers:
+    unbedingt, **noch vor 0.3.0**, nach dem laufenden Test): „In vielen Situationen fehlt er eindeutig.“ Stand im Code: Das Fenster-Programm hat keine Browser-Leiste, dort
+    gibt es also keinen sichtbaren Weg zurück. Einen Zurück-Link haben nur die Fehlerseite (`data-back`, `static/app.js` mit
+    `history.back()`) und die Paketdetails (Brotkrumen `back`). Die Sprünge zwischen Verbindung, Paketen, Statistik und Stream
+    führen damit nur vorwärts. Beim Umsetzen klären: ein Knopf an fester Stelle im Seitenkopf aller Seiten statt je Seite,
+    `history.back()` mit Rückfall ohne Verlauf (wie `data-back`), Filter und Position der Ausgangsseite bleiben erhalten,
+    Alt+Links im Fenster-Programm prüfen. Beispiele, wo er am meisten fehlt, kann der Nutzer aus dem laufenden Test nennen.
+
+18. ⬜ **Statistik-Knopf auf der Seite Verbindungen** (Rückmeldung 2026-10-30 zu 0.2.7, vorgemerkt, noch nicht umgesetzt): Ein
+    Knopf „Statistik“ soll den Inhalt der Suchleiste automatisch übernehmen, und die Statistik muss entsprechend angepasst
+    werden. Das geht nicht durch einfaches Weitergeben des Texts, denn die beiden Filter sind verschieden:
+    - Die Verbindungen filtern mit `Filter::parse_connections` (`CONNECTION_FIELDS`) über Verbindungen, die Statistik mit dem
+      Anzeigefilter `Filter::parse` über Pakete. `ip.addr` oder `tcp.port` gibt es in beiden. Felder wie `country`, `program`,
+      `service`, `direction`, `favorite`, `bytes`, `packets` kennt nur der Verbindungsfilter, und dort `bytes` meint die Summe
+      der Verbindung. `/statistics?f=country == US` wäre also ein Filterfehler.
+    - Machbar ist es, weil jedes `StoredPacket` seine Verbindung kennt (`src/engine/packets.rs`).
+
+    Vorgehen (vom Nutzer bestätigt, 2026-10-30): `/statistics` bekommt einen zweiten Parameter (z. B. `c=` für den Verbindungsfilter). Die Statistik nimmt dann die
+    Pakete aller Verbindungen, auf die der Filter passt. Dazu gehören:
+    - Das Filterfeld der Statistik zeigt und prüft dann den Verbindungsfilter (`data-filter-kind="connections"`), und ein Hinweis
+      nennt, dass die Auswahl von der Seite Verbindungen kommt. Zurücksetzen und ein Weg zurück zu den Verbindungen mit demselben
+      Filter (passt zu Punkt 17).
+    - Die Sprünge der Statistik (Protokollhierarchie, Befunde, Antwortzeiten, „Pakete“ über `packets_link`/`and_filter`) hängen
+      bisher einen Anzeigefilter an. Sie brauchen dieselbe Auswahl, also muss `/packets` den Parameter ebenfalls verstehen.
+    - Der Treffer-Zwischenspeicher (`with_matches`) ist nach dem Filtertext geordnet; er muss die neue Art unterscheiden und bei
+      laufender Aufzeichnung neue Verbindungen aufnehmen. Werte wie `bytes` ändern sich dabei laufend.
+    - Ohne Paketspeicher (aus) oder bei IPFIX gibt es keine Pakete: Der Knopf braucht dann einen Hinweis, wie die Statistik heute.
+      Es zählen nur Pakete, die noch im Speicher sind; die Summen können also kleiner sein als in der Verbindungsliste.
+    - Der Knopf gilt für den angewendeten Filter. Ist er falsch, oder ist die Suchleiste leer, zeigt er nichts Falsches: bei
+      leerer Leiste einfach die ganze Statistik. Die gleiche Übernahme wäre für „Pakete“ möglich, gewünscht ist bisher nur Statistik.
+
 #### Fenster-Programm `openpacketmon-app` (Variante B, erledigt am 2026-10-28)
 
 Wunsch des Nutzers: eigenständige App statt Browser, mit Symbol im Infobereich. Umsetzung:
@@ -898,7 +929,10 @@ veröffentlichen. Bleibt die Antwort aus, entscheidet der Nutzer über das weite
 Noch offen, in dieser Reihenfolge:
 1. **Antwort von Sniffnet** (Gmail-Faden `1a18d94568cbe1f1`, Betreff „Sniffnet IPFIX collector: …“). Einen Termin, den
    Sniffnet nennt, einhalten; die Herkunftsangabe im Advisory prüfen.
-2. Nutzertest 0.2.7 abschließen (läuft seit 2026-10-30, der Nutzer hat 0.2.7 installiert).
+2. Nutzertest 0.2.7 abschließen (läuft seit 2026-10-30, der Nutzer hat 0.2.7 installiert; erster Eindruck sehr gut) und die
+   Rückmeldungen umsetzen. **Der Zurück-Knopf (Phase 3 Punkt 17) kommt noch vor 0.3.0** (Nutzer, 2026-10-30), Umsetzung nach
+   dem Test, damit weitere Rückmeldungen mit einfließen. Ebenfalls aus dem Test: Statistik-Knopf auf der Seite Verbindungen
+   (Punkt 18).
 3. Version **0.3.0** setzen: `Cargo.toml`, `app/Cargo.toml`, `cargo update --workspace --offline`; in `CHANGELOG.md`
    `## [Unreleased]` zu `## [0.3.0]` mit Datum; Release-Hinweise (Englisch) als Datei schreiben; committen, pushen, CI grün.
 4. Trockenlauf `dev/release.sh` (das Skript lief noch nie), Installationstest auf sauberem Ubuntu 24.04 und Debian 13
@@ -1127,10 +1161,40 @@ Alles, was für die Fortsetzung auf einem Windows-Rechner nötig ist, steht in *
 Zugänge, Einrichten, die Linux-Bindungen im Code mit ihrer Lösung, Tests, Installer, CI und Reihenfolge. Der Code baut unter
 Windows noch nicht; die größte Baustelle ist `app/src/main.rs`. Npcap wird nie mitgeliefert.
 
-Entschieden (Nutzer, 2026-10-30): **Beginn erst nach dem Release 0.3.0**; der Installer soll, **wenn möglich, eine Code-Signatur**
+Entschieden (Nutzer, 2026-10-30/31): **Beginn erst nach dem Release 0.3.0 und nach der MCP-Anbindung (5.4)**, die
+Windows-Version enthält MCP also schon; der Installer soll, **wenn möglich, eine Code-Signatur**
 bekommen. Weg (`docs/windows.md` 6.1): zuerst kostenlos über die SignPath Foundation, das setzt ein unsigniertes Windows-Release und
 einen Build in GitHub Actions voraus, und die Zusage ist nicht sicher, weil deren Regel „No hacking tools“ ein
 Mitschnitt-Programm treffen könnte. Sonst ein OV-Zertifikat; Azure Artifact Signing gibt es für Einzelentwickler in Deutschland nicht.
+
+#### 5.4 MCP-Anbindung (Idee des Nutzers, 2026-10-31, beschlossen: nach dem Release 0.3.0)
+
+Beim Untersuchen von Geräten im Heimnetz mit Claude in einer anderen Instanz (`../Abfrage_Geraete_im_Heimnetzwerk`) wäre es sehr
+hilfreich, wenn Claude den Mitschnitt von openpacketmon direkt abfragen könnte, statt dass der Nutzer Werte abliest oder PCAPs
+weitergibt. Erster Entwurf, noch nicht geprüft:
+
+- **Form:** Unterbefehl `openpacketmon mcp` (stdio), der als MCP-Server läuft und mit dem laufenden Server auf `127.0.0.1` spricht.
+  So bleibt der Mitschnitt in einem Prozess, und nichts lauscht zusätzlich. Die Anmeldung nutzt den Startlink des Benutzers wie
+  das Fenster-Programm.
+- **Zuerst nur lesen:** Aufzeichnungsstatus, Verbindungen und Pakete mit den vorhandenen Filtern, Paketdetails, Statistik, Hosts,
+  Programme. Später vielleicht Start und Stopp einer Aufzeichnung auf einem Adapter, dann nur mit Bestätigung.
+- **Grenzen:** Jede Antwort mit fester Obergrenze (Zeilen, Bytes) und Seiten, weil 500 000 Pakete nicht in eine Antwort passen.
+  Der Filter als Pflichtweg, Zusammenfassungen vor Rohdaten.
+- **Sicherheit, vor allem anderen klären:**
+  - Paketinhalte, DNS-Namen, TLS-Servernamen und HTTP-Köpfe stammen von fremden Geräten. Sie sind **ungeprüfte Eingaben für das
+    Sprachmodell** und können versteckte Anweisungen enthalten (Prompt Injection). Die Antworten müssen sie als Daten kennzeichnen,
+    und schreibende Werkzeuge dürfen nicht ohne Bestätigung laufen.
+  - Der Mitschnitt enthält private Inhalte, die mit jeder Abfrage an den KI-Dienst gehen. Rohdaten (Stream, Hex-Dump) nur auf
+    ausdrücklichen Wunsch, standardmäßig nur Kopfdaten und Statistik. Das gehört in README und Einstellungen.
+  - Erweitert den Geltungsbereich von `SECURITY.md`, und die Prüfungen aus 4.8 gelten auch hier.
+- **Abhängigkeit:** vermutlich eine MCP-Crate; Lizenz und Abhängigkeiten über `cargo deny` prüfen, `THIRD-PARTY-LICENSES.txt`
+  neu erzeugen. Alternativ das kleine JSON-RPC-Protokoll selbst umsetzen.
+- **Zeitpunkt:** nach dem Release 0.3.0 und **vor der Windows-Version** (Nutzer, 2026-10-31): Reihenfolge 0.3.0 → MCP → Windows.
+  Die Windows-Version enthält MCP dann schon.
+- **Windows gleich mitdenken:** MCP-Code ohne `std::os::unix`, Unix-Sockets, `XDG_*` oder `HOME` schreiben. stdio und HTTP auf
+  `127.0.0.1` gehen auf beiden Systemen. Den Startlink nur über `web::auth::start_link_path`/`read_start_link` lesen, nicht
+  über einen eigenen Pfad, damit die Anpassung aus `docs/windows.md` 4 auch für MCP gilt. Keine Pfade in Beispielen der
+  Einrichtung fest verdrahten (Aufruf `openpacketmon mcp` bzw. `openpacketmon.exe mcp`).
 
 ---
 

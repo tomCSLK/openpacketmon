@@ -1,0 +1,172 @@
+# Windows-Version von openpacketmon
+
+Stand: 2026-10-30. Diese Datei beschreibt, was nötig ist, um das Projekt auf einem Windows-Rechner fortzusetzen und dort eine
+Windows-Version zu bauen und zu testen.
+
+**Heutiger Stand:** openpacketmon läuft nur unter Linux und **baut unter Windows noch nicht**. Es ist nichts davon umgesetzt.
+Die Punkte in Abschnitt 4 stammen aus einer Durchsicht des Codes; ein Build für Windows war auf dem Linux-Rechner nicht
+möglich (die Abhängigkeiten `ring` und `aws-lc-sys` brauchen einen C-Compiler für Windows). Die vollständige Liste
+der Fehler liefert also erst der erste `cargo check` unter Windows.
+
+**Feste Vorgaben:** Npcap wird **nie mitgeliefert**, der Nutzer installiert es selbst (proprietäre Lizenz). Wireshark-Code
+bleibt tabu. Die Arbeitsregeln in `CLAUDE.md` gelten unverändert.
+
+## 1. Was auf dem Windows-Rechner installiert sein muss
+
+Vorgesehen sind Windows 10/11 x64. Die `winget`-Befehle sind Vorschläge und noch nicht ausprobiert.
+
+| Was | Wofür | Installation |
+|---|---|---|
+| Git für Windows | Repo, außerdem Git Bash für `dev/*.sh` | `winget install Git.Git` |
+| Visual Studio Build Tools mit „Desktop development with C++“ und Windows SDK | Linker und C-Compiler für Rust | `winget install Microsoft.VisualStudio.2022.BuildTools`, danach die Komponente im Visual Studio Installer wählen |
+| Rust (rustup, Toolchain `stable-x86_64-pc-windows-msvc`) | Bauen | `winget install Rustlang.Rustup` |
+| Npcap | Mitschnitt zur Laufzeit, die Tests und der Build von `pcap` brauchen `wpcap.dll` | https://npcap.com/#download |
+| Npcap SDK | Linken gegen `wpcap.lib` | https://npcap.com/#download, entpacken, `Lib\x64` in die Umgebungsvariable `LIB` |
+| WebView2 Runtime | Fenster-Programm (wry) | bei Windows 11 dabei, sonst von Microsoft |
+| Python 3 | `dev/third-party-licenses.py`, `dev/update-services.py` | `winget install Python.Python.3.12` |
+| GitHub CLI | Anmeldung, Repo, später Releases | `winget install GitHub.cli` |
+| cargo-deny 0.20.2 | Lizenz- und Sicherheitsprüfung | `cargo install cargo-deny --locked --version 0.20.2` |
+| Claude Code | Weiterarbeit | wie gewohnt |
+
+Falls `aws-lc-sys` beim Bauen CMake oder NASM verlangt, beides nachinstallieren (`winget install Kitware.CMake`,
+`winget install NASM.NASM`).
+
+Für den Installer kommt später WiX oder Inno Setup dazu (Abschnitt 6).
+
+**Zum Testen sinnvoll:** eine echte Netzwerkkarte, und für den Installationstest eine zweite, saubere Windows-Umgebung
+(virtuelle Maschine), in der noch kein Npcap und kein Rust installiert ist.
+
+## 2. Zugänge und Dateien
+
+- **GitHub:** Das Repo `tomCSLK/openpacketmon` ist noch privat, also vorher `gh auth login` mit dem Konto `tomCSLK`.
+- **Im Repo ist alles, was zum Bauen nötig ist.** Das gilt auch für die Icons bis 1024 px (`resources/packaging/linux/graphics/`).
+- **Nur auf dem Linux-Laptop, zum Bauen nicht nötig:**
+  - `CLAUDE.local.md` (nur Angaben zum Laptop),
+  - `~/Claude/Projekte/CLAUDE.md` (Übersicht aller Projekte),
+  - `~/Bilder/openpacketmon_*` (Original-Logos),
+  - `../PRTG_Nachbau` (opennetmon) und `../design-system`,
+  - `~/Dokumente/openpacketmon-history-bis-2026-10-29.bundle` (alte Historie),
+  - der lokale Zweig `design-muster`.
+- **Notizen von Claude Code** liegen nur auf dem Laptop. Die wichtigen Regeln stehen deshalb auch in `CLAUDE.md`
+  (Arbeitsregeln) und `PLAN.md` 4.10 (Haltepunkt Sniffnet).
+
+## 3. Einrichten
+
+In PowerShell, nach dem Installieren von Abschnitt 1:
+
+```powershell
+gh auth login
+gh repo clone tomCSLK/openpacketmon
+cd openpacketmon
+# der Pfad ist ein Beispiel: dorthin, wo das Npcap SDK entpackt wurde
+[Environment]::SetEnvironmentVariable("LIB", "C:\npcap-sdk\Lib\x64;" + [Environment]::GetEnvironmentVariable("LIB", "User"), "User")
+# neues Terminal öffnen, dann:
+cargo check --workspace
+```
+
+`.gitattributes` setzt für Textdateien `eol=lf`, die Zeilenenden bleiben also auch unter Windows richtig.
+
+Die Arbeit gehört in einen eigenen Zweig (z. B. `windows`), bis sie unter Linux und Windows grün ist. Die Linux-Fassung muss
+dabei unverändert weiter bauen; Windows-Code kommt hinter `#[cfg(windows)]`, Linux-Code hinter `#[cfg(unix)]`.
+
+## 4. Was im Code zu tun ist
+
+### Server `openpacketmon`
+
+| Stelle | Heute | Für Windows |
+|---|---|---|
+| `src/web/mod.rs` `shutdown_signal` | `tokio::signal::unix`, **baut nicht** | Teil hinter `#[cfg(unix)]`; unter Windows reicht `ctrl_c` |
+| `src/web/auth.rs` `write_start_link` | `std::os::unix`-Rechte `0700`/`0600`, **baut nicht** | Datei im Benutzerprofil anlegen; prüfen, dass nur der Benutzer lesen kann (ACL). Sie enthält den Zugangsschlüssel, das ist sicherheitsrelevant |
+| `src/web/auth.rs` `start_link_path` | `XDG_RUNTIME_DIR`, sonst Konfigurationsordner | Rückfall greift; `%LOCALAPPDATA%` wäre passender als das roamende `%APPDATA%` |
+| `src/utils/formatted_strings.rs` `redirect_stdout_stderr_to_file` | nutzt die Crate `gag`, die nicht mehr in `Cargo.toml` steht, **baut im Release nicht** | Funktion entfernen oder `gag` wieder aufnehmen; Log-Datei wird gebraucht, wenn es kein Konsolenfenster gibt |
+| `src/main.rs` `open_browser` | `xdg-open` | Browser unter Windows öffnen. Der Link enthält `?token=`, also keinen Weg über `cmd /c start` mit ungeschütztem `&`; besser `rundll32 url.dll,FileProtocolHandler` oder `ShellExecuteW`. Nur `http(s)` zulassen |
+| `src/web/app.rs` `app_binary` | Dateiname ohne Endung | `openpacketmon-app.exe` suchen |
+| `src/web/app.rs` Autostart | `.desktop` in `~/.config/autostart` | Eintrag unter `HKCU\Software\Microsoft\Windows\CurrentVersion\Run` oder Verknüpfung im Ordner „Autostart“, Tests anpassen |
+| `src/mmdb/geo.rs` `geo_dir` | `HOME`, `.local/share` (`HOME` fehlt unter Windows) | `%LOCALAPPDATA%\openpacketmon\geo` |
+| `src/mmdb/geo.rs` `geoipupdate_file` | `/var/lib/GeoIP/…` | unter Windows weglassen oder den Ordner von `geoipupdate` nehmen, Test anpassen |
+| `src/networking/traffic_preview.rs`, `capture_context.rs` | aus Sniffnet, schon für Windows vorbereitet | prüfen |
+| Adapterliste, `--adapter`, Aufzeichnungsseite | Namen wie `enp0s31f6` | unter Windows heißen sie `\Device\NPF_{GUID}`: überall die Beschreibung zeigen (`get_desc`), den Namen nur intern verwenden |
+| Latenzmessung (`surge-ping`) | unter Linux unprivilegiert | ICMP-Sockets ohne Adminrechte gibt es unter Windows vermutlich nicht: prüfen, sonst Hinweis in der Oberfläche |
+| Programme je Verbindung (`listeners`) | hat einen Windows-Teil | prüfen, auch die Kürzung auf 15 Zeichen in unserem Code (betrifft nur Linux) |
+| Doku-Texte | „Linux“, `setcap`, `systemctl`, `/usr/share/doc/…` | Oberfläche und README prüfen |
+
+Der Build von Windows braucht in `build.rs` zusätzlich das Programm-Icon: Sniffnet nutzte dafür `winresource`. Bei uns wurde das
+entfernt, es kommt für `openpacketmon.exe` und `openpacketmon-app.exe` mit einem eigenen `.ico` wieder dazu (aus
+`openpacketmon_256x256.png` u. a. erzeugen, **nicht** das `sniffnet.ico` des Originals).
+
+### Fenster-Programm `openpacketmon-app` (`app/src/main.rs`)
+
+Hier liegt die meiste Arbeit, die Datei ist durchgehend auf Linux geschrieben:
+
+| Stelle | Heute | Für Windows |
+|---|---|---|
+| Einzelne Instanz (`single_instance`, `listen_for_show`) | Unix-Socket im Laufzeitordner | Named Pipe oder benannter Mutex; zweiter Start muss das Fenster der laufenden Instanz zeigen |
+| Serverstart | `CommandExt::process_group(0)` | `CREATE_NO_WINDOW`/`CREATE_NEW_PROCESS_GROUP` über `std::os::windows::process::CommandExt` |
+| Pfade `runtime_dir`, `config_dir`, `webview_dir` | `XDG_*`, `HOME` | dieselben Ordner wie der Server. Beide Programme müssen die Datei mit dem Startlink am **selben** Ort suchen |
+| Webview | `build_gtk(window.default_vbox())`, `WebViewBuilderExtUnix`, `WindowExtUnix` | `build(&window)` hinter `cfg`; GTK-Teile nur unter Unix |
+| Links | `xdg-open` | wie beim Server, nur `http(s)` |
+| Konsole | keine Angabe | `#![cfg_attr(windows, windows_subsystem = "windows")]` für das Fenster-Programm. Das gilt je nach Entscheidung auch für den Server, wenn er ohne Fenster laufen soll |
+| `Cargo.toml` | `tao` mit Funktion `x11` | Linux-Funktion nur für Linux aktivieren |
+
+Danach prüfen: Downloads (PCAP) in WebView2, neue Fenster und Links, Anmeldung per Startlink, Symbol im Infobereich, Beenden
+über den Infobereich, Verhalten beim Schließen des Fensters.
+
+Die Trennung der Rechte bleibt: Unter Linux hat der Server die Mitschnittrechte, das Fenster nicht. Unter Windows entscheidet
+die Installation von Npcap, ob normale Benutzer mitschneiden dürfen oder nur Administratoren. Das Fenster-Programm soll
+nie als Administrator laufen müssen.
+
+### Was es unter Windows nicht gibt
+
+- **systemd-User-Dienst:** Dafür reicht der Autostart des Fenster-Programms. Ein Windows-Dienst ist vorerst nicht nötig.
+- **`setcap` und `postinst`:** Das übernimmt Npcap.
+- **`.deb`:** ersetzt durch einen Installer (Abschnitt 6).
+
+## 5. Was unter Windows getestet werden muss
+
+1. `cargo test --workspace`: Tests mit Pfaden (`/var/lib/GeoIP`, `/usr/bin/…`) und Rechten scheitern vermutlich zuerst.
+2. Start ohne Npcap: verständlicher Hinweis mit Link auf npcap.com, kein Absturz. Da `wpcap.dll` beim Laden des Programms
+   gebraucht wird, startet das Programm ohne Npcap womöglich gar nicht; dann braucht es verzögertes Laden.
+3. Mitschnitt auf WLAN, Ethernet und dem Npcap-Loopback-Adapter, jeweils als normaler Benutzer und als Administrator.
+4. Zerleger und Paketliste: Link-Typen unter Windows (kein „Linux cooked capture“), TCP-Analyse mit Offloading (große
+   Segmente).
+5. Programme je Verbindung, Latenzmessung, Geodaten-Download, Benachrichtigungen mit Ton, PCAP-Download und -Import.
+6. IPFIX-Collector: Die Windows-Firewall fragt nach, weil er auf `0.0.0.0:4739` lauscht. Die Oberfläche auf `127.0.0.1` löst
+   keine Nachfrage aus.
+7. Sicherheit: Der Sicherheitstest aus `PLAN.md` 4.8 für die geänderten Stellen, vor allem die Rechte der Startlink-Datei.
+8. Sauberes System: Installer, Deinstallation, Update über eine ältere Version.
+
+## 6. Installer und Release
+
+- Sniffnet baute ein MSI mit WiX: `resources/packaging/windows/setup.wxs`, `EULA.rtf` und Grafiken im Original bei Commit
+  `ab4bf739d464` (bei uns entfernt, siehe `PLAN.md` Phase 2). Wird davon etwas übernommen, gilt die Kennzeichnungspflicht aus
+  `CLAUDE.md`, und Sniffnet-Logo, -Grafiken und -Namen müssen raus.
+- Der Installer darf Npcap nicht enthalten, er nennt nur den Download.
+- **Ohne Code-Signatur warnt Windows SmartScreen** vor dem Installer. Signaturen kosten Geld; das ist eine Entscheidung des
+  Nutzers vor dem ersten Windows-Release.
+- `dev/release.sh` kennt nur das `.deb`. Es braucht eine Erweiterung oder einen Schritt in GitHub Actions.
+- Die Update-Prüfung vergleicht nur Versionsnummern. Der Hinweis muss unter Windows auf den Installer zeigen.
+- `THIRD-PARTY-LICENSES.txt` muss die Windows-Crates enthalten, siehe Abschnitt 7.
+
+## 7. Prüfwerkzeuge und CI
+
+- `deny.toml`: `targets` um `x86_64-pc-windows-msvc` ergänzen.
+- `dev/third-party-licenses.py`: `TARGET` gilt nur für Linux. Es kommen z. B. `webview2-com` und die `windows-*`-Crates dazu,
+  die Windows-Lizenzliste kann also größer werden. Am besten erzeugt das Skript eine gemeinsame Liste für beide Plattformen.
+- `dev/*.sh` laufen in Git Bash. `dev/build-deb.sh` und `dev/release.sh` sind nur für Linux gedacht.
+- `.github/workflows/ci.yml`: einen Job auf `windows-latest` ergänzen, mit Npcap SDK (Sniffnet lädt `npcap-sdk-1.16.zip` von
+  npcap.com und setzt `LIB`). Die Sniffnet-CI installiert Npcap per OEM-Installer über ein Secret, das wir nicht haben, und
+  lässt Windows ohne das Secret bei Pull Requests aus. Bei uns ist also zuerst `fmt`, `check` und `clippy` realistisch. Ob
+  `cargo test` in der CI ohne Npcap läuft, muss sich zeigen.
+
+## 8. Reihenfolge
+
+1. Einrichten (Abschnitt 1 bis 3), `cargo check --workspace` und die echte Fehlerliste mit Abschnitt 4 abgleichen.
+2. Server bauen und starten, Oberfläche im Browser, ein Mitschnitt mit Npcap.
+3. `cargo test`, Pfade und Rechte, vor allem die Startlink-Datei.
+4. Fenster-Programm mit Symbol im Infobereich.
+5. Windows-Eigenheiten aus Abschnitt 5.
+6. CI, Lizenzliste, `deny.toml`.
+7. Installer, Test auf sauberem System, README, Release.
+
+Vor dem Start klären, ob die Arbeit erst nach dem Release 0.3.0 beginnt. Der Haltepunkt aus `PLAN.md` 4.10 gilt auch auf dem
+Windows-Rechner: Das Repo bleibt privat, bis Sniffnet geantwortet hat.

@@ -3,7 +3,7 @@
 
 [package]
 name = "openpacketmon"
-version = "0.2.6"
+version = "0.2.7"
 description = "Network traffic monitor with a browser UI, based on Sniffnet"
 readme = "README.md"
 keywords = ["network", "packet", "traffic", "monitor", "pcap"]

@@ -347,7 +347,8 @@ Der Nutzer testet das installierte `.deb`. Punkte 1, 3 und 4 umgesetzt am 2026-1
    **dunkel** Leiste `#2a0b52` → `#0e0620`, Flächen leicht violett getönt und etwas heller (Variante B; Variante A „Flächen wie
    bisher, Leiste fast schwarz“ verworfen). Schrift, Größen, Knöpfe, Karten, Akzent- und Statusfarben bleiben. Neue Variablen
    `--sidebar-active-text`, `--sidebar-hover`, `--sidebar-focus` in `static/app.css`. Zur Übernahme in opennetmon in dessen
-   `PLAN.md` beschrieben. Offen gelassen: Herkunft/Rechte der Vorlage (nur Farbwerte übernommen, keine Assets).
+   `PLAN.md` beschrieben. Herkunft der Vorlage geklärt (Nutzer, 2026-10-30): eigene Idee, angeregt von den Farben eines
+   anderen Programms, mit Claude Design erstellt; hier nur Farbwerte übernommen, keine Assets.
 
 8. ✅ **Test-Pakete mit eigener Version** (2026-10-29): Ein neues `.deb` mit derselben Version `0.1.0-1` wurde von
    `apt install ./….deb` stillschweigend übersprungen (nur „openpacketmon wird an Stelle von … gewählt“); erst `--reinstall`
@@ -888,16 +889,30 @@ Vorbereitet (2026-10-30):
   verdichtet. Vor dem Release wird `[Unreleased]` zu `[X.Y.Z]`, das Skript prüft das.
 - Geklärt: Die Töne erzeugt der Browser per Oszillator (`static/live.js`), keine Tondateien im Repo.
 
-Noch offen:
-- Nutzertest 0.2.6 abschließen; Version nennt der Nutzer.
-- Herkunft der Vorlage `../design-system` klären (Phase 3 Punkt 7, nur Farbwerte übernommen).
-- Trockenlauf `dev/release.sh`, Installationstest auf sauberem Ubuntu 24.04 und Debian 13.
-- Repo-Einstellungen: Themen (`network-monitor`, `packet-capture`, `rust`, `linux`), Force-Push auf `main` sperren.
-  Beschreibung gesetzt, Wiki/Projects aus.
-- Sichtbarkeit auf **öffentlich** (macht der Nutzer oder nach ausdrücklicher Freigabe per `gh repo edit
-  --visibility public --accept-visibility-change-consequences`). Direkt danach „Private vulnerability reporting“ an: Die API
-  antwortet beim privaten Repo mit 404, und `SECURITY.md` verweist darauf.
-- Release: `dev/release.sh --publish --notes <datei>`, danach `cargo test test_fetch_latest_release_from_github -- --ignored`.
+Stand 2026-10-30: Commit `55f5213` gepusht, CI grün. Test-Paket **0.2.7** gebaut (enthält gegenüber 0.2.6 nur die
+korrigierten Paket-Abhängigkeiten). Von Sniffnet noch keine Antwort.
+
+**Entschieden (Nutzer, 2026-10-30):** Antwort von Sniffnet abwarten, dann umschalten und **0.3.0** als erstes Release
+veröffentlichen. Bleibt die Antwort aus, entscheidet der Nutzer über das weitere Vorgehen.
+
+Noch offen, in dieser Reihenfolge:
+1. **Antwort von Sniffnet** (Gmail-Faden `1a18d94568cbe1f1`, Betreff „Sniffnet IPFIX collector: …“). Einen Termin, den
+   Sniffnet nennt, einhalten; die Herkunftsangabe im Advisory prüfen.
+2. Nutzertest 0.2.7 abschließen (läuft seit 2026-10-30, der Nutzer hat 0.2.7 installiert).
+3. Version **0.3.0** setzen: `Cargo.toml`, `app/Cargo.toml`, `cargo update --workspace --offline`; in `CHANGELOG.md`
+   `## [Unreleased]` zu `## [0.3.0]` mit Datum; Release-Hinweise (Englisch) als Datei schreiben; committen, pushen, CI grün.
+4. Trockenlauf `dev/release.sh` (das Skript lief noch nie), Installationstest auf sauberem Ubuntu 24.04 und Debian 13
+   (Start, Fenster, Mitschnitt). Danach die Angabe in der README prüfen, die diese Systeme nennt.
+5. Repo-Einstellungen: Themen (`network-monitor`, `packet-capture`, `rust`, `linux`), Force-Push auf `main` sperren.
+   Beschreibung gesetzt, Wiki/Projects aus.
+6. Sichtbarkeit auf **öffentlich** (macht der Nutzer oder nach ausdrücklicher Freigabe per `gh repo edit
+   --visibility public --accept-visibility-change-consequences`). Direkt danach „Private vulnerability reporting“ an: Die API
+   antwortet beim privaten Repo mit 404, und `SECURITY.md` verweist darauf.
+7. Release: `dev/release.sh --publish --notes <datei>`, danach
+   `cargo test test_fetch_latest_release_from_github -- --ignored` (geht erst mit einem Release).
+8. Doku nachziehen: `CLAUDE.md`, `PLAN.md`, Übersicht `~/Claude/Projekte/CLAUDE.md`; Haltepunkt aus den Notizen entfernen.
+
+Geklärt (2026-10-30): Herkunft der Vorlage `../design-system`, siehe Phase 3 Punkt 7.
 
 #### Reihenfolge und Aufwand
 
@@ -1105,6 +1120,13 @@ Hinweis: Die Feldnamen (`ip.addr`, `tcp.port`) als Bedienkonvention sind kein Co
 #### 5.2 Weitere Ideen (noch nicht beschlossen)
 
 Langzeitspeicherung (SQLite) und Berichte; Gerätenamen aus AdGuard/Omada; Warnung bei auffälligem Upload. (Fenster-Variante B ist umgesetzt, siehe „Fenster-Programm“.)
+
+#### 5.3 Windows-Version (vorgesehen, noch nicht begonnen)
+
+Alles, was für die Fortsetzung auf einem Windows-Rechner nötig ist, steht in **`docs/windows.md`** (2026-10-30): Software,
+Zugänge, Einrichten, die Linux-Bindungen im Code mit ihrer Lösung, Tests, Installer, CI und Reihenfolge. Der Code baut unter
+Windows noch nicht; die größte Baustelle ist `app/src/main.rs`. Npcap wird nie mitgeliefert. Offen sind Beginn (vor oder nach
+0.3.0) und die Frage einer Code-Signatur.
 
 ---
 

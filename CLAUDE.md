@@ -6,7 +6,7 @@
 Sprache: Deutsch. Fork und Weiterentwicklung von **Sniffnet** (https://github.com/GyulyVGC/sniffnet), einem
 Netzwerkverkehrs-Monitor in Rust (iced-GUI, libpcap). Maßgeblich für Stand, Lizenzprüfung und Vorgehen ist **`PLAN.md`**.
 
-## Status (2026-10-29)
+## Status (2026-10-30)
 
 - Phase: **1, 2 und 3 erledigt** (2026-10-28): privat auf https://github.com/tomCSLK/openpacketmon, dieser Ordner ist das Repo
   (seit 4.9 neues Repo mit einem Anfangs-Commit; Bezug zum Original ist Commit `ab4bf739d464`). Umbenannt, iced-Oberfläche entfernt, Kern als `src/engine/`;
@@ -86,6 +86,11 @@ Netzwerkverkehrs-Monitor in Rust (iced-GUI, libpcap). Maßgeblich für Stand, Li
   `security@sniffnet.app` gemeldet. **Repo bleibt privat, bis Sniffnet geantwortet hat oder ein Termin vereinbart ist.**
   `.deb` mit `depends = "$auto, libcap2-bin"`, neues `dev/release.sh` (Release-Titel `vX.Y.Z`, sonst bleibt die
   Update-Prüfung stumm; noch nicht ausgeführt), README und CHANGELOG für das erste Release überarbeitet.
+  Commit `55f5213`, CI grün; Test-Paket **0.2.7** (nur die korrigierten Abhängigkeiten dazu). Entschieden: nach der Antwort
+  von Sniffnet umschalten und **0.3.0** veröffentlichen. Die vollständige Liste der offenen Schritte steht in `PLAN.md` 4.10.
+  Nutzertest 0.2.7 läuft seit 2026-10-30. Herkunft der Vorlage `../design-system` geklärt: eigene Idee, mit Claude Design erstellt.
+- **Windows-Version** (vorgesehen, noch nicht begonnen): Alles für die Fortsetzung auf einem Windows-Rechner steht in
+  `docs/windows.md` (Software, Einrichten, Linux-Bindungen im Code, Tests, Installer, CI, Reihenfolge).
 - **Bedienung nachgebessert** (2026-10-30, `PLAN.md` Phase 3 Punkt 16): Verbindungsseite ohne
   Knopfleiste, Sprünge direkt in den Zeilen („Pakete 77 · anzeigen · Statistik“, `Fact.links`); Paketdetails mit
   Blätter-Gruppe und „Verbindung: Pakete, Statistik, Stream, Details“; Hinweis auf die Verbindung über Pakete und
@@ -99,6 +104,10 @@ Netzwerkverkehrs-Monitor in Rust (iced-GUI, libpcap). Maßgeblich für Stand, Li
 ## Arbeitsregeln
 
 - Erst planen, Umsetzung nur nach ausdrücklicher Freigabe durch den Nutzer.
+- Committen, Pushen und Pakete bauen nur auf Ansage des Nutzers; die Version nennt der Nutzer. Nach einer Änderung Doku
+  nachziehen, lokal prüfen und berichten, nicht auf die CI warten.
+- **Repo nicht öffentlich schalten und nichts veröffentlichen, solange der Haltepunkt in `PLAN.md` 4.10 gilt** (auch auf
+  anderen Rechnern).
 - **Nichts auf GitHub anlegen oder hochladen, bevor Name und Logo feststehen.** Repo zuerst privat (kein GitHub-Fork, siehe `PLAN.md` Phase 1).
 - Vor dem Öffentlich-Schalten `PLAN.md` Phase 4 vollständig abarbeiten (u. a. GeoIP zur Laufzeit, Fremdlizenzen, Sicherheitstest).
 - Oberfläche: Technik und Designsystem von opennetmon (`../PRTG_Nachbau`, `static/app.css`, Templates) wiederverwenden; deren Dateien
@@ -122,8 +131,10 @@ Netzwerkverkehrs-Monitor in Rust (iced-GUI, libpcap). Maßgeblich für Stand, Li
 - Rust Edition 2024, Workspace mit `lib/sniffnet-packet-parser`; Build unter Linux braucht `libpcap-dev` und `libwebkit2gtk-4.1-dev` (Fenster-Programm).
 - Prüfen: `cargo deny --workspace check` (cargo-deny 0.20.2; ohne `--workspace` fehlt `openpacketmon-app`), `cargo test --workspace`, `cargo clippy -- -D warnings` (ohne `--all-targets`, wie Upstream; der Testcode hat viele Pedantic-Meldungen), `cargo fmt --all -- --check`.
 - Paket: **`dev/build-deb.sh`** (2026-10-29) baut alles mit der Version aus `Cargo.toml` und nennt den Installationsbefehl.
-  **Versionen wie bei opennetmon** (Wunsch des Nutzers): `0.x.y` ohne Datum, vor jedem neuen Test-Paket in `Cargo.toml`
-  erhöhen – `y` bei Kleinigkeiten, `x` bei größeren Schritten (nächster größerer Sprung: `0.2.0`). Das Skript hält an, wenn die
+  **Versionen wie bei opennetmon** (Wunsch des Nutzers): `0.x.y` ohne Datum, vor jedem neuen Test-Paket in `Cargo.toml` und
+  `app/Cargo.toml` erhöhen, danach `cargo update --workspace --offline` (sonst scheitert die Lizenzprüfung im Skript an
+  `Cargo.lock`) – `y` bei Kleinigkeiten, `x` bei größeren Schritten (nächster größerer Sprung: `0.3.0`, erstes Release;
+  Ablauf mit `dev/release.sh` in `PLAN.md` 4.10). Das Skript hält an, wenn die
   Version nicht neuer als die installierte ist, weil `apt install ./….deb` ein Paket gleicher Version stillschweigend
   überspringt („… wird an Stelle von … gewählt“); `--force` baut trotzdem, dann `apt install --reinstall`. Von Hand:
   `cargo build --release --workspace && cargo deb` (`cargo deb` allein baut `openpacketmon-app` nicht neu). Jeder `cargo build`

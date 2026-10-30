@@ -1,6 +1,6 @@
 [package]
 name = "openpacketmon-app"
-version = "0.2.6"
+version = "0.2.7"
 description = "Window and tray icon for openpacketmon"
 authors.workspace = true
 edition.workspace = true

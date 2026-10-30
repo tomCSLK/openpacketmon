@@ -2527,7 +2527,7 @@ checksum = "384b8ab6d37215f3c5301a95a4accb5d64aa607f1fcb26a11b5303878451b4fe"
 
 [[package]]
 name = "openpacketmon"
-version = "0.2.6"
+version = "0.2.7"
 dependencies = [
  "askama",
  "async-channel",
@@ -2572,7 +2572,7 @@ dependencies = [
 
 [[package]]
 name = "openpacketmon-app"
-version = "0.2.6"
+version = "0.2.7"
 dependencies = [
  "png",
  "serde_json",

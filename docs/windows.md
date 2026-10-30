@@ -9,7 +9,8 @@ möglich (die Abhängigkeiten `ring` und `aws-lc-sys` brauchen einen C-Compiler 
 der Fehler liefert also erst der erste `cargo check` unter Windows.
 
 **Feste Vorgaben:** Npcap wird **nie mitgeliefert**, der Nutzer installiert es selbst (proprietäre Lizenz). Wireshark-Code
-bleibt tabu. Die Arbeitsregeln in `CLAUDE.md` gelten unverändert.
+bleibt tabu. Die Arbeitsregeln in `CLAUDE.md` gelten unverändert. Die Arbeit beginnt **erst nach dem Release 0.3.0**, und der
+Installer soll, wenn möglich, signiert werden (Nutzer, 2026-10-30).
 
 ## 1. Was auf dem Windows-Rechner installiert sein muss
 
@@ -141,11 +142,37 @@ nie als Administrator laufen müssen.
   `ab4bf739d464` (bei uns entfernt, siehe `PLAN.md` Phase 2). Wird davon etwas übernommen, gilt die Kennzeichnungspflicht aus
   `CLAUDE.md`, und Sniffnet-Logo, -Grafiken und -Namen müssen raus.
 - Der Installer darf Npcap nicht enthalten, er nennt nur den Download.
-- **Ohne Code-Signatur warnt Windows SmartScreen** vor dem Installer. Signaturen kosten Geld; das ist eine Entscheidung des
-  Nutzers vor dem ersten Windows-Release.
+- **Code-Signatur:** Der Installer soll, wenn möglich, signiert werden (Nutzer, 2026-10-30); ohne Signatur warnt Windows
+  SmartScreen. Die Wege stehen in Abschnitt 6.1.
 - `dev/release.sh` kennt nur das `.deb`. Es braucht eine Erweiterung oder einen Schritt in GitHub Actions.
 - Die Update-Prüfung vergleicht nur Versionsnummern. Der Hinweis muss unter Windows auf den Installer zeigen.
 - `THIRD-PARTY-LICENSES.txt` muss die Windows-Crates enthalten, siehe Abschnitt 7.
+
+### 6.1 Code-Signatur
+
+Recherche vom 2026-10-30, vor der Umsetzung erneut prüfen. Vorgehen: zuerst SignPath versuchen, sonst ein OV-Zertifikat kaufen.
+Auch mit Signatur kann SmartScreen anfangs warnen, bis der Installer genug Reputation gesammelt hat.
+
+| Weg | Für uns | Bedingungen und Haken |
+|---|---|---|
+| **SignPath Foundation** (kostenlos für Open Source, https://signpath.org/terms.html) | **erster Versuch, Zusage nicht sicher** | Siehe unten |
+| **OV-Zertifikat** einer Zertifizierungsstelle | Rückfall, geht auch für Privatpersonen | Kostet jährlich Geld, Preise vor dem Kauf vergleichen. Der Schlüssel liegt auf Hardware-Token oder in einem Cloud-Dienst, das muss zum Build passen |
+| **Azure Artifact Signing** (früher Trusted Signing) | **kommt nicht infrage** | Laut einer Antwort auf Microsoft Q&A für Einzelentwickler nur in USA und Kanada, Organisationen auch in der EU. Ab 9,99 $ im Monat, braucht ein bezahltes Azure-Abo |
+
+Was SignPath verlangt und was das für uns heißt:
+
+- **Bereits veröffentlicht:** Das Projekt muss schon in der Form veröffentlicht sein, die signiert werden soll. Es braucht also
+  ein öffentliches Repo und zuerst ein **unsigniertes Windows-Release**. SignPath verlangt außerdem eine nachprüfbare Reputation.
+- **Build in der CI:** Die Binärdateien müssen nachprüfbar aus dem Quellcode entstehen. Der Windows-Build muss also in GitHub
+  Actions laufen, nicht auf dem eigenen Rechner. Jedes Release wird von Hand freigegeben.
+- **Kein Hacking-Werkzeug:** Verboten sind Funktionen, die Sicherheitslücken finden oder ausnutzen, auch Diagnosewerkzeuge, die
+  aktiv nach ausnutzbaren Schwachstellen suchen. openpacketmon sucht nicht nach Lücken, sondern zeigt Verkehr. Trotzdem ist es ein
+  Paketmitschnitt-Programm, und SignPath entscheidet ohne Einspruchsmöglichkeit. **Hier kann die Ablehnung kommen.**
+- **Herausgeber:** Im Zertifikat steht „SignPath Foundation“, nicht der Name des Projekts oder des Nutzers.
+- **Keine proprietären Teile:** Npcap liegt nicht bei, das passt. Alle Komponenten brauchen eine OSI-Lizenz.
+- **Website:** Auf Startseite und Download-Seite ein Abschnitt „Code signing policy“ mit dem Satz aus den Bedingungen, Rollen
+  und Datenschutzangabe. Die Update-Prüfung ist in der README beschrieben und abschaltbar; ob das reicht, beim Antrag klären.
+- **Konten:** Mehr-Faktor-Anmeldung für SignPath und GitHub.
 
 ## 7. Prüfwerkzeuge und CI
 
@@ -166,7 +193,8 @@ nie als Administrator laufen müssen.
 4. Fenster-Programm mit Symbol im Infobereich.
 5. Windows-Eigenheiten aus Abschnitt 5.
 6. CI, Lizenzliste, `deny.toml`.
-7. Installer, Test auf sauberem System, README, Release.
+7. Installer, Test auf sauberem System, README, erstes Windows-Release, zunächst unsigniert.
+8. Signatur beantragen (Abschnitt 6.1), danach signierte Installer.
 
-Vor dem Start klären, ob die Arbeit erst nach dem Release 0.3.0 beginnt. Der Haltepunkt aus `PLAN.md` 4.10 gilt auch auf dem
-Windows-Rechner: Das Repo bleibt privat, bis Sniffnet geantwortet hat.
+**Beginn (Nutzer, 2026-10-30):** erst nach dem Release 0.3.0. Bis dahin gilt auch auf dem Windows-Rechner der Haltepunkt aus
+`PLAN.md` 4.10.

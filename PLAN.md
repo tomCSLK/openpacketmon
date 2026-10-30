@@ -1125,8 +1125,12 @@ Langzeitspeicherung (SQLite) und Berichte; Gerätenamen aus AdGuard/Omada; Warnu
 
 Alles, was für die Fortsetzung auf einem Windows-Rechner nötig ist, steht in **`docs/windows.md`** (2026-10-30): Software,
 Zugänge, Einrichten, die Linux-Bindungen im Code mit ihrer Lösung, Tests, Installer, CI und Reihenfolge. Der Code baut unter
-Windows noch nicht; die größte Baustelle ist `app/src/main.rs`. Npcap wird nie mitgeliefert. Offen sind Beginn (vor oder nach
-0.3.0) und die Frage einer Code-Signatur.
+Windows noch nicht; die größte Baustelle ist `app/src/main.rs`. Npcap wird nie mitgeliefert.
+
+Entschieden (Nutzer, 2026-10-30): **Beginn erst nach dem Release 0.3.0**; der Installer soll, **wenn möglich, eine Code-Signatur**
+bekommen. Weg (`docs/windows.md` 6.1): zuerst kostenlos über die SignPath Foundation, das setzt ein unsigniertes Windows-Release und
+einen Build in GitHub Actions voraus, und die Zusage ist nicht sicher, weil deren Regel „No hacking tools“ ein
+Mitschnitt-Programm treffen könnte. Sonst ein OV-Zertifikat; Azure Artifact Signing gibt es für Einzelentwickler in Deutschland nicht.
 
 ---
 

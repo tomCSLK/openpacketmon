@@ -528,36 +528,35 @@ für Dienste entfallen; die **Mini-Ansicht entfällt**. Umsetzung am 2026-10-29:
     Geprüft: 2 neue Tests, Headless-Chrome mit erzeugter PCAP bei 1000/1400 px, hell/dunkel (Latenz-Zeile nur bei
     Live-Mitschnitt, dort nicht erneut geprüft). Test-Paket **0.2.6** gebaut (2026-10-30).
 
-17. ⬜ **Zurück-Knopf fehlt** (Rückmeldung 2026-10-30 zu 0.2.7, vorgemerkt, noch nicht umgesetzt; Wunsch des Nutzers:
-    unbedingt, **noch vor 0.3.0**, nach dem laufenden Test): „In vielen Situationen fehlt er eindeutig.“ Stand im Code: Das Fenster-Programm hat keine Browser-Leiste, dort
-    gibt es also keinen sichtbaren Weg zurück. Einen Zurück-Link haben nur die Fehlerseite (`data-back`, `static/app.js` mit
-    `history.back()`) und die Paketdetails (Brotkrumen `back`). Die Sprünge zwischen Verbindung, Paketen, Statistik und Stream
-    führen damit nur vorwärts. Beim Umsetzen klären: ein Knopf an fester Stelle im Seitenkopf aller Seiten statt je Seite,
-    `history.back()` mit Rückfall ohne Verlauf (wie `data-back`), Filter und Position der Ausgangsseite bleiben erhalten,
-    Alt+Links im Fenster-Programm prüfen. Beispiele, wo er am meisten fehlt, kann der Nutzer aus dem laufenden Test nennen.
+17. ✅ **Zurück-Knopf** (Rückmeldung 2026-10-30 zu 0.2.7, umgesetzt 2026-10-31): „In vielen Situationen fehlt er eindeutig.“ Das
+    Fenster-Programm hat keine Browser-Leiste, die Sprünge zwischen Verbindung, Paketen, Statistik und Stream führten nur vorwärts.
+    - Knopf „‹ Zurück“ fest links neben dem Titel aller Seiten (`templates/app.html`, `.page-back`, Seitenköpfe eingerückt).
+    - Ein Schritt durch die Seiten des Tabs (`static/app.js`): Jeder Verlaufseintrag merkt sich in `history.state` seine Tiefe und
+      wie viele Schritte zur vorigen anderen Seite führen. Formulare, die zur selben Seite zurückkehren (Favorit, Einheit, Pause),
+      erzeugen sonst Einträge mit gleicher Adresse, und „Zurück“ täte scheinbar nichts. Die Tiefe wandert in `sessionStorage` von Seite zu Seite.
+    - Ohne Verlauf (Seite direkt geöffnet): Verbindung → Verbindungen, Paket → Liste, Stream → Paket (`{% block back %}`); die Seiten der
+      Navigation haben kein Ziel, der Knopf ist dann ausgegraut.
+    - Blättern (nächstes Paket, Text/Hex, Richtung im Stream) legt mit `data-replace` keinen eigenen Schritt an: Zurück führt aus den
+      Paketdetails direkt zur Liste. Beim Öffnen eines Pakets schreibt `packets.js` `goto=` in die Adresse der Liste, Zurück landet also
+      beim Paket statt am Ende der Liste; die Liste folgt dann nicht mehr den neuen Paketen (Knopf Live).
+    - Alt+Links macht dasselbe wie der Knopf. Die Fehlerseite behält ihren eigenen `data-back` (ein Schritt, damit das Formular erhalten bleibt).
+    - Geprüft in Headless-Chrome (Testinstanz, erzeugte PCAP, 152 Pakete) mit Klick, Alt+Links, Favoriten-Formular, Blättern und frischen
+      Tabs. **Im Fenster-Programm (WebKitGTK) noch nicht geprüft** (Test-Paket 0.2.8).
 
-18. ⬜ **Statistik-Knopf auf der Seite Verbindungen** (Rückmeldung 2026-10-30 zu 0.2.7, vorgemerkt, noch nicht umgesetzt): Ein
-    Knopf „Statistik“ soll den Inhalt der Suchleiste automatisch übernehmen, und die Statistik muss entsprechend angepasst
-    werden. Das geht nicht durch einfaches Weitergeben des Texts, denn die beiden Filter sind verschieden:
-    - Die Verbindungen filtern mit `Filter::parse_connections` (`CONNECTION_FIELDS`) über Verbindungen, die Statistik mit dem
-      Anzeigefilter `Filter::parse` über Pakete. `ip.addr` oder `tcp.port` gibt es in beiden. Felder wie `country`, `program`,
-      `service`, `direction`, `favorite`, `bytes`, `packets` kennt nur der Verbindungsfilter, und dort `bytes` meint die Summe
-      der Verbindung. `/statistics?f=country == US` wäre also ein Filterfehler.
-    - Machbar ist es, weil jedes `StoredPacket` seine Verbindung kennt (`src/engine/packets.rs`).
-
-    Vorgehen (vom Nutzer bestätigt, 2026-10-30): `/statistics` bekommt einen zweiten Parameter (z. B. `c=` für den Verbindungsfilter). Die Statistik nimmt dann die
-    Pakete aller Verbindungen, auf die der Filter passt. Dazu gehören:
-    - Das Filterfeld der Statistik zeigt und prüft dann den Verbindungsfilter (`data-filter-kind="connections"`), und ein Hinweis
-      nennt, dass die Auswahl von der Seite Verbindungen kommt. Zurücksetzen und ein Weg zurück zu den Verbindungen mit demselben
-      Filter (passt zu Punkt 17).
-    - Die Sprünge der Statistik (Protokollhierarchie, Befunde, Antwortzeiten, „Pakete“ über `packets_link`/`and_filter`) hängen
-      bisher einen Anzeigefilter an. Sie brauchen dieselbe Auswahl, also muss `/packets` den Parameter ebenfalls verstehen.
-    - Der Treffer-Zwischenspeicher (`with_matches`) ist nach dem Filtertext geordnet; er muss die neue Art unterscheiden und bei
-      laufender Aufzeichnung neue Verbindungen aufnehmen. Werte wie `bytes` ändern sich dabei laufend.
-    - Ohne Paketspeicher (aus) oder bei IPFIX gibt es keine Pakete: Der Knopf braucht dann einen Hinweis, wie die Statistik heute.
-      Es zählen nur Pakete, die noch im Speicher sind; die Summen können also kleiner sein als in der Verbindungsliste.
-    - Der Knopf gilt für den angewendeten Filter. Ist er falsch, oder ist die Suchleiste leer, zeigt er nichts Falsches: bei
-      leerer Leiste einfach die ganze Statistik. Die gleiche Übernahme wäre für „Pakete“ möglich, gewünscht ist bisher nur Statistik.
+18. ✅ **Statistik-Knopf auf der Seite Verbindungen** (Rückmeldung 2026-10-30 zu 0.2.7, umgesetzt 2026-10-31): Der Knopf „Statistik“
+    übernimmt den Inhalt der Suchleiste, auch wenn er noch nicht angewendet wurde, und die Statistik zeigt die Pakete aller passenden
+    Verbindungen. Die Filter sind verschieden: `country`, `program`, `service`, `direction`, `favorite`, `bytes`, `packets` kennt nur der
+    Verbindungsfilter, daher ein eigener Parameter.
+    - `/statistics`, `/packets`, `/api/packets` und `/packets.pcap` verstehen `c=` (Verbindungsfilter) neben `f=` (Anzeigefilter), beide
+      lassen sich kombinieren (`packets::Selection`). Jedes `StoredPacket` kennt seine Verbindung; `EngineState::selected_connections`
+      nennt die passenden. Wie in der Verbindungsliste zählt jede Richtung als eigene Verbindung: `direction == outgoing` nimmt nur diese Pakete.
+    - Abweichung vom Plan: Das Filterfeld wechselt nicht seine Bedeutung. Ist `c` gesetzt, steht links daneben ein zweites Feld mit dem
+      Verbindungsfilter (`data-filter-kind="connections"`, `templates/connections_field.html`), sonst ginge die Kombination aus Statistik-Links
+      (`c=…&f=tcp`) nicht. Darüber ein Hinweis mit Link zurück zu den Verbindungen (`connections_note.html`), Zurücksetzen entfernt beide.
+    - `FilterIndex::with_connections`: eigener Eintrag je Filtertext, merkt sich die Menge der Verbindungen. Ändert sie sich (neue Verbindung,
+      `bytes` wächst), wird neu ausgewertet, ohne Pakete zu zerlegen; sonst kommen nur neue Pakete dazu. Einträge von 4 auf 6 erhöht.
+    - Ohne Paketspeicher oder bei IPFIX führt der Knopf zur Statistik mit deren Hinweis. Es zählen nur Pakete, die noch im Speicher sind;
+      die Summen können kleiner sein als in der Verbindungsliste, das sagt der Hinweis.
 
 #### Fenster-Programm `openpacketmon-app` (Variante B, erledigt am 2026-10-28)
 
@@ -929,10 +928,8 @@ veröffentlichen. Bleibt die Antwort aus, entscheidet der Nutzer über das weite
 Noch offen, in dieser Reihenfolge:
 1. **Antwort von Sniffnet** (Gmail-Faden `1a18d94568cbe1f1`, Betreff „Sniffnet IPFIX collector: …“). Einen Termin, den
    Sniffnet nennt, einhalten; die Herkunftsangabe im Advisory prüfen.
-2. Nutzertest 0.2.7 abschließen (läuft seit 2026-10-30, der Nutzer hat 0.2.7 installiert; erster Eindruck sehr gut) und die
-   Rückmeldungen umsetzen. **Der Zurück-Knopf (Phase 3 Punkt 17) kommt noch vor 0.3.0** (Nutzer, 2026-10-30), Umsetzung nach
-   dem Test, damit weitere Rückmeldungen mit einfließen. Ebenfalls aus dem Test: Statistik-Knopf auf der Seite Verbindungen
-   (Punkt 18).
+2. Nutzertest 0.2.7 vorläufig abgeschlossen (2026-10-31). Zurück-Knopf und Statistik-Knopf (Phase 3 Punkte 17, 18) sind umgesetzt
+   (2026-10-31), Test-Paket **0.2.8** gebaut. Offen: Zurück-Knopf und Alt+Links im Fenster-Programm prüfen.
 3. Version **0.3.0** setzen: `Cargo.toml`, `app/Cargo.toml`, `cargo update --workspace --offline`; in `CHANGELOG.md`
    `## [Unreleased]` zu `## [0.3.0]` mit Datum; Release-Hinweise (Englisch) als Datei schreiben; committen, pushen, CI grün.
 4. Trockenlauf `dev/release.sh` (das Skript lief noch nie), Installationstest auf sauberem Ubuntu 24.04 und Debian 13

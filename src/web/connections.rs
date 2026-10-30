@@ -28,7 +28,7 @@ use crate::report::types::sort_type::SortType;
 use crate::web::auth::Session;
 use crate::web::entries::{encode, host_sub, program_label, service_label};
 use crate::web::i18n::{self, Lang};
-use crate::web::packets::filter_error;
+use crate::web::packets::{filter_error, filters_href};
 use crate::web::pager::Pager;
 use crate::web::pages::{Layout, render};
 use crate::web::{AppState, WebError, format};
@@ -222,6 +222,8 @@ struct ConnectionsPage {
     programs: bool,
     unit: &'static str,
     back: String,
+    /// The statistics of the packets of the connections of the filter
+    statistics: String,
 }
 
 /// `GET /connections`
@@ -297,6 +299,7 @@ pub async fn list(
         programs: engine.capture_source.supports_programs(),
         unit: crate::web::api::unit_code(unit),
         back: query.href(page),
+        statistics: filters_href("/statistics", "", &query.f),
         query,
     })
 }

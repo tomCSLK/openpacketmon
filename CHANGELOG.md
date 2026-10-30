@@ -19,6 +19,8 @@ First public version. This list describes what differs from Sniffnet.
 - New program `openpacketmon-app`: the UI in its own window (system web view) with a tray icon (open, browser, quit). It
   starts the server when needed and runs without capture rights; closing the window keeps the capture running, downloads
   go to the download folder, and links to other sites open in the browser. A setting starts it in the tray at sign-in
+- A back button on every page, also for the window without a browser bar. Statistics, packet list and PCAP download can
+  take the connection filter, so the Connections page opens the statistics of everything its search selects
 - Sign-in with a start link (random access key, readable only by the user), session cookie, CSRF tokens, `Host`/`Origin`
   checks and security headers
 - A second start only opens the browser for the running instance, with one start link file per port; options `--port`,

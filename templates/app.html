@@ -65,6 +65,8 @@
   </aside>
   <main class="content">
     <div class="page{% block page_class %}{% endblock %}">
+      {# one step back; the address is the way there for a page opened directly, empty for the pages of the navigation #}
+      <a class="button secondary small page-back" href="{% block back %}{% endblock %}" data-nav-back title="{{ t.get("back-hint") }}">‹ {{ t.get("back") }}</a>
 {% block content %}{% endblock %}
     </div>
   </main>

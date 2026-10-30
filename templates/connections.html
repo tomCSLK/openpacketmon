@@ -7,7 +7,7 @@
     <h1>{{ t.get("nav-connections") }}</h1>
     <p class="subtitle">{{ t.get("connections-subtitle") }}</p>
   </div>
-  <div class="actions">{% include "unit_select.html" %}</div>
+  <div class="actions"><a class="button secondary" href="{{ statistics }}" data-filter-carry title="{{ t.get("connections-statistics-hint") }}">{{ t.get("nav-statistics") }}</a>{% include "unit_select.html" %}</div>
 </div>
 {% if !running %}<p class="notice">{{ t.get("no-capture") }} <a href="/">{{ t.get("no-capture-start") }}</a></p>{% endif %}
 <form method="get" action="/connections" class="filter-bar" data-filter-form>

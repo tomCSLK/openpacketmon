@@ -1,6 +1,7 @@
 {% extends "app.html" %}
 {% block title %}{{ t.get("stream-title") }} · openpacketmon{% endblock %}
 {% block page_class %} wide{% endblock %}
+{% block back %}/packet?n={{ number }}{% endblock %}
 {% block content %}
 <div class="page-head">
   <div>
@@ -19,13 +20,13 @@
     <h2 class="stream-sides"><span class="stream-client">{{ client }} → {{ server }}: {{ client_counts }}</span> <span class="stream-server">{{ server }} → {{ client }}: {{ server_counts }}</span></h2>
     <div class="card-tools">
       <span class="segmented">
-        <a class="button small{% if view != "text" %} secondary{% endif %}" href="{{ base }}&side={{ side }}">{{ t.get("stream-text") }}</a>
-        <a class="button small{% if view != "hex" %} secondary{% endif %}" href="{{ base }}&view=hex&side={{ side }}">Hex</a>
+        <a class="button small{% if view != "text" %} secondary{% endif %}" href="{{ base }}&side={{ side }}" data-replace>{{ t.get("stream-text") }}</a>
+        <a class="button small{% if view != "hex" %} secondary{% endif %}" href="{{ base }}&view=hex&side={{ side }}" data-replace>Hex</a>
       </span>
       <span class="segmented">
-        <a class="button small{% if side != "both" %} secondary{% endif %}" href="{{ base }}&view={{ view }}">{{ t.get("stream-both") }}</a>
-        <a class="button small{% if side != "client" %} secondary{% endif %}" href="{{ base }}&view={{ view }}&side=client" title="{{ client }} → {{ server }}">{{ t.get("stream-client-side") }}</a>
-        <a class="button small{% if side != "server" %} secondary{% endif %}" href="{{ base }}&view={{ view }}&side=server" title="{{ server }} → {{ client }}">{{ t.get("stream-server-side") }}</a>
+        <a class="button small{% if side != "both" %} secondary{% endif %}" href="{{ base }}&view={{ view }}" data-replace>{{ t.get("stream-both") }}</a>
+        <a class="button small{% if side != "client" %} secondary{% endif %}" href="{{ base }}&view={{ view }}&side=client" data-replace title="{{ client }} → {{ server }}">{{ t.get("stream-client-side") }}</a>
+        <a class="button small{% if side != "server" %} secondary{% endif %}" href="{{ base }}&view={{ view }}&side=server" data-replace title="{{ server }} → {{ client }}">{{ t.get("stream-server-side") }}</a>
       </span>
     </div>
   </div>

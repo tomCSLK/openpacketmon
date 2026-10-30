@@ -13,13 +13,15 @@
 {% if !running %}<p class="notice">{{ t.get("no-capture") }} <a href="/">{{ t.get("no-capture-start") }}</a></p>
 {% else if !unavailable.is_empty() %}<p class="notice">{{ unavailable }}</p>{% endif %}
 {% include "connection_note.html" %}
+{% include "connections_note.html" %}
 <form method="get" action="/statistics" class="filter-bar" data-filter-form>
+  {% include "connections_field.html" %}
   <input type="search" name="f" value="{{ filter }}" placeholder="{{ t.get("stats-filter-placeholder") }}" aria-label="{{ t.get("packets-filter") }}"
-    autocomplete="off" spellcheck="false" data-filter-input{% if error.is_some() %} class="invalid"{% else if !filter.trim().is_empty() %} class="valid"{% endif %}>
+    autocomplete="off" spellcheck="false" data-filter-input{% if let Some(e) = error %}{% if !e.connections %} class="invalid"{% endif %}{% else if !filter.trim().is_empty() %} class="valid"{% endif %}>
   <button type="submit">{{ t.get("apply") }}</button>
-  {% if !filter.is_empty() %}<a class="button secondary" href="/statistics">{{ t.get("filter-reset") }}</a>{% endif %}
+  {% if !filter.is_empty() || !connections.is_empty() %}<a class="button secondary" href="/statistics">{{ t.get("filter-reset") }}</a>{% endif %}
 </form>
-<p class="filter-error" data-filter-error{% if error.is_none() %} hidden{% endif %}>{% if let Some(e) = error %}{{ e }}{% endif %}</p>
+<p class="filter-error" data-filter-error{% if error.is_none() %} hidden{% endif %}>{% if let Some(e) = error %}{{ e.message }}{% endif %}</p>
 {% if error.is_none() %}
 <div class="stats">
   <div class="tiles"{% if live %} data-fragment="stats-tiles"{% endif %}>

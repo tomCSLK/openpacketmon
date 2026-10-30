@@ -60,11 +60,67 @@
     });
   }
 
+  // "Back" of the page heads: a step through the pages of this tab, also where no browser bar offers
+  // it (the window of openpacketmon-app). Every history entry notes how many entries lead to it and
+  // how many steps go to another page: a form that returns to its page (favorite, unit, pause) adds
+  // an entry with the same address, and going there would look like nothing happened.
+  var NAV_KEY = 'openpacketmon-nav';
+  var here = window.location.pathname + window.location.search;
+  function navRemember(replacing) {
+    try {
+      sessionStorage.setItem(NAV_KEY, JSON.stringify({ depth: nav.depth, skip: nav.skip, url: here, replacing: replacing }));
+    } catch (e) { /* every page then counts as the first one: the button uses its address */ }
+  }
+  function navLast() {
+    try { return JSON.parse(sessionStorage.getItem(NAV_KEY)); } catch (e) { return null; }
+  }
+  var nav = window.history.state && window.history.state.depth ? window.history.state : null;
+  if (!nav) {
+    var last = navLast();
+    if (!last) {
+      nav = { depth: 1, skip: 1 };
+    } else if (last.replacing) {
+      nav = { depth: last.depth, skip: last.skip };
+    } else {
+      nav = { depth: last.depth + 1, skip: last.url === here ? last.skip + 1 : 1 };
+    }
+    window.history.replaceState(nav, '');
+  }
+  // also after the browser restored the page without loading it
+  window.addEventListener('pageshow', function () { navRemember(false); });
+
+  var navBack = document.querySelector('[data-nav-back]');
+  if (navBack) {
+    var earlier = nav.depth > nav.skip && window.history.length > 1;
+    var nowhere = !earlier && !navBack.getAttribute('href');
+    if (nowhere) { navBack.setAttribute('aria-disabled', 'true'); }
+    navBack.addEventListener('click', function (e) {
+      if (earlier || nowhere) { e.preventDefault(); }
+      if (earlier) { window.history.go(-nav.skip); }
+    });
+    // Alt+Left as in a browser, with the same steps
+    document.addEventListener('keydown', function (e) {
+      if (e.altKey && !e.ctrlKey && !e.metaKey && !e.shiftKey && e.key === 'ArrowLeft') {
+        e.preventDefault();
+        navBack.click();
+      }
+    });
+  }
+
+  // Links that change the view of a page (next packet, text or hex) leave no step of their own.
+  document.addEventListener('click', function (e) {
+    var link = e.target.closest ? e.target.closest('a[data-replace]') : null;
+    if (!link || e.button !== 0 || e.ctrlKey || e.metaKey || e.shiftKey) { return; }
+    e.preventDefault();
+    navRemember(true);
+    window.location.replace(link.href);
+  });
+
   // A display filter turns red or green while it is typed, the message says what is wrong
   // (packets and statistics; `data-filter-kind="connections"` for the connection filter).
-  var input = document.querySelector('[data-filter-input]');
+  var inputs = document.querySelectorAll('[data-filter-input]');
   var message = document.querySelector('[data-filter-error]');
-  if (input && message) {
+  Array.prototype.forEach.call(message ? inputs : [], function (input) {
     var timer = null;
     input.addEventListener('input', function () {
       clearTimeout(timer);
@@ -89,8 +145,16 @@
           .catch(function () { /* checked again on submit */ });
       }, 200);
     });
-  }
+  });
 
+  // The statistics of the connections take what is in the filter field, applied or not.
+  var carry = document.querySelector('[data-filter-carry]');
+  if (carry && inputs.length) {
+    carry.addEventListener('click', function () {
+      var text = inputs[0].value.trim();
+      carry.href = carry.pathname + (text ? '?c=' + encodeURIComponent(text) : '');
+    });
+  }
 
   // Selections that apply at once (rows per page).
   var autos = document.querySelectorAll('select[data-autosubmit]');

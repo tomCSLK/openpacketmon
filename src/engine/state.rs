@@ -7,7 +7,7 @@
 //! starting and stopping captures, merging backend messages into the traffic data,
 //! host and program resolution, notifications and favorites.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::net::IpAddr;
 use std::thread;
 
@@ -509,14 +509,7 @@ impl EngineState {
             .map
             .iter()
             .filter(|(key, value)| {
-                let Some(filter) = filter else {
-                    return true;
-                };
-                let protocols = self.connection_values(key, value, &mut values);
-                filter.matches_connection(&filter::Connection {
-                    protocols: &protocols,
-                    values: &values,
-                })
+                filter.is_none_or(|filter| self.selects(filter, key, value, &mut values))
             })
             .map(|(key, val)| {
                 agglomerate.refresh(val.data_info());
@@ -532,6 +525,31 @@ impl EngineState {
         all_results.truncate(end);
         all_results.drain(..start);
         (all_results, tot, agglomerate)
+    }
+
+    /// The connections the filter selects
+    pub fn selected_connections(&self, filter: &Filter) -> HashSet<AddressPortPair> {
+        let mut values = Vec::new();
+        self.info_traffic
+            .map
+            .iter()
+            .filter(|(key, value)| self.selects(filter, key, value, &mut values))
+            .map(|(key, _)| *key)
+            .collect()
+    }
+
+    fn selects(
+        &self,
+        filter: &Filter,
+        key: &AddressPortPair,
+        info: &InfoAddressPortPair,
+        values: &mut Vec<(&'static str, Value)>,
+    ) -> bool {
+        let protocols = self.connection_values(key, info, values);
+        filter.matches_connection(&filter::Connection {
+            protocols: &protocols,
+            values,
+        })
     }
 
     /// The protocols and values of a connection for the connection filter (`values` is reused)

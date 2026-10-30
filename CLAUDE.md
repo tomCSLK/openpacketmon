@@ -6,7 +6,7 @@
 Sprache: Deutsch. Fork und Weiterentwicklung von **Sniffnet** (https://github.com/GyulyVGC/sniffnet), einem
 Netzwerkverkehrs-Monitor in Rust (iced-GUI, libpcap). Maßgeblich für Stand, Lizenzprüfung und Vorgehen ist **`PLAN.md`**.
 
-## Status (2026-10-30)
+## Status (2026-10-31)
 
 - Phase: **1, 2 und 3 erledigt** (2026-10-28): privat auf https://github.com/tomCSLK/openpacketmon, dieser Ordner ist das Repo
   (seit 4.9 neues Repo mit einem Anfangs-Commit; Bezug zum Original ist Commit `ab4bf739d464`). Umbenannt, iced-Oberfläche entfernt, Kern als `src/engine/`;
@@ -89,10 +89,11 @@ Netzwerkverkehrs-Monitor in Rust (iced-GUI, libpcap). Maßgeblich für Stand, Li
   Commit `55f5213`, CI grün; Test-Paket **0.2.7** (nur die korrigierten Abhängigkeiten dazu). Entschieden: nach der Antwort
   von Sniffnet umschalten und **0.3.0** veröffentlichen. Die vollständige Liste der offenen Schritte steht in `PLAN.md` 4.10.
   Nutzertest 0.2.7 läuft seit 2026-10-30. Herkunft der Vorlage `../design-system` geklärt: eigene Idee, mit Claude Design erstellt.
-  Vorgemerkt aus dem Test: **Zurück-Knopf** fehlt an vielen Stellen, im Fenster-Programm gibt es gar keinen (`PLAN.md` Phase 3
-  Punkt 17); kommt noch vor 0.3.0, Umsetzung nach dem laufenden Test. Ebenso **Statistik-Knopf auf der Seite Verbindungen**, der
-  die Suchleiste übernimmt (Punkt 18; die Statistik braucht dafür den Verbindungsfilter, ihr Anzeigefilter kennt `country`,
-  `program` usw. nicht).
+  Nutzertest vorläufig abgeschlossen (2026-10-31). Aus dem Test umgesetzt (2026-10-31, `PLAN.md` Phase 3 Punkte 17, 18, Test-Paket
+  **0.2.8**): **Zurück-Knopf** links neben dem Titel aller Seiten (`static/app.js`: Schritte durch den Verlauf, überspringt Einträge
+  gleicher Adresse nach Formularen; Blättern mit `data-replace` ohne eigenen Schritt; Alt+Links; im Fenster-Programm noch nicht geprüft)
+  und **Statistik-Knopf auf der Seite Verbindungen**: `c=` (Verbindungsfilter) neben `f=` auf `/statistics`, `/packets`, `/api/packets`,
+  `/packets.pcap` (`packets::Selection`, `FilterIndex::with_connections`).
 - **Reihenfolge nach dem Release** (Nutzer, 2026-10-31): 0.3.0 → MCP-Anbindung → Windows-Version.
 - **MCP-Anbindung** (`PLAN.md` 5.4): Claude soll den Mitschnitt abfragen können, etwa beim Untersuchen von Geräten im Heimnetz.
   Paketinhalte sind dabei ungeprüfte Eingaben für das Sprachmodell. Von Anfang an plattformneutral schreiben, damit sie unter

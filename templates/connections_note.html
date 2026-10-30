@@ -1,0 +1,3 @@
+{# says what the connection filter does on packets and statistics; needs `connections`, `t` #}
+{% if !connections.is_empty() %}<p class="notice"><span>{{ t.get("filter-connections") }} <a href="/connections?f={{ connections.trim()|urlencode }}">{{ t.get("filter-connections-open") }}</a></span></p>
+{% endif %}

@@ -6,9 +6,12 @@
   // ---- list: whole rows are links ---------------------------------------------------------------
   document.addEventListener('click', function (e) {
     var row = e.target.closest ? e.target.closest('tr[data-href]') : null;
-    if (!row || e.target.closest('a, button, input, select')) { return; }
-    if (window.getSelection && String(window.getSelection())) { return; }
-    window.location.href = row.getAttribute('data-href');
+    if (!row) { return; }
+    var link = e.target.closest('a, button, input, select');
+    if (!link && window.getSelection && String(window.getSelection())) { return; }
+    // the way back leads to this packet, not to the end of the list
+    window.history.replaceState(window.history.state, '', new URL(row.getAttribute('data-href'), window.location.href).searchParams.get('back'));
+    if (!link) { window.location.href = row.getAttribute('data-href'); }
   });
 
   // ---- list: colors, filter check and the live list ---------------------------------------------
@@ -60,6 +63,7 @@
     var toggle = list.querySelector('[data-live-toggle]');
     var note = document.querySelector('[data-goto-note]');
     var filter = list.getAttribute('data-filter') || '';
+    var connections = list.getAttribute('data-connections') || '';
     var running = list.hasAttribute('data-running');
     var LIVE_MS = 300;
     // browsers limit the height of an element; beyond it the scroll position is scaled
@@ -104,7 +108,8 @@
     };
 
     var backFor = function (n) {
-      return encodeURIComponent('/packets?' + (filter ? 'f=' + encodeURIComponent(filter) + '&' : '') + 'goto=' + n);
+      return encodeURIComponent('/packets?' + (connections ? 'c=' + encodeURIComponent(connections) + '&' : '')
+        + (filter ? 'f=' + encodeURIComponent(filter) + '&' : '') + 'goto=' + n);
     };
 
     var cell = function (tr, text, cls, title) {
@@ -163,6 +168,7 @@
       var n = visible();
       var params = [];
       if (filter) { params.push('f=' + encodeURIComponent(filter)); }
+      if (connections) { params.push('c=' + encodeURIComponent(connections)); }
       if (opts.goto) {
         params.push('goto=' + opts.goto);
         params.push('count=' + n);

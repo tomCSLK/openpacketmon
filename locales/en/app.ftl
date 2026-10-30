@@ -21,6 +21,7 @@ licenses = Licenses
 based-on-sniffnet = based on Sniffnet
 update-available = Version { $version } available
 back = Back
+back-hint = To the previous page (Alt+Left)
 apply = Apply
 save = Save
 unknown = unknown
@@ -214,8 +215,11 @@ connection-packets = show
 connection-packets-hint = Packets of this connection, both directions
 connection-statistics = Statistics
 connection-statistics-hint = Statistics of this connection, both directions
+connections-statistics-hint = Statistics of the packets of all connections in the filter
 filter-connection = Selection: connection
 filter-connection-open = Go to connection
+filter-connections = Selection from the Connections page: the packets of the matching connections that are still in the packet store count.
+filter-connections-open = Go to the connections
 
 # Packets
 packets-subtitle = The stored packets of the capture with their layers and bytes.

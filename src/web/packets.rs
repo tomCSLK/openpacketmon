@@ -2,7 +2,7 @@
 //! rows in view and loads them in blocks, like a packet analyzer), the details of one packet with
 //! its layers and a hex dump, and the download as a PCAP file.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet, VecDeque};
 use std::fmt::Write;
 use std::net::IpAddr;
 
@@ -26,6 +26,7 @@ use crate::web::auth::Session;
 use crate::web::connections::connection_query;
 use crate::web::entries::encode;
 use crate::web::i18n::{self, Lang};
+use crate::web::packet_index::FilterIndex;
 use crate::web::pages::{Layout, render};
 use crate::web::{AppState, WebError, format};
 
@@ -179,25 +180,111 @@ pub fn filtered_connection(engine: &EngineState, filter: &str) -> Option<(String
     ))
 }
 
-/// The filter of the list and the packet to show, as given in the address
+/// The filters of the list and the packet to show, as given in the address
 #[derive(Deserialize, Default, Clone)]
 pub struct PacketQuery {
     /// Display filter
     #[serde(default)]
     pub(crate) f: String,
+    /// Connection filter: only packets of the connections it selects
+    #[serde(default)]
+    pub(crate) c: String,
     /// Show this packet (or the next matching one) and mark it; without it the list follows the
     /// newest packets
-    goto: Option<u64>,
+    pub(crate) goto: Option<u64>,
 }
 
 impl PacketQuery {
-    /// The filter as query string
-    fn filter_query(&self) -> String {
-        if self.f.trim().is_empty() {
-            String::new()
-        } else {
-            format!("f={}", encode(self.f.trim()))
+    /// An address of this site with the filters
+    pub(crate) fn href(&self, path: &str) -> String {
+        filters_href(path, &self.f, &self.c)
+    }
+}
+
+/// An address of this site with a display and a connection filter
+pub(crate) fn filters_href(path: &str, display: &str, connections: &str) -> String {
+    let pairs: Vec<String> = [("c", connections.trim()), ("f", display.trim())]
+        .into_iter()
+        .filter(|(_, value)| !value.is_empty())
+        .map(|(name, value)| format!("{name}={}", encode(value)))
+        .collect();
+    if pairs.is_empty() {
+        path.to_owned()
+    } else {
+        format!("{path}?{}", pairs.join("&"))
+    }
+}
+
+/// A filter of an address that cannot be read
+pub(crate) struct FilterFault {
+    pub message: String,
+    /// It is the connection filter, not the display filter
+    pub connections: bool,
+}
+
+/// The packets a page is about: all, those of a display filter, those of the connections a
+/// connection filter selects, or those of both
+#[derive(Default)]
+pub(crate) struct Selection {
+    /// The display filter and its text
+    display: Option<(String, Filter)>,
+    /// The text of the connection filter and the connections it selects now
+    connections: Option<(String, HashSet<AddressPortPair>)>,
+}
+
+impl Selection {
+    pub(crate) fn read(
+        t: Lang,
+        engine: &EngineState,
+        display: &str,
+        connections: &str,
+    ) -> Result<Self, FilterFault> {
+        let (display, connections) = (display.trim(), connections.trim());
+        let selected = Filter::parse_connections(connections).map_err(|e| FilterFault {
+            message: filter_error(t, &e),
+            connections: true,
+        })?;
+        let filter = Filter::parse(display).map_err(|e| FilterFault {
+            message: filter_error(t, &e),
+            connections: false,
+        })?;
+        Ok(Self {
+            display: filter.map(|filter| (display.to_owned(), filter)),
+            connections: selected
+                .map(|filter| (connections.to_owned(), engine.selected_connections(&filter))),
+        })
+    }
+
+    /// Calls `f` with the numbers of the selected packets, oldest first; nothing is selected
+    /// without a filter
+    fn with_numbers<R>(
+        &self,
+        index: &FilterIndex,
+        store: &SharedPacketStore,
+        f: impl FnOnce(&VecDeque<u64>) -> R,
+    ) -> R {
+        match (&self.display, &self.connections) {
+            (None, None) => f(&VecDeque::new()),
+            (Some((text, filter)), None) => index.with_matches(store, text, filter, f),
+            (None, Some((text, keys))) => index.with_connections(store, text, keys, f),
+            (Some((text, filter)), Some((connections, keys))) => {
+                let mut both = index.with_matches(store, text, filter, VecDeque::clone);
+                let of_connections =
+                    index.with_connections(store, connections, keys, VecDeque::clone);
+                both.retain(|n| of_connections.binary_search(n).is_ok());
+                f(&both)
+            }
         }
+    }
+
+    /// The numbers of the selected packets, `None` for all of them
+    pub(crate) fn numbers(
+        &self,
+        index: &FilterIndex,
+        store: &SharedPacketStore,
+    ) -> Option<Vec<u64>> {
+        (self.display.is_some() || self.connections.is_some())
+            .then(|| self.with_numbers(index, store, |m| m.iter().copied().collect()))
     }
 }
 
@@ -284,35 +371,30 @@ struct Matching<'a> {
 fn with_matching<R>(
     state: &AppState,
     store: &SharedPacketStore,
-    text: &str,
-    filter: Option<&Filter>,
+    selection: &Selection,
     f: impl FnOnce(&Matching) -> R,
 ) -> R {
-    match filter {
+    if selection.display.is_none() && selection.connections.is_none() {
         // the numbers in the store have no gaps
-        None => {
-            let (first, total) = {
-                let store = store.lock();
-                (store.iter().next().map_or(0, |p| p.number), store.len())
-            };
-            f(&Matching {
-                total,
-                nth: &|i| first + i as u64,
-                upto: &|n| {
-                    usize::try_from((n + 1).saturating_sub(first)).map_or(total, |c| c.min(total))
-                },
-            })
-        }
-        Some(filter) => state
-            .packet_index
-            .with_matches(store, text, filter, |matches| {
-                f(&Matching {
-                    total: matches.len(),
-                    nth: &|i| matches[i],
-                    upto: &|n| matches.partition_point(|m| *m <= n),
-                })
-            }),
+        let (first, total) = {
+            let store = store.lock();
+            (store.iter().next().map_or(0, |p| p.number), store.len())
+        };
+        return f(&Matching {
+            total,
+            nth: &|i| first + i as u64,
+            upto: &|n| {
+                usize::try_from((n + 1).saturating_sub(first)).map_or(total, |c| c.min(total))
+            },
+        });
     }
+    selection.with_numbers(&state.packet_index, store, |matches| {
+        f(&Matching {
+            total: matches.len(),
+            nth: &|i| matches[i],
+            upto: &|n| matches.partition_point(|m| *m <= n),
+        })
+    })
 }
 
 /// Which rows the list asks for
@@ -447,9 +529,11 @@ struct PacketsPage {
     unavailable: String,
     /// The display filter as typed
     filter: String,
+    /// The connection filter as typed
+    connections: String,
     /// The connection the filter selects: its two ends and its page
     connection: Option<(String, String)>,
-    error: Option<String>,
+    error: Option<FilterFault>,
     /// The list can be shown (packets kept, filter valid)
     list: bool,
     goto: Option<u64>,
@@ -479,7 +563,7 @@ pub async fn list(
     Query(query): Query<PacketQuery>,
 ) -> Response {
     let t = i18n::current();
-    let (layout, running, unavailable, store, connection) = {
+    let (layout, running, unavailable, store, connection, error) = {
         let engine = state.engine.lock();
         (
             Layout::new(&engine, &session),
@@ -487,30 +571,22 @@ pub async fn list(
             unavailable(t, &engine),
             engine.packets.clone(),
             filtered_connection(&engine, &query.f),
+            Selection::read(t, &engine, &query.f, &query.c).err(),
         )
     };
-    let error = Filter::parse(&query.f).err().map(|e| filter_error(t, &e));
-    let filter_query = query.filter_query();
     render(&PacketsPage {
         t,
         layout,
         running,
         unavailable,
         filter: query.f.clone(),
+        connections: query.c.clone(),
         connection,
         list: store.is_some() && error.is_none(),
         error,
         goto: query.goto,
-        download: if filter_query.is_empty() {
-            "/packets.pcap".to_owned()
-        } else {
-            format!("/packets.pcap?{filter_query}")
-        },
-        statistics: if filter_query.is_empty() {
-            "/statistics".to_owned()
-        } else {
-            format!("/statistics?{filter_query}")
-        },
+        download: query.href("/packets.pcap"),
+        statistics: query.href("/statistics"),
         foot: store.as_ref().map(|s| foot_text(t, s)),
         examples: FILTER_EXAMPLES,
         protocols: filter::PROTOCOLS.join(" "),
@@ -527,6 +603,8 @@ pub async fn list(
 pub struct RowsQuery {
     #[serde(default)]
     f: String,
+    #[serde(default)]
+    c: String,
     from: Option<usize>,
     #[serde(default)]
     count: usize,
@@ -558,20 +636,23 @@ pub async fn rows_api(
     Query(query): Query<RowsQuery>,
 ) -> Result<Json<RowBlock>, WebError> {
     let t = i18n::current();
-    let (store, running) = {
+    let (store, running, selection) = {
         let engine = state.engine.lock();
-        (engine.packets.clone(), engine.is_running())
+        (
+            engine.packets.clone(),
+            engine.is_running(),
+            Selection::read(t, &engine, &query.f, &query.c),
+        )
     };
     let store = store.ok_or(WebError::NotFound)?;
-    let text = query.f.trim();
-    let filter = Filter::parse(text).map_err(|_| WebError::NotFound)?;
+    let selection = selection.map_err(|_| WebError::NotFound)?;
     let window = Window {
         from: query.from,
         count: query.count,
         goto: query.goto,
         anchor: query.anchor,
     };
-    let picked = with_matching(&state, &store, text, filter.as_ref(), |m| pick(m, window));
+    let picked = with_matching(&state, &store, &selection, |m| pick(m, window));
     Ok(Json(RowBlock {
         total: picked.total,
         from: picked.from,
@@ -841,16 +922,16 @@ pub async fn download(
     _session: Session,
     Query(query): Query<PacketQuery>,
 ) -> Result<Response, WebError> {
-    let store = state.engine.lock().packets.clone();
+    let (store, selection) = {
+        let engine = state.engine.lock();
+        (
+            engine.packets.clone(),
+            Selection::read(i18n::current(), &engine, &query.f, &query.c),
+        )
+    };
     let store = store.ok_or(WebError::NotFound)?;
-    let filter = Filter::parse(&query.f).map_err(|_| WebError::NotFound)?;
-    let file = if let Some(filter) = &filter {
-        let numbers: Vec<u64> =
-            state
-                .packet_index
-                .with_matches(&store, query.f.trim(), filter, |m| {
-                    m.iter().copied().collect()
-                });
+    let selection = selection.map_err(|_| WebError::NotFound)?;
+    let file = if let Some(numbers) = selection.numbers(&state.packet_index, &store) {
         let store = store.lock();
         store.to_pcap(numbers.iter().filter_map(|n| store.get(*n)))
     } else {
@@ -1016,6 +1097,61 @@ mod tests {
     }
 
     #[test]
+    fn the_index_follows_the_connections_of_a_filter() {
+        use crate::config::packet_store::PacketStoreConf;
+        use crate::dissect::tests::{ETH, tcp_packet};
+
+        let store = SharedPacketStore::new(PacketStoreConf::default(), ETH);
+        let index = FilterIndex::default();
+        let ts = Timestamp::new(1, 0);
+        let a = packet([192, 168, 1, 10], 51000, [10, 0, 0, 2], 443).conn;
+        let b = packet([192, 168, 1, 10], 51001, [10, 0, 0, 3], 80).conn;
+        let push = |conn| {
+            store
+                .lock()
+                .push(ts, 60, tcp_packet(51000, 443, 1, b"x").into(), conn);
+        };
+        push(a);
+        push(b);
+        push(None);
+        let numbers = |keys: &HashSet<AddressPortPair>| -> Vec<u64> {
+            index.with_connections(&store, "tcp", keys, |m| m.iter().copied().collect())
+        };
+        let only_a = HashSet::from([a.unwrap().0]);
+        assert_eq!(numbers(&only_a), [1]);
+        // new packets are judged on top, a changed selection takes the older ones too
+        push(a);
+        assert_eq!(numbers(&only_a), [1, 4]);
+        let both = HashSet::from([a.unwrap().0, b.unwrap().0]);
+        assert_eq!(numbers(&both), [1, 2, 4]);
+        assert_eq!(numbers(&HashSet::new()), [0u64; 0]);
+        assert_eq!(numbers(&both), [1, 2, 4]);
+
+        // the same text as a display filter is another entry, and both filters can apply
+        let filter = Filter::parse("frame.number > 1").unwrap().unwrap();
+        let selection = Selection {
+            display: Some(("frame.number > 1".to_owned(), filter)),
+            connections: Some(("tcp".to_owned(), only_a)),
+        };
+        assert_eq!(selection.numbers(&index, &store), Some(vec![4]));
+        let display = Filter::parse("tcp").unwrap().unwrap();
+        let all: Vec<u64> =
+            index.with_matches(&store, "tcp", &display, |m| m.iter().copied().collect());
+        assert_eq!(all, [1, 2, 3, 4]);
+        assert_eq!(Selection::default().numbers(&index, &store), None);
+    }
+
+    #[test]
+    fn addresses_keep_both_filters() {
+        assert_eq!(filters_href("/packets", " ", ""), "/packets");
+        assert_eq!(filters_href("/packets", "dns", ""), "/packets?f=dns");
+        assert_eq!(
+            filters_href("/statistics", "tcp", " country == US "),
+            "/statistics?c=country%20%3D%3D%20US&f=tcp"
+        );
+    }
+
+    #[test]
     fn the_list_picks_blocks_of_rows() {
         let numbers = [3u64, 5, 8, 9, 12];
         let pick_from = |window: Window| {
@@ -1139,6 +1275,17 @@ mod tests {
             "{}",
             reply.body
         );
+        // the connection filter has its own field and its own fields
+        let reply = send(&h.app, get("/packets?c=country%20%3D%3D", Some(&h.cookie))).await;
+        assert!(reply.body.contains("name=\"c\""), "{}", reply.body);
+        assert!(reply.body.contains("Error at position"), "{}", reply.body);
+        let reply = send(
+            &h.app,
+            get("/packets?c=country%20%3D%3D%20US", Some(&h.cookie)),
+        )
+        .await;
+        assert!(reply.body.contains("name=\"c\""), "{}", reply.body);
+        assert!(!reply.body.contains("Error at position"), "{}", reply.body);
         let reply = send(&h.app, get("/api/filter?f=foo", Some(&h.cookie))).await;
         assert!(
             reply.body.contains("unknown field or protocol"),

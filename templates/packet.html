@@ -2,6 +2,7 @@
 {% block title %}{{ t.get1("packet-title", "number", number) }} · openpacketmon{% endblock %}
 {% block page_head %}<script src="/static/packets.js" defer></script>{% endblock %}
 {% block page_class %} wide{% endblock %}
+{% block back %}{{ back }}{% endblock %}
 {% block content %}
 <div class="page-head">
   <div>
@@ -12,8 +13,8 @@
   <div class="actions">
     {# browsing the list, then the jumps to what belongs to the connection of the packet #}
     <span class="segmented">
-      {% if let Some(href) = prev %}<a class="button secondary" href="{{ href }}">‹ {{ t.get("packet-prev") }}</a>{% else %}<span class="button secondary" aria-disabled="true">‹ {{ t.get("packet-prev") }}</span>{% endif %}
-      {% if let Some(href) = next %}<a class="button secondary" href="{{ href }}">{{ t.get("packet-next") }} ›</a>{% else %}<span class="button secondary" aria-disabled="true">{{ t.get("packet-next") }} ›</span>{% endif %}
+      {% if let Some(href) = prev %}<a class="button secondary" href="{{ href }}" data-replace>‹ {{ t.get("packet-prev") }}</a>{% else %}<span class="button secondary" aria-disabled="true">‹ {{ t.get("packet-prev") }}</span>{% endif %}
+      {% if let Some(href) = next %}<a class="button secondary" href="{{ href }}" data-replace>{{ t.get("packet-next") }} ›</a>{% else %}<span class="button secondary" aria-disabled="true">{{ t.get("packet-next") }} ›</span>{% endif %}
     </span>
     {% if let Some(href) = connection %}<span class="actions-sep" aria-hidden="true"></span><span class="actions-label">{{ t.get("packet-connection-label") }}</span>
     {% if let Some(packets) = conversation %}<a class="button secondary" href="{{ packets }}" title="{{ t.get("connection-packets-hint") }}">{{ t.get("nav-packets") }}</a>{% endif %}

@@ -9,11 +9,9 @@ use axum::response::Response;
 use serde::Serialize;
 
 use crate::engine::analysis::{self, PacketAnalysis, flag};
-use crate::filter::Filter;
 use crate::web::auth::Session;
-use crate::web::entries::encode;
 use crate::web::i18n::{self, Lang};
-use crate::web::packets::{PacketQuery, filter_error};
+use crate::web::packets::{FilterFault, PacketQuery, Selection, filters_href};
 use crate::web::pages::{Layout, render};
 use crate::web::{AppState, format};
 
@@ -167,9 +165,11 @@ struct StatisticsPage {
     running: bool,
     unavailable: String,
     filter: String,
+    /// The connection filter as typed
+    connections: String,
     /// The connection the filter selects: its two ends and its page
     connection: Option<(String, String)>,
-    error: Option<String>,
+    error: Option<FilterFault>,
     /// The statistics change while packets come
     live: bool,
     summary: Vec<(String, String)>,
@@ -191,8 +191,9 @@ fn and_filter(page: &str, extra: &str) -> String {
     }
 }
 
-fn packets_link(page: &str, extra: &str) -> String {
-    format!("/packets?f={}", encode(&and_filter(page, extra)))
+/// The packets behind a number of the page: its filters and `extra`
+fn packets_link(query: &PacketQuery, extra: &str) -> String {
+    filters_href("/packets", &and_filter(&query.f, extra), &query.c)
 }
 
 /// Percent with one decimal (`12.5 %`)
@@ -232,7 +233,7 @@ fn hierarchy(
     t: Lang,
     totals: &Totals,
     paths: &[Vec<&'static str>],
-    page_filter: &str,
+    query: &PacketQuery,
 ) -> Vec<HierarchyRow> {
     let mut nodes: HashMap<Vec<&'static str>, (u64, u64)> = HashMap::new();
     for (path, (packets, bytes)) in &totals.paths {
@@ -246,7 +247,7 @@ fn hierarchy(
         }
     }
     let mut rows = Vec::new();
-    add_children(t, &nodes, &[], totals, page_filter, &mut rows);
+    add_children(t, &nodes, &[], totals, query, &mut rows);
     rows
 }
 
@@ -255,7 +256,7 @@ fn add_children(
     nodes: &HashMap<Vec<&'static str>, (u64, u64)>,
     parent: &[&'static str],
     totals: &Totals,
-    page_filter: &str,
+    query: &PacketQuery,
     rows: &mut Vec<HierarchyRow>,
 ) {
     let mut children: Vec<(&Vec<&'static str>, &(u64, u64))> = nodes
@@ -275,9 +276,9 @@ fn add_children(
             bar: format!("{bar:.1}"),
             bytes: format::bytes(t, u128::from(*bytes)),
             bytes_share,
-            href: packets_link(page_filter, name),
+            href: packets_link(query, name),
         });
-        add_children(t, nodes, path, totals, page_filter, rows);
+        add_children(t, nodes, path, totals, query, rows);
     }
 }
 
@@ -357,7 +358,7 @@ fn summary(t: Lang, totals: &Totals) -> Vec<(String, String)> {
 }
 
 /// The findings of the TCP analysis and the response times, with links to their packets
-fn analysis_rows(t: Lang, totals: &Totals, page_filter: &str) -> (Vec<FindingRow>, Vec<TimeRow>) {
+fn analysis_rows(t: Lang, totals: &Totals, query: &PacketQuery) -> (Vec<FindingRow>, Vec<TimeRow>) {
     let findings = FINDINGS
         .iter()
         .zip(totals.flags)
@@ -365,7 +366,7 @@ fn analysis_rows(t: Lang, totals: &Totals, page_filter: &str) -> (Vec<FindingRow
             label: t.get(id),
             count: format::count(t, u128::from(count)),
             problem: bit & flag::PROBLEMS != 0 || *bit == flag::RESET,
-            href: (count > 0).then(|| packets_link(page_filter, field)),
+            href: (count > 0).then(|| packets_link(query, field)),
         })
         .collect();
     #[allow(clippy::cast_precision_loss)]
@@ -382,7 +383,7 @@ fn analysis_rows(t: Lang, totals: &Totals, page_filter: &str) -> (Vec<FindingRow
         } else {
             format::millis(t, f64::from(times.max))
         },
-        href: (times.count > 0).then(|| packets_link(page_filter, field)),
+        href: (times.count > 0).then(|| packets_link(query, field)),
     };
     let times = vec![
         time_row(
@@ -396,14 +397,14 @@ fn analysis_rows(t: Lang, totals: &Totals, page_filter: &str) -> (Vec<FindingRow
     (findings, times)
 }
 
-/// `GET /statistics?f=…`
+/// `GET /statistics?f=…&c=…`
 pub async fn page(
     State(state): State<AppState>,
     session: Session,
     Query(query): Query<PacketQuery>,
 ) -> Response {
     let t = i18n::current();
-    let (layout, running, unavailable, store, finished, connection) = {
+    let (layout, running, unavailable, store, finished, connection, selection) = {
         let engine = state.engine.lock();
         (
             Layout::new(&engine, &session),
@@ -412,22 +413,19 @@ pub async fn page(
             engine.packets.clone(),
             engine.traffic_history.no_more_packets(),
             crate::web::packets::filtered_connection(&engine, &query.f),
+            Selection::read(t, &engine, &query.f, &query.c),
         )
     };
-    let parsed = Filter::parse(&query.f);
-    let error = parsed.as_ref().err().map(|e| filter_error(t, e));
-    let filter = parsed.ok().flatten();
-    let page_filter = query.f.trim().to_owned();
+    let (selection, error) = match selection {
+        Ok(selection) => (selection, None),
+        Err(fault) => (Selection::default(), Some(fault)),
+    };
 
     let mut totals = Totals::default();
     let mut points = Vec::new();
     let mut paths = Vec::new();
     if let (Some(store), None) = (&store, &error) {
-        let numbers: Option<Vec<u64>> = filter.as_ref().map(|filter| {
-            state
-                .packet_index
-                .with_matches(store, &page_filter, filter, |m| m.iter().copied().collect())
-        });
+        let numbers = selection.numbers(&state.packet_index, store);
         let last = store.lock().last_number();
         analysis::advance(store, last);
         let analysis = store.analysis();
@@ -450,7 +448,7 @@ pub async fn page(
         _ => Chart::default(),
     };
     let summary = summary(t, &totals);
-    let (findings, times) = analysis_rows(t, &totals, &page_filter);
+    let (findings, times) = analysis_rows(t, &totals, &query);
     render(&StatisticsPage {
         t,
         layout,
@@ -458,20 +456,17 @@ pub async fn page(
         live: running && !finished && store.is_some() && error.is_none(),
         unavailable,
         filter: query.f.clone(),
+        connections: query.c.clone(),
         connection,
         error,
         summary,
-        hierarchy: hierarchy(t, &totals, &paths, &page_filter),
+        hierarchy: hierarchy(t, &totals, &paths, &query),
         findings,
         times,
         chart: serde_json::to_string(&chart)
             .unwrap_or_else(|_| "{}".to_owned())
             .replace('<', "\\u003c"),
-        packets_href: if page_filter.is_empty() {
-            "/packets".to_owned()
-        } else {
-            format!("/packets?f={}", encode(&page_filter))
-        },
+        packets_href: query.href("/packets"),
         empty: totals.packets == 0,
     })
 }
@@ -524,5 +519,61 @@ mod tests {
         assert_eq!(reply.status, StatusCode::OK);
         let reply = send(&h.app, get("/statistics?f=tcp.port%20==", Some(&h.cookie))).await;
         assert!(reply.body.contains("filter-error"), "{}", reply.body);
+    }
+
+    #[tokio::test]
+    async fn the_connection_filter_comes_along() {
+        let h = harness().await;
+        let reply = send(
+            &h.app,
+            get("/connections?f=country%20%3D%3D%20US", Some(&h.cookie)),
+        )
+        .await;
+        assert!(
+            reply
+                .body
+                .contains("href=\"/statistics?c=country%20%3D%3D%20US\""),
+            "{}",
+            reply.body
+        );
+        let reply = send(&h.app, get("/connections", Some(&h.cookie))).await;
+        assert!(
+            reply
+                .body
+                .contains("href=\"/statistics\" data-filter-carry")
+        );
+
+        // a field of the connection filter is no display filter, and the links keep it
+        let reply = send(
+            &h.app,
+            get("/statistics?c=country%20%3D%3D%20US", Some(&h.cookie)),
+        )
+        .await;
+        assert_eq!(reply.status, StatusCode::OK);
+        assert!(!reply.body.contains("Error at position"), "{}", reply.body);
+        assert!(reply.body.contains("name=\"c\""), "{}", reply.body);
+        assert!(
+            reply
+                .body
+                .contains("href=\"/packets?c=country%20%3D%3D%20US\""),
+            "{}",
+            reply.body
+        );
+        let reply = send(
+            &h.app,
+            get("/statistics?c=country%20%3D%3D", Some(&h.cookie)),
+        )
+        .await;
+        assert!(reply.body.contains("Error at position"), "{}", reply.body);
+        assert_eq!(
+            packets_link(
+                &PacketQuery {
+                    c: "port == 443".into(),
+                    ..PacketQuery::default()
+                },
+                "tcp"
+            ),
+            "/packets?c=port%20%3D%3D%20443&f=tcp"
+        );
     }
 }

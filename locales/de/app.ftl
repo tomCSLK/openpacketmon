@@ -21,6 +21,7 @@ licenses = Lizenzen
 based-on-sniffnet = basiert auf Sniffnet
 update-available = Version { $version } verfügbar
 back = Zurück
+back-hint = Zur vorherigen Seite (Alt+Links)
 apply = Anwenden
 save = Speichern
 unknown = unbekannt
@@ -214,8 +215,11 @@ connection-packets = anzeigen
 connection-packets-hint = Pakete dieser Verbindung, beide Richtungen
 connection-statistics = Statistik
 connection-statistics-hint = Statistik dieser Verbindung, beide Richtungen
+connections-statistics-hint = Statistik der Pakete aller Verbindungen im Filter
 filter-connection = Auswahl: Verbindung
 filter-connection-open = Zur Verbindung
+filter-connections = Auswahl von der Seite Verbindungen: Es zählen die Pakete der passenden Verbindungen, die noch im Paketspeicher liegen.
+filter-connections-open = Zu den Verbindungen
 
 # Pakete
 packets-subtitle = Die gespeicherten Pakete der Aufzeichnung mit Schichten und Bytes.

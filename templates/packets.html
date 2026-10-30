@@ -8,18 +8,20 @@
     <h1>{{ t.get("nav-packets") }}</h1>
     <p class="subtitle">{{ t.get("packets-subtitle") }}</p>
   </div>
-  {% if foot.is_some() %}<div class="actions"><a class="button secondary" href="{{ statistics }}">{{ t.get("nav-statistics") }}</a><a class="button secondary" href="{{ download }}" download>{% if filter.trim().is_empty() %}{{ t.get("packets-download") }}{% else %}{{ t.get("packets-download-filtered") }}{% endif %}</a></div>{% endif %}
+  {% if foot.is_some() %}<div class="actions"><a class="button secondary" href="{{ statistics }}">{{ t.get("nav-statistics") }}</a><a class="button secondary" href="{{ download }}" download>{% if filter.trim().is_empty() && connections.trim().is_empty() %}{{ t.get("packets-download") }}{% else %}{{ t.get("packets-download-filtered") }}{% endif %}</a></div>{% endif %}
 </div>
 {% if !running %}<p class="notice">{{ t.get("no-capture") }} <a href="/">{{ t.get("no-capture-start") }}</a></p>
 {% else if !unavailable.is_empty() %}<p class="notice">{{ unavailable }}</p>{% endif %}
 {% include "connection_note.html" %}
+{% include "connections_note.html" %}
 <form method="get" action="/packets" class="filter-bar" data-filter-form>
+  {% include "connections_field.html" %}
   <input type="search" name="f" value="{{ filter }}" placeholder="{{ t.get("packets-filter-placeholder") }}" aria-label="{{ t.get("packets-filter") }}"
-    autocomplete="off" spellcheck="false" data-filter-input{% if error.is_some() %} class="invalid"{% else if !filter.trim().is_empty() %} class="valid"{% endif %}>
+    autocomplete="off" spellcheck="false" data-filter-input{% if let Some(e) = error %}{% if !e.connections %} class="invalid"{% endif %}{% else if !filter.trim().is_empty() %} class="valid"{% endif %}>
   <button type="submit">{{ t.get("apply") }}</button>
-  {% if !filter.is_empty() %}<a class="button secondary" href="/packets">{{ t.get("filter-reset") }}</a>{% endif %}
+  {% if !filter.is_empty() || !connections.is_empty() %}<a class="button secondary" href="/packets">{{ t.get("filter-reset") }}</a>{% endif %}
 </form>
-<p class="filter-error" data-filter-error{% if error.is_none() %} hidden{% endif %}>{% if let Some(e) = error %}{{ e }}{% endif %}</p>
+<p class="filter-error" data-filter-error{% if error.is_none() %} hidden{% endif %}>{% if let Some(e) = error %}{{ e.message }}{% endif %}</p>
 <details class="filter-help">
   <summary>{{ t.get("packets-filter-help") }}</summary>
   <div class="filter-help-body">
@@ -33,7 +35,7 @@
 </details>
 {% if list %}
 <p class="notice" data-goto-note hidden></p>
-<section class="card flush packet-list" data-packets data-filter="{{ filter.trim() }}"{% if let Some(n) = goto %} data-goto="{{ n }}"{% endif %}{% if running %} data-running{% endif %}>
+<section class="card flush packet-list" data-packets data-filter="{{ filter.trim() }}" data-connections="{{ connections.trim() }}"{% if let Some(n) = goto %} data-goto="{{ n }}"{% endif %}{% if running %} data-running{% endif %}>
   <div class="card-head">
     <h2 data-packets-head>{{ t.get("packets-loading") }}</h2>
     <div class="card-tools">
@@ -41,6 +43,7 @@
       <label class="inline"><input type="checkbox" data-colors checked> {{ t.get("packets-colors") }}</label>
       <form method="get" action="/packets" class="pager-goto" data-goto-form>
         {% if !filter.trim().is_empty() %}<input type="hidden" name="f" value="{{ filter.trim() }}">{% endif %}
+        {% if !connections.trim().is_empty() %}<input type="hidden" name="c" value="{{ connections.trim() }}">{% endif %}
         <label>{{ t.get("packets-goto") }} <input type="number" name="goto" min="1" class="page-input" placeholder="{{ t.get("packets-goto-placeholder") }}" title="{{ t.get("packets-goto-key") }}" data-goto-input></label>
       </form>
     </div>
@@ -55,7 +58,7 @@
         </tr></thead>
         <tbody data-packets-rows></tbody>
       </table>
-      <p class="empty" data-packets-empty hidden>{% if !filter.trim().is_empty() %}{{ t.get("packets-none-filtered") }}{% else %}{{ t.get("packets-empty") }}{% endif %}</p>
+      <p class="empty" data-packets-empty hidden>{% if !filter.trim().is_empty() || !connections.trim().is_empty() %}{{ t.get("packets-none-filtered") }}{% else %}{{ t.get("packets-empty") }}{% endif %}</p>
     </div>
     <div class="vlist-spacer" data-packets-spacer></div>
   </div>

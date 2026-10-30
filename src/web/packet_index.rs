@@ -1,21 +1,23 @@
-//! The packets that pass a display filter, kept per filter and brought up to date as packets
-//! arrive: the list, its live updates and the download then dissect only the new packets.
+//! The packets that pass a display filter or belong to the connections of a connection filter,
+//! kept per filter and brought up to date as packets arrive: the list, its live updates and the
+//! download then dissect only the new packets.
 //!
 //! The store is locked only to copy a chunk of packets (their bytes are shared); the dissection
 //! runs without the lock, so the capture thread is never held up for long. The packets are
 //! analyzed on the way ([`analysis`]), so the filter sees the findings of the TCP analysis.
 
-use std::collections::VecDeque;
+use std::collections::{HashSet, VecDeque};
 use std::sync::{Mutex, PoisonError};
 use std::time::{Duration, Instant};
 
 use crate::engine::analysis;
 use crate::engine::packets::SharedPacketStore;
 use crate::filter::Filter;
+use crate::networking::types::address_port_pair::AddressPortPair;
 use crate::web::packets::{FOLLOWUP_PACKETS, dissect_following, filter_packet};
 
-/// Filters kept at a time (the list, the download, a second tab …)
-const ENTRIES: usize = 4;
+/// Filters kept at a time (the list, the download, a second tab, both filters of a selection …)
+const ENTRIES: usize = 6;
 /// Packets dissected per lock of the store
 const CHUNK: usize = 2048;
 /// How long a message split over TCP segments waits for its next segment before the packet is
@@ -28,6 +30,8 @@ pub struct FilterIndex(Mutex<Vec<Entry>>);
 struct Entry {
     store: u64,
     filter: String,
+    /// The connections selected at the last look, for a connection filter
+    connections: Option<HashSet<AddressPortPair>>,
     /// Numbers of the matching packets still in the store, oldest first
     matches: VecDeque<u64>,
     /// The packets up to this number have been judged
@@ -47,31 +51,95 @@ impl FilterIndex {
         f: impl FnOnce(&VecDeque<u64>) -> R,
     ) -> R {
         let mut entries = self.0.lock().unwrap_or_else(PoisonError::into_inner);
-        let id = store.lock().id();
-        // results of finished captures are of no use any more
-        entries.retain(|e| e.store == id);
-        let i = if let Some(i) = entries.iter().position(|e| e.filter == text) {
-            i
-        } else {
-            if entries.len() >= ENTRIES
-                && let Some(oldest) = (0..entries.len()).min_by_key(|i| entries[*i].used)
-            {
-                entries.remove(oldest);
-            }
-            entries.push(Entry {
-                store: id,
-                filter: text.to_owned(),
-                matches: VecDeque::new(),
-                checked: 0,
-                pending_since: None,
-                used: Instant::now(),
-            });
-            entries.len() - 1
-        };
-        let entry = &mut entries[i];
-        entry.used = Instant::now();
+        let entry = entry(&mut entries, store, text, false);
         update(entry, store, filter);
         f(&entry.matches)
+    }
+
+    /// Calls `f` with the numbers of the stored packets of `connections`, the ones a connection
+    /// filter with the text `text` selects now. New connections and values like the volume change
+    /// that selection; the packets are then judged anew, which needs no dissection.
+    pub fn with_connections<R>(
+        &self,
+        store: &SharedPacketStore,
+        text: &str,
+        connections: &HashSet<AddressPortPair>,
+        f: impl FnOnce(&VecDeque<u64>) -> R,
+    ) -> R {
+        let mut entries = self.0.lock().unwrap_or_else(PoisonError::into_inner);
+        let entry = entry(&mut entries, store, text, true);
+        if entry.connections.as_ref() != Some(connections) {
+            entry.connections = Some(connections.clone());
+            entry.matches.clear();
+            entry.checked = 0;
+        }
+        update_connections(entry, store, connections);
+        f(&entry.matches)
+    }
+}
+
+/// The entry of a filter, a new one if there is none
+fn entry<'a>(
+    entries: &'a mut Vec<Entry>,
+    store: &SharedPacketStore,
+    text: &str,
+    connections: bool,
+) -> &'a mut Entry {
+    let id = store.lock().id();
+    // results of finished captures are of no use any more
+    entries.retain(|e| e.store == id);
+    let found = entries
+        .iter()
+        .position(|e| e.filter == text && e.connections.is_some() == connections);
+    let i = if let Some(i) = found {
+        i
+    } else {
+        if entries.len() >= ENTRIES
+            && let Some(oldest) = (0..entries.len()).min_by_key(|i| entries[*i].used)
+        {
+            entries.remove(oldest);
+        }
+        entries.push(Entry {
+            store: id,
+            filter: text.to_owned(),
+            connections: connections.then(HashSet::new),
+            matches: VecDeque::new(),
+            checked: 0,
+            pending_since: None,
+            used: Instant::now(),
+        });
+        entries.len() - 1
+    };
+    let entry = &mut entries[i];
+    entry.used = Instant::now();
+    entry
+}
+
+fn update_connections(
+    entry: &mut Entry,
+    store: &SharedPacketStore,
+    connections: &HashSet<AddressPortPair>,
+) {
+    loop {
+        let store = store.lock();
+        let first = store.iter().next().map_or(u64::MAX, |p| p.number);
+        while entry.matches.front().is_some_and(|n| *n < first) {
+            entry.matches.pop_front();
+        }
+        let mut judged = 0;
+        for packet in store.after(entry.checked).take(CHUNK) {
+            judged += 1;
+            if packet
+                .conn
+                .is_some_and(|(key, _)| connections.contains(&key))
+            {
+                entry.matches.push_back(packet.number);
+            }
+            entry.checked = packet.number;
+        }
+        if judged < CHUNK {
+            return;
+        }
     }
 }
 

@@ -1,6 +1,6 @@
 {# rows of hosts, services or programs; needs `rows`, `t`, `layout`, `back` #}
 {# services cannot be favorites, so their tables have no star column #}
-{% let stars = rows.iter().any(crate::web::entries::EntryRow::favorable) %}
+{% let stars = rows.iter().any(crate::view::entries::EntryRow::favorable) %}
 <table class="entries">
   <thead><tr>{% if stars %}<th class="fav"><span class="visually-hidden">{{ t.get("favorite") }}</span></th>{% endif %}<th>{{ t.get("entry-name") }}</th><th class="bar-col">{{ t.get("entry-traffic") }}</th><th class="right">{{ t.get("entry-in") }}</th><th class="right">{{ t.get("entry-out") }}</th><th class="right">{{ t.get("entry-total") }}</th></tr></thead>
   <tbody>
@@ -10,8 +10,8 @@
       <td class="fav">
         <form method="post" action="/favorites">
           <input type="hidden" name="csrf_token" value="{{ layout.csrf_token }}">
-          <input type="hidden" name="kind" value="{{ r.kind }}">
-          <input type="hidden" name="key" value="{{ r.key }}">
+          <input type="hidden" name="kind" value="{{ r.form_kind() }}">
+          <input type="hidden" name="key" value="{{ r.form_key() }}">
           <input type="hidden" name="add" value="{% if r.favorite %}0{% else %}1{% endif %}">
           <input type="hidden" name="back" value="{{ back }}">
           <button type="submit" class="star{% if r.favorite %} on{% endif %}" aria-pressed="{{ r.favorite }}" title="{% if r.favorite %}{{ t.get("favorite-remove") }}{% else %}{{ t.get("favorite-add") }}{% endif %}">
@@ -20,7 +20,7 @@
         </form>
       </td>
       {% endif %}
-      <td class="wrap" title="{{ r.label }}{% for tag in r.tags %} · {{ tag }}{% endfor %}{% if !r.sub.is_empty() %}&#10;{{ r.sub }}{% endif %}"><a href="/connections{% if !r.search.is_empty() %}?{{ r.search }}{% endif %}"><strong>{{ r.label }}</strong></a>{% if !r.sub.is_empty() %}<span class="sub">{{ r.sub }}</span>{% endif %}{% for tag in r.tags %} <span class="tag">{{ tag }}</span>{% endfor %}</td>
+      <td class="wrap" title="{{ r.label }}{% for tag in r.tags %} · {{ tag }}{% endfor %}{% if !r.sub.is_empty() %}&#10;{{ r.sub }}{% endif %}"><a href="{{ r.jump.href() }}"><strong>{{ r.label }}</strong></a>{% if !r.sub.is_empty() %}<span class="sub">{{ r.sub }}</span>{% endif %}{% for tag in r.tags %} <span class="tag">{{ tag }}</span>{% endfor %}</td>
       <td class="bar-col"><svg class="bar" viewBox="0 0 100 8" preserveAspectRatio="none" aria-hidden="true"><rect class="bar-in" width="{{ r.bar_in }}" height="8"/><rect class="bar-out" x="{{ r.bar_in }}" width="{{ r.bar_out }}" height="8"/></svg></td>
       <td class="right nowrap num">{{ r.incoming }}</td>
       <td class="right nowrap num">{{ r.outgoing }}</td>

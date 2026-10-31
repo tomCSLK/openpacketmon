@@ -1265,7 +1265,7 @@ Filter über 524 000 Zeilen: rund 0,5 s, die Oberfläche läuft dabei mit 60 Bil
 - Vom Nutzer von Hand getestet (2026-10-31): alles gut, bis auf **„Mitlaufen“**: Man musste erst selbst nach unten scrollen. In der
   echten Fassung springt die Liste beim Einschalten sofort ans Ende.
 
-Reihenfolge: Helfer (erledigt, läuft mit der Browser-Oberfläche), dann Seitendaten aus den Handlern lösen, dann die Seiten.
+Reihenfolge: Helfer (erledigt, läuft mit der Browser-Oberfläche), dann Seitendaten aus den Handlern lösen (erledigt, siehe „Stand Seitendaten“), dann die Seiten.
 
 Stand Helfer (2026-11-01, freigegeben vom Nutzer, Test-Paket 0.3.0, kein Release: das erste Release bleibt 0.4.0 oder 0.5.0):
 
@@ -1289,6 +1289,26 @@ Stand Helfer (2026-11-01, freigegeben vom Nutzer, Test-Paket 0.3.0, kein Release
 - Bekannte Grenze: Stirbt der Helfer mitten im Mitschnitt, steht die Meldung nur auf stderr, die Aufzeichnung steht still. Die Meldung in der
   Oberfläche kommt mit der egui-Fassung. `cap_net_raw,cap_net_admin` auf dem Helfer erlauben weiter jedem lokalen Benutzer den Mitschnitt,
   wie zuvor auf `openpacketmon` (siehe `SECURITY.md`).
+
+Stand Seitendaten (2026-11-01): Alles, was die Seiten zeigen, liegt jetzt in **`src/view/`**, ohne Webserver, HTML und Adressen.
+Die Oberfläche ist unverändert, `src/web/` rendert diese Daten nur noch.
+
+- `src/view/`: `i18n`, `format`, `filter_index` (vorher `web/packet_index.rs`), `packets`, `statistics`, `stream`, `entries`, `connections`, `overview`,
+  `notifications`, `capture`, `settings`, `suggest`, dazu in `mod.rs` `Jump` und `Status`. Einstiege sind einfache Funktionen, etwa `packet_list`, `row_block`,
+  `packet_detail`, `pcap_file`, `statistics`, `stream`, `entry_list`, `connection_list`, `connection_detail`, `overview`, `capture_setup`,
+  `settings`; Änderungen laufen über `apply_start(StartRequest)` und `apply_settings(SettingsChange)`.
+- Links sind `Jump`-Werte (`Connection`, `Connections`, `Packets`, `Statistics`, `Stream`), Zeiten bleiben `Timestamp`. `src/web/jump.rs` macht daraus Adressen,
+  `format::TimeHtml` das `<time>`-Element; Templates rufen `{{ r.jump.href() }}` und `{{ ts.html()|safe }}`. Links zu einem einzelnen Paket bleiben im Web,
+  weil sie den Rückweg (`back=`) tragen; die Daten liefern dort nur die Nummer.
+- Im Web bleiben Handler, Formulare, Live-Protokoll (`api.rs`), Pager, Anmeldung, Fenster-Programm und `sound`/`unit`-Codes der Formulare. `Lang::js_texts` steht noch in
+  `view/i18n.rs` und fällt mit der Browser-Oberfläche weg.
+- Der Test `the_view_knows_nothing_of_the_browser_pages` hält die Grenze: In `src/view/` dürfen weder `axum`, `askama`, `crate::web` noch Links vorkommen.
+- Geprüft: 631 Seiten je Englisch und Deutsch (Aufzeichnung aus einer PCAP mit 177 Paketen, Pakete, Details, Stream, Verbindungen, Statistik, Listen, Einstellungen,
+  JSON-Antworten) vor und nach dem Umbau Byte für Byte gleich, nach jedem Schritt. Normalisiert wurden nur CSRF-Token, temporäre Pfade, die Reihenfolge von JSON-Schlüsseln und
+  gleich sortierte Zeilen bei `/connections?sort=`. POST-Wege decken die Tests im Web ab; ein Live-Mitschnitt lief für diesen Umbau nicht, er berührt die Aufzeichnung nicht.
+- Vor dem Release zu beheben: Der Test `test_increments_ping_sequence` (`src/networking/types/latency.rs`) schlägt selten fehl, weil parallele Tests denselben Zähler `PING_SEQUENCE` erhöhen; beim Umbau einmal aufgetreten, beim nächsten Lauf nicht mehr.
+- Eine gewollte Abweichung: Eine Benachrichtigung ohne Filter (Host ohne Name, AS und Land) führt nach `/connections` statt `/connections?f=`, die Seite ist dieselbe.
+- Auf dem Weg ohne Änderung der Ausgabe zusammengelegt: doppeltes `sound_code` (`api.rs`, `settings.rs`), `endpoint` in `stream.rs` (jetzt `format::socket`), Seitengrößen als Konstante.
 
 Entschieden (Nutzer, 2026-10-31): Der Paketspeicher bleibt im RAM, die Grenze wird wählbar (bis etwa 2 GiB mit passender Paketzahl).
 Eine temporäre Datei wie bei Wireshark kommt nur, falls das später nicht reicht, weil sonst unverschlüsselter Verkehr auf der SSD läge.

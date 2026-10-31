@@ -1,5 +1,4 @@
-//! The capture page: choose what to analyze (network adapter, capture file, IPFIX collector),
-//! start, pause and stop the capture.
+//! The capture page: choose what to analyze, start, pause and stop the capture.
 
 use askama::Template;
 use axum::Form;
@@ -7,47 +6,15 @@ use axum::extract::{Query, State};
 use axum::response::{IntoResponse, Redirect, Response};
 use serde::Deserialize;
 
-use sniffnet_packet_parser::LinkType;
-
-use crate::config::packet_store::PacketStoreConf;
 use crate::engine::state::EngineState;
-use crate::networking::types::capture_context::{
-    CaptureError, CaptureSource, CaptureSourcePicklist,
+use crate::networking::types::capture_context::CaptureSourcePicklist;
+use crate::view::capture::{
+    AdapterRow, PacketChoice, RunningCapture, StartRequest, apply_start, capture_setup, start_error,
 };
-use crate::networking::types::data_representation::DataRepr;
 use crate::web::auth::Session;
 use crate::web::i18n::{self, Lang};
 use crate::web::pages::{Layout, flash_message, render};
-use crate::web::settings::packets_max_choices;
-use crate::web::{AppState, WebError, format};
-
-/// A network adapter in the selection
-pub struct AdapterRow {
-    pub name: String,
-    pub desc: String,
-    pub addresses: String,
-    pub selected: bool,
-    /// Packets seen in the last 30 seconds
-    pub packets: String,
-}
-
-/// The running capture, shown instead of the selection
-pub struct RunningCapture {
-    pub kind: String,
-    pub name: String,
-    pub state: String,
-    pub frozen: bool,
-    pub filter: String,
-    pub export: Option<String>,
-    /// Link type of the adapter or file (Ethernet, Linux cooked capture …)
-    pub link_type: Option<String>,
-    /// Addresses an IPFIX collector bound to the unspecified address listens on
-    pub listening: Vec<String>,
-    /// Packets dropped by the adapter and by openpacketmon (buffer full)
-    pub dropped: Option<(String, String)>,
-    /// What the packet store keeps (not shown for IPFIX, which has no packets)
-    pub packet_store: Option<String>,
-}
+use crate::web::{AppState, WebError};
 
 #[derive(Template)]
 #[template(path = "capture.html")]
@@ -101,127 +68,32 @@ fn capture_page(
     flash: Option<String>,
     error: Option<String>,
 ) -> CapturePage {
-    let conf = &state.conf;
-    let selected_device = match &state.capture_source {
-        CaptureSource::Device(device) => device.get_name().clone(),
-        _ => conf.device.device_name.clone(),
-    };
-    let adapters = state
-        .previews
-        .iter()
-        .map(|p| AdapterRow {
-            name: p.device.get_name().clone(),
-            desc: p.device.get_desc().cloned().unwrap_or_default(),
-            addresses: p
-                .device
-                .get_addresses()
-                .iter()
-                .map(|a| a.addr.to_string())
-                .collect::<Vec<_>>()
-                .join(", "),
-            selected: *p.device.get_name() == selected_device,
-            packets: format::count(t, p.tot_packets()),
-        })
-        .collect();
-    let running = state.is_running().then(|| running_capture(t, state));
+    let setup = capture_setup(t, state);
     CapturePage {
         t,
         layout: Layout::new(state, session),
         flash,
         error,
-        running,
-        source: match conf.capture_source_picklist {
+        running: setup.running,
+        source: match setup.source {
             CaptureSourcePicklist::Device => "device",
             CaptureSourcePicklist::File => "file",
             CaptureSourcePicklist::Ipfix => "ipfix",
         },
-        adapters,
-        file: conf.import_pcap_path.clone(),
-        ipfix_addr: conf.ipfix_socket.addr().to_owned(),
-        ipfix_port: conf.ipfix_socket.port().to_owned(),
-        bpf: conf.filters.bpf().to_owned(),
-        export_enabled: conf.export_pcap.enabled(),
-        export_dir: conf.export_pcap.directory().to_owned(),
-        export_name: conf.export_pcap.file_name().to_owned(),
-        packets: match conf.packet_store {
-            c if !c.enabled => "off",
-            c if c.headers_only => "headers",
-            _ => "full",
+        adapters: setup.adapters,
+        file: setup.file,
+        ipfix_addr: setup.ipfix_addr,
+        ipfix_port: setup.ipfix_port,
+        bpf: setup.bpf,
+        export_enabled: setup.export_enabled,
+        export_dir: setup.export_dir,
+        export_name: setup.export_name,
+        packets: match setup.packets {
+            PacketChoice::Off => "off",
+            PacketChoice::Headers => "headers",
+            PacketChoice::Full => "full",
         },
-        packets_max: packets_max_choices(t, conf.packet_store),
-    }
-}
-
-/// Kind of the capture source, as shown to the user
-pub fn source_kind(t: Lang, source: &CaptureSource) -> String {
-    t.get(match source {
-        CaptureSource::Device(_) => "source-device",
-        CaptureSource::File(_) => "source-file",
-        CaptureSource::Ipfix(_) => "source-ipfix",
-    })
-}
-
-/// State of the running capture, as shown to the user
-pub fn capture_state(t: Lang, state: &EngineState) -> String {
-    t.get(if state.capture_error.is_some() {
-        "capture-state-error"
-    } else if state.traffic_history.no_more_packets() {
-        "capture-state-finished"
-    } else if state.frozen {
-        "capture-state-paused"
-    } else {
-        "capture-state-running"
-    })
-}
-
-fn running_capture(t: Lang, state: &EngineState) -> RunningCapture {
-    let source = &state.capture_source;
-    RunningCapture {
-        kind: source_kind(t, source),
-        name: source.get_name(),
-        state: capture_state(t, state),
-        frozen: state.frozen,
-        filter: if source.supports_filters() && state.conf.filters.is_some_filter_active() {
-            state.conf.filters.bpf().to_owned()
-        } else {
-            String::new()
-        },
-        export: if source.supports_export_pcap() {
-            state.conf.export_pcap.full_path()
-        } else {
-            None
-        },
-        link_type: source.get_link_type().map(LinkType::description),
-        listening: source
-            .get_ipfix_unspecified_bound_addresses()
-            .iter()
-            .map(|a| a.addr.to_string())
-            .collect(),
-        dropped: state.info_traffic.dropped_packets.map(|dropped| {
-            let packets = DataRepr::packets(false);
-            let data = state.info_traffic.tot_data_info;
-            (
-                format::count(t, dropped.by_adapter(packets, data)),
-                format::count(t, dropped.by_sniffnet(packets, data)),
-            )
-        }),
-        packet_store: (!matches!(source, CaptureSource::Ipfix(_))).then(|| {
-            state.packets.as_ref().map_or_else(
-                || t.get("capture-packets-off"),
-                |store| {
-                    let store = store.lock();
-                    t.get1(
-                        if store.headers_only() {
-                            "capture-packets-headers-max"
-                        } else {
-                            "capture-packets-full-max"
-                        },
-                        "max",
-                        format::count(t, store.max_packets() as u128),
-                    )
-                },
-            )
-        }),
+        packets_max: setup.packets_max,
     }
 }
 
@@ -254,6 +126,33 @@ pub struct StartForm {
     packets_max: usize,
 }
 
+impl StartForm {
+    fn request(self) -> StartRequest {
+        StartRequest {
+            source: match self.source.as_str() {
+                "file" => CaptureSourcePicklist::File,
+                "ipfix" => CaptureSourcePicklist::Ipfix,
+                _ => CaptureSourcePicklist::Device,
+            },
+            packets: match self.packets.as_str() {
+                "full" => Some(PacketChoice::Full),
+                "headers" => Some(PacketChoice::Headers),
+                "off" => Some(PacketChoice::Off),
+                _ => None,
+            },
+            device: self.device,
+            file: self.file,
+            ipfix_addr: self.ipfix_addr,
+            ipfix_port: self.ipfix_port,
+            bpf: self.bpf,
+            export: self.export.is_some(),
+            export_dir: self.export_dir,
+            export_name: self.export_name,
+            packets_max: self.packets_max,
+        }
+    }
+}
+
 /// `POST /capture/start`: applies the chosen source and options and starts the capture
 pub async fn start(
     State(state): State<AppState>,
@@ -267,7 +166,7 @@ pub async fn start(
         if engine.is_running() {
             return Ok(Redirect::to("/overview").into_response());
         }
-        apply_start_form(&mut engine, &form)
+        apply_start(&mut engine, &form.request())
     };
     let started = problem.is_none() && state.engine.start();
     if started {
@@ -275,64 +174,14 @@ pub async fn start(
         return Ok(Redirect::to("/overview").into_response());
     }
     let engine = state.engine.lock();
-    let error = problem.map(|id| t.get(id)).or_else(|| {
-        Some(match &engine.capture_error {
-            Some(CaptureError::Fatal(e)) => t.get1("capture-error", "error", e.as_str()),
-            _ => t.get("capture-error-unknown"),
-        })
-    });
-    Ok(render(&capture_page(t, &engine, &session, None, error)))
-}
-
-/// Puts the form into the settings; returns the message id of a problem found before starting
-fn apply_start_form(engine: &mut EngineState, form: &StartForm) -> Option<&'static str> {
-    let bpf = form.bpf.trim().to_owned();
-    engine.conf.filters.expanded = !bpf.is_empty();
-    engine.conf.filters.set_bpf(bpf);
-    if form.source != "ipfix" {
-        apply_packet_store(&mut engine.conf.packet_store, form);
-    }
-    match form.source.as_str() {
-        "file" => {
-            let path = form.file.trim();
-            engine.set_capture_source(CaptureSourcePicklist::File);
-            if path.is_empty() {
-                return Some("capture-file-missing");
-            }
-            engine.set_pcap_import(path.to_owned());
-        }
-        "ipfix" => {
-            engine.set_capture_source(CaptureSourcePicklist::Ipfix);
-            engine.set_ipfix_addr(form.ipfix_addr.trim().to_owned());
-            engine.set_ipfix_port(form.ipfix_port.trim().to_owned());
-        }
-        _ => {
-            engine.set_capture_source(CaptureSourcePicklist::Device);
-            if !engine.select_device(&form.device) {
-                return Some("capture-adapter-missing");
-            }
-            let export = &mut engine.conf.export_pcap;
-            export.set_enabled(form.export.is_some());
-            export.set_directory(form.export_dir.trim().to_owned());
-            export.set_file_name(form.export_name.trim().to_owned());
-        }
-    }
-    None
-}
-
-/// Puts the packet store choice of the form into `conf` (left as it is without a choice)
-fn apply_packet_store(conf: &mut PacketStoreConf, form: &StartForm) {
-    match form.packets.as_str() {
-        "full" | "headers" => {
-            conf.enabled = true;
-            conf.headers_only = form.packets == "headers";
-        }
-        "off" => conf.enabled = false,
-        _ => {}
-    }
-    if PacketStoreConf::MAX_PACKETS_CHOICES.contains(&form.packets_max) {
-        conf.max_packets = form.packets_max;
-    }
+    let error = start_error(t, &engine, problem);
+    Ok(render(&capture_page(
+        t,
+        &engine,
+        &session,
+        None,
+        Some(error),
+    )))
 }
 
 #[derive(Deserialize)]

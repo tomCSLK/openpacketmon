@@ -26,7 +26,7 @@
 {% else %}
 <div class="tiles">
   {% for tile in tiles %}
-  <div class="tile"><div class="tile-value" data-live="{{ tile.live }}">{{ tile.value }}</div><div class="tile-label">{{ tile.label }}</div></div>
+  <div class="tile"><div class="tile-value" data-live="{{ tile.id }}">{{ tile.value }}</div><div class="tile-label">{{ tile.label }}</div></div>
   {% endfor %}
 </div>
 {% endif %}

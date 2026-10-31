@@ -27,7 +27,7 @@
   {% for n in rows %}
     <li class="notification favorite">
       <div class="notification-head"><strong>{{ n.title }}</strong><span class="muted small">{{ n.time }}</span></div>
-      <p><a href="{{ n.href }}">{{ n.text }}</a></p>
+      <p><a href="{{ n.jump.href() }}">{{ n.text }}</a></p>
     </li>
   {% endfor %}
   </ul>

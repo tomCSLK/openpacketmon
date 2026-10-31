@@ -57,16 +57,16 @@
     <tbody>
     {% for r in rows %}
       <tr>
-        <td class="nowrap"><a href="{{ r.href }}"><code>{{ r.src }}</code></a></td>
+        <td class="nowrap"><a href="{{ r.jump.href() }}"><code>{{ r.src }}</code></a></td>
         <td class="dir{% if r.outgoing %} out{% endif %}" title="{% if r.outgoing %}{{ t.get("direction-out") }}{% else %}{{ t.get("direction-in") }}{% endif %}">→</td>
-        <td class="nowrap"><a href="{{ r.href }}"><code>{{ r.dst }}</code></a></td>
+        <td class="nowrap"><a href="{{ r.jump.href() }}"><code>{{ r.dst }}</code></a></td>
         <td>{{ r.proto }}</td>
         {% if r.service_na %}<td class="faint" title="{{ r.service }}">–</td>{% else %}<td class="nowrap">{{ r.service }}</td>{% endif %}
         {% if programs %}{% if r.program_na %}<td class="faint" title="{{ r.program }}">–</td>{% else %}<td class="clip" title="{{ r.program }}">{{ r.program }}</td>{% endif %}{% endif %}
         <td class="clip" title="{{ r.host }}{% if !r.host_sub.is_empty() %} · {{ r.host_sub }}{% endif %}">{{ r.host }}{% if !r.host_sub.is_empty() %}<span class="sub">{{ r.host_sub }}</span>{% endif %}</td>
         <td class="right num nowrap">{{ r.packets }}</td>
         <td class="right num nowrap">{{ r.data }}</td>
-        <td class="right nowrap small">{{ r.last|safe }}</td>
+        <td class="right nowrap small">{{ r.last.html()|safe }}</td>
       </tr>
     {% endfor %}
     </tbody>

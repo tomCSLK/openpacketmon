@@ -6,7 +6,7 @@
 Sprache: Deutsch. Fork und Weiterentwicklung von **Sniffnet** (https://github.com/GyulyVGC/sniffnet), einem
 Netzwerkverkehrs-Monitor in Rust (iced-GUI, libpcap). Maßgeblich für Stand, Lizenzprüfung und Vorgehen ist **`PLAN.md`**.
 
-## Status (2026-10-31)
+## Status (2026-11-01)
 
 - Phase: **1, 2 und 3 erledigt** (2026-10-28): privat auf https://github.com/tomCSLK/openpacketmon, dieser Ordner ist das Repo
   (seit 4.9 neues Repo mit einem Anfangs-Commit; Bezug zum Original ist Commit `ab4bf739d464`). Umbenannt, iced-Oberfläche entfernt, Kern als `src/engine/`;
@@ -21,11 +21,11 @@ Netzwerkverkehrs-Monitor in Rust (iced-GUI, libpcap). Maßgeblich für Stand, Li
   `tls.rs`, `text.rs`, `misc.rs`): DNS/mDNS/LLMNR, DHCP, TLS mit SNI (auch über mehrere TCP-Segmente zusammengesetzt),
   HTTP/1, SSDP, NTP, QUIC-Kopf. Details `PLAN.md` 5.1.
 - **Phase 5.1 Stufe 3 erledigt** (2026-10-29): Live-Paketliste (0,3 s, `/api/packets`), Anzeigefilter mit eigener Grammatik
-  (`src/filter/`), Treffer-Zwischenspeicher (`src/web/packet_index.rs`), Farbregeln, Stream folgen (`src/web/stream.rs`).
+  (`src/filter/`), Treffer-Zwischenspeicher (`src/view/filter_index.rs`), Farbregeln, Stream folgen (`src/view/stream.rs`).
   Details `PLAN.md` 5.1.
 - **Phase 5.1 Stufe 4 erledigt** (2026-10-29): TCP-Analyse (`src/engine/analysis.rs`: Retransmission, Lücke, außer der
   Reihe, Dup-ACK, Nullfenster, Keep-Alive, RTT, Handshake- und DNS-Zeit) mit Filterfeldern `tcp.analysis.*`/`dns.time`,
-  Seite „Statistik“ (`src/web/statistics.rs`: Diagramm, Protokollhierarchie, Befunde, Antwortzeiten). Details `PLAN.md` 5.1.
+  Seite „Statistik“ (`src/view/statistics.rs`: Diagramm, Protokollhierarchie, Befunde, Antwortzeiten). Details `PLAN.md` 5.1.
 - **Fehler behoben** (2026-10-29): Live-Mitschnitt schnitt Pakete auf 200 Bytes ab; jetzt ganze Pakete, wenn der
   Paketspeicher sie behält. Paketspeicher (vollständig/Kopfdaten/aus, Anzahl) auch auf der Seite Aufzeichnung wählbar.
 - **Nachbesserungen aus dem Nutzertest** (2026-10-29): Seitenleiste mit Seitenzahlen, Seitenfeld und „Gehe zu Paket“
@@ -94,13 +94,16 @@ Netzwerkverkehrs-Monitor in Rust (iced-GUI, libpcap). Maßgeblich für Stand, Li
   gleicher Adresse nach Formularen; Blättern mit `data-replace` ohne eigenen Schritt; Alt+Links; im Fenster-Programm noch nicht geprüft)
   und **Statistik-Knopf auf der Seite Verbindungen**: `c=` (Verbindungsfilter) neben `f=` auf `/statistics`, `/packets`, `/api/packets`,
   `/packets.pcap` (`packets::Selection`, `FilterIndex::with_connections`). Der Zurück-Knopf ist seit dem Test ein Pfeil ohne Rahmen im
-  Rand links neben dem Titel. **Vorschläge in den Filterfeldern** (Punkt 19, `static/suggest.js`, `src/web/suggest.rs`,
+  Rand links neben dem Titel. **Vorschläge in den Filterfeldern** (Punkt 19, `static/suggest.js`, `src/view/suggest.rs`,
   `/api/filter/names`, `/api/filter/values`): Felder, Operatoren, Verknüpfungen, Erklärungen (`filter-hint-*`), im Verbindungsfilter echte
   Werte. Enter ohne gewählte Zeile wendet weiter den Filter an. Test-Paket **0.2.9**, im Fenster-Programm noch nicht geprüft.
 - **Mitschnitt-Helfer `openpacketmon-capture`** (2026-11-01, `capture/`, `src/networking/types/capture_helper.rs`, `PLAN.md` 5.5
   „Stand Helfer“, Test-Paket **0.3.0**, kein Release): Nur er hat die Rechte, gibt sie nach dem Öffnen des Adapters ab und reicht Pakete über eine Pipe weiter;
   `openpacketmon` läuft ohne Sonderrechte. Das `.deb` setzt `setcap` auf den Helfer. Live-Test `capture/tests/live.rs` im Netz-Namensraum.
-- **Umstellung auf egui** (Wunsch des Nutzers, 2026-10-31, `PLAN.md` 5.5, Helfer fertig, Oberfläche noch nicht begonnen): native Oberfläche statt Browser-Technik.
+- **Seitendaten in `src/view/`** (2026-11-01, `PLAN.md` 5.5 „Stand Seitendaten“): Alles, was die Seiten zeigen, liegt ohne Webserver, HTML und
+  Adressen in `src/view/` (Links als `Jump`, Zeiten als `Timestamp`), `src/web/` rendert nur noch und behält Handler, Formulare und Live-Protokoll. Keine sichtbare
+  Änderung: 631 Seiten je Sprache vor und nach dem Umbau gleich. Neue Seitendaten gehören nach `src/view/`; der Test `the_view_knows_nothing_of_the_browser_pages` hält die Grenze.
+- **Umstellung auf egui** (Wunsch des Nutzers, 2026-10-31, `PLAN.md` 5.5, Helfer und Seitendaten fertig, Oberfläche noch nicht begonnen): native Oberfläche statt Browser-Technik.
   Entschieden: **Wireshark-Muster** (Fenster schließen beendet das Programm, mit Rückfrage; kein Infobereich, kein Autostart) und
   **erstes Release 0.4.0 oder 0.5.0** statt 0.3.0; der Haltepunkt gilt unverändert. Ebenfalls entschieden: **Plan B** mit kleinem
   Mitschnitt-Helfer und egui-Programm ohne Rechte, ohne Webschicht; Paketspeicher bleibt im RAM mit wählbarer Grenze. Probebau im Scratchpad bestanden (flüssig mit 2 Millionen

@@ -12,9 +12,9 @@ mod connections;
 mod entries;
 mod format;
 pub mod i18n;
+mod jump;
 mod notifications;
 mod overview;
-mod packet_index;
 mod packets;
 mod pager;
 mod pages;
@@ -38,6 +38,7 @@ use axum::routing::{get, post};
 use tower_http::set_header::SetResponseHeaderLayer;
 
 use crate::engine::Engine;
+use crate::view::filter_index::FilterIndex;
 use crate::web::auth::Auth;
 use crate::web::i18n::Lang;
 
@@ -56,7 +57,7 @@ pub struct AppState {
     /// Stops the server (button in the settings)
     pub shutdown: Arc<Notify>,
     /// The packets that pass the display filters in use
-    pub packet_index: Arc<packet_index::FilterIndex>,
+    pub packet_index: Arc<FilterIndex>,
 }
 
 impl AppState {

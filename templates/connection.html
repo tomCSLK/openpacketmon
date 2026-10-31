@@ -13,7 +13,7 @@
     <div class="card-head"><h2>{{ t.get("connection-title") }}</h2></div>
     <div class="card-body">
       <dl class="facts">
-      {% for f in facts %}<dt>{{ f.label }}</dt><dd>{% if f.is_html %}{{ f.value|safe }}{% else %}{{ f.value }}{% endif %}{% for l in f.links %} <span class="fact-sep" aria-hidden="true">·</span> <a href="{{ l.href }}" title="{{ l.title }}">{{ l.label }}</a>{% endfor %}</dd>{% endfor %}
+      {% for f in facts %}<dt>{{ f.label }}</dt><dd>{% if let FactValue::Time(ts) = f.value %}{{ ts.html()|safe }}{% else %}{{ f.value }}{% endif %}{% for l in f.links %} <span class="fact-sep" aria-hidden="true">·</span> <a href="{{ l.jump.href() }}" title="{{ l.title }}">{{ l.label }}</a>{% endfor %}</dd>{% endfor %}
       </dl>
       {% if !message_types.is_empty() %}
       <h3>{{ t.get("conn-message-types") }}</h3>
@@ -36,8 +36,8 @@
               <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.5l2.6 5.3 5.9.9-4.25 4.1 1 5.8L12 16.9l-5.25 2.7 1-5.8L3.5 9.7l5.9-.9z"/></svg>
             </button>
           </form>
-          <span class="fact-sep" aria-hidden="true">·</span> <a href="/connections?{{ address_search }}" title="{{ t.get("connection-address-connections") }}">{{ t.get("connection-list") }}</a></dd>
-        {% for f in host_facts %}<dt>{{ f.label }}</dt><dd>{{ f.value }}{% for l in f.links %} <span class="fact-sep" aria-hidden="true">·</span> <a href="{{ l.href }}" title="{{ l.title }}">{{ l.label }}</a>{% endfor %}</dd>{% endfor %}
+          <span class="fact-sep" aria-hidden="true">·</span> <a href="{{ address_jump.href() }}" title="{{ t.get("connection-address-connections") }}">{{ t.get("connection-list") }}</a></dd>
+        {% for f in host_facts %}<dt>{{ f.label }}</dt><dd>{{ f.value }}{% for l in f.links %} <span class="fact-sep" aria-hidden="true">·</span> <a href="{{ l.jump.href() }}" title="{{ l.title }}">{{ l.label }}</a>{% endfor %}</dd>{% endfor %}
         {% if latency_supported || latency.is_some() %}
         <dt>{{ t.get("latency") }}</dt><dd class="inline-action">{% if let Some(latency) = latency %}{{ latency }}{% else %}<span class="faint">–</span>{% endif %}
           {% if latency_supported %}

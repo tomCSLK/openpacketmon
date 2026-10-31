@@ -1,5 +1,4 @@
-//! The settings page (language, notifications, geolocation databases, update check)
-//! and the unit selection of the page heads.
+//! The settings page and the unit selection of the page heads.
 
 use askama::Template;
 use axum::Form;
@@ -7,53 +6,17 @@ use axum::extract::{Query, State};
 use axum::response::{Redirect, Response};
 use serde::Deserialize;
 
-use std::net::IpAddr;
-
-use crate::config::favorite::{FavoriteKey, MAX_ADDRESSES};
-use crate::config::packet_store::PacketStoreConf;
 use crate::mmdb::geo::{self, DownloadError};
-use crate::mmdb::types::mmdb_reader::MmdbReader;
 use crate::networking::types::data_representation::DataUnit;
-use crate::notifications::types::sound::Sound;
+use crate::view::settings::{
+    Choice, GeoRow, Settings, SettingsChange, apply_settings, parse_addresses, parse_sound,
+    settings,
+};
 use crate::web::auth::{CsrfForm, Session};
 use crate::web::capture::back_path;
 use crate::web::i18n::{self, Lang};
 use crate::web::pages::{Layout, flash_message, render};
-use crate::web::{AppState, WebError, format};
-
-/// An entry of a `<select>`
-pub struct Choice {
-    pub value: &'static str,
-    pub label: String,
-    pub selected: bool,
-}
-
-fn sound_code(sound: Sound) -> &'static str {
-    match sound {
-        Sound::Gulp => "gulp",
-        Sound::Pop => "pop",
-        Sound::Swhoosh => "swhoosh",
-        Sound::None => "none",
-    }
-}
-
-fn parse_sound(code: &str) -> Sound {
-    Sound::ALL
-        .into_iter()
-        .find(|s| sound_code(*s) == code)
-        .unwrap_or(Sound::None)
-}
-
-fn sound_choices(t: Lang, selected: Sound) -> Vec<Choice> {
-    Sound::ALL
-        .into_iter()
-        .map(|s| Choice {
-            value: sound_code(s),
-            label: t.get(&format!("sound-{}", sound_code(s))),
-            selected: s == selected,
-        })
-        .collect()
-}
+use crate::web::{AppState, WebError};
 
 fn parse_unit(code: &str) -> Option<DataUnit> {
     match code {
@@ -61,79 +24,6 @@ fn parse_unit(code: &str) -> Option<DataUnit> {
         "bits" => Some(DataUnit::Bits),
         "packets" => Some(DataUnit::Packets),
         _ => None,
-    }
-}
-
-/// The favorite addresses, one per line, sorted
-fn addresses_text(addresses: &std::collections::HashSet<IpAddr>) -> String {
-    let mut sorted: Vec<&IpAddr> = addresses.iter().collect();
-    sorted.sort();
-    sorted
-        .iter()
-        .map(ToString::to_string)
-        .collect::<Vec<_>>()
-        .join("\n")
-}
-
-/// Addresses typed by the user: separated by lines, spaces or commas; the words that are no
-/// address are returned apart. Both stop at their limits (the first [`MAX_ADDRESSES`] addresses
-/// are kept, [`MAX_INVALID`] wrong words are named).
-fn parse_addresses(text: &str) -> (Vec<IpAddr>, Vec<String>) {
-    let mut addresses = Vec::new();
-    let mut seen = std::collections::HashSet::new();
-    let mut invalid = Vec::new();
-    for word in text.split(|c: char| c.is_whitespace() || c == ',' || c == ';') {
-        if word.is_empty() {
-            continue;
-        }
-        match word.parse::<IpAddr>() {
-            Ok(ip) => {
-                if addresses.len() < MAX_ADDRESSES && seen.insert(ip) {
-                    addresses.push(ip);
-                }
-            }
-            Err(_) => {
-                if invalid.len() < MAX_INVALID {
-                    invalid.push(word.chars().take(60).collect());
-                }
-            }
-        }
-    }
-    (addresses, invalid)
-}
-
-/// Most wrong words named after saving the favorite addresses
-const MAX_INVALID: usize = 20;
-
-/// A geolocation database in use
-pub struct GeoRow {
-    pub label: String,
-    /// The file and its description, `None` without a database
-    pub file: Option<(String, String)>,
-    /// Build date and age in days
-    pub built: String,
-    pub old: bool,
-}
-
-fn geo_row(t: Lang, label: &str, reader: &MmdbReader) -> GeoRow {
-    let label = t.get(label);
-    let Some((path, metadata)) = reader.source() else {
-        return GeoRow {
-            label,
-            file: None,
-            built: String::new(),
-            old: false,
-        };
-    };
-    let age = geo::age_days(metadata.build_epoch);
-    let built = jiff::Timestamp::from_second(metadata.build_epoch.cast_signed())
-        .map(|ts| ts.to_zoned(jiff::tz::TimeZone::system()).date().to_string())
-        .unwrap_or_default();
-    GeoRow {
-        label,
-        file: Some((path.display().to_string(), metadata.database_type.clone())),
-        built: t.get2("settings-geo-built", "date", &built, "days", age),
-        old: age > geo::OLD_AFTER_DAYS,
     }
 }
 
@@ -184,73 +74,52 @@ pub async fn page(
 ) -> Response {
     let t = i18n::current();
     let engine = state.engine.lock();
-    let conf = &engine.conf;
-    let notifications = &conf.settings.notifications;
-    let mut languages = vec![Choice {
-        value: "",
-        label: t.get("language-browser"),
-        selected: Lang::parse(&conf.language).is_none(),
-    }];
-    languages.extend(Lang::ALL.into_iter().map(|l| Choice {
-        value: l.code(),
-        label: l.native_name().to_owned(),
-        selected: conf.language == l.code(),
-    }));
-    let page_size = if conf.page_size == 0 {
-        50
-    } else {
-        conf.page_size
-    };
+    let Settings {
+        languages,
+        page_sizes,
+        favorite_active,
+        favorite_sounds,
+        favorite_addresses,
+        volume,
+        mmdb_country,
+        mmdb_asn,
+        geo_rows,
+        geo_dir,
+        update_checks,
+        packets_enabled,
+        packets_max,
+        packets_headers,
+    } = settings(t, &engine);
     render(&SettingsPage {
         t,
         layout: Layout::new(&engine, &session),
         flash: flash_message(t, query.msg.as_deref()),
         languages,
-        page_sizes: [25, 50, 100, 250]
-            .into_iter()
-            .map(|s| (s, s == page_size))
-            .collect(),
-        favorite_active: notifications.favorite_notification.is_active,
-        favorite_sounds: sound_choices(t, notifications.favorite_notification.sound),
-        favorite_addresses: addresses_text(conf.favorites.addresses()),
+        page_sizes,
+        favorite_active,
+        favorite_sounds,
+        favorite_addresses,
         invalid_addresses: query
             .invalid
             .filter(|i| !i.is_empty())
             .map(|i| t.get1("settings-addresses-invalid", "words", i)),
-        volume: notifications.volume,
-        mmdb_country: conf.settings.mmdb_country.clone(),
-        mmdb_asn: conf.settings.mmdb_asn.clone(),
-        geo_rows: vec![
-            geo_row(
-                t,
-                "settings-geo-country",
-                &engine.mmdb_readers.country.get(),
-            ),
-            geo_row(t, "settings-geo-asn", &engine.mmdb_readers.asn.get()),
-        ],
-        geo_dir: geo::geo_dir()
-            .map(|dir| dir.display().to_string())
-            .unwrap_or_default(),
+        volume,
+        mmdb_country,
+        mmdb_asn,
+        geo_rows,
+        geo_dir,
         geo_error: match query.geo.as_deref() {
             Some("busy") => Some(t.get("settings-geo-busy")),
             Some(_) => Some(t.get("settings-geo-failed")),
             None => None,
         },
-        update_checks: !conf.updates.disable_checks(),
-        packets_enabled: conf.packet_store.enabled,
-        packets_max: packets_max_choices(t, conf.packet_store),
-        packets_headers: conf.packet_store.headers_only,
+        update_checks,
+        packets_enabled,
+        packets_max,
+        packets_headers,
         app_installed: crate::web::app::app_binary().is_some(),
         autostart: crate::web::app::autostart_enabled(),
     })
-}
-
-/// The choices for the number of stored packets: label, number, selected
-pub fn packets_max_choices(t: Lang, conf: PacketStoreConf) -> Vec<(String, usize, bool)> {
-    PacketStoreConf::MAX_PACKETS_CHOICES
-        .into_iter()
-        .map(|n| (format::count(t, n as u128), n, n == conf.max_packets()))
-        .collect()
 }
 
 #[derive(Deserialize)]
@@ -290,47 +159,23 @@ pub async fn save(
 ) -> Result<Redirect, WebError> {
     session.check_csrf(&form.csrf_token)?;
     let (addresses, invalid) = parse_addresses(&form.favorite_addresses);
-    {
-        let mut engine = state.engine.lock();
-        let conf = &mut engine.conf;
-        conf.language = Lang::parse(&form.language)
-            .map(|l| l.code().to_owned())
-            .unwrap_or_default();
-        if [25, 50, 100, 250].contains(&form.page_size) {
-            conf.page_size = form.page_size;
-        }
-
-        let notifications = &mut conf.settings.notifications;
-        notifications.favorite_notification.is_active = form.favorite_active.is_some();
-        notifications.favorite_notification.sound = parse_sound(&form.favorite_sound);
-        notifications.volume = form.volume.min(100);
-        let old: Vec<IpAddr> = conf.favorites.addresses().iter().copied().collect();
-        for ip in old.iter().filter(|ip| !addresses.contains(ip)) {
-            conf.favorites.remove(&FavoriteKey::Address(*ip));
-        }
-        for ip in &addresses {
-            conf.favorites.insert(&FavoriteKey::Address(*ip));
-        }
-
-        conf.packet_store.enabled = form.packets_enabled.is_some();
-        if PacketStoreConf::MAX_PACKETS_CHOICES.contains(&form.packets_max) {
-            conf.packet_store.max_packets = form.packets_max;
-        }
-        conf.packet_store.headers_only = form.packets_headers.is_some();
-
-        if conf.updates.disable_checks() == form.update_checks.is_some() {
-            conf.updates.toggle_disable_checks();
-        }
-
-        let country = form.mmdb_country.trim().to_owned();
-        if country != engine.conf.settings.mmdb_country {
-            engine.set_custom_country_db(country);
-        }
-        let asn = form.mmdb_asn.trim().to_owned();
-        if asn != engine.conf.settings.mmdb_asn {
-            engine.set_custom_asn_db(asn);
-        }
-    }
+    apply_settings(
+        &mut state.engine.lock(),
+        &SettingsChange {
+            language: form.language,
+            page_size: form.page_size,
+            favorite_active: form.favorite_active.is_some(),
+            favorite_sound: parse_sound(&form.favorite_sound),
+            addresses,
+            volume: form.volume,
+            mmdb_country: form.mmdb_country,
+            mmdb_asn: form.mmdb_asn,
+            update_checks: form.update_checks.is_some(),
+            packets_enabled: form.packets_enabled.is_some(),
+            packets_max: form.packets_max,
+            packets_headers: form.packets_headers.is_some(),
+        },
+    );
     if form.autostart_shown.is_some()
         && form.autostart.is_some() != crate::web::app::autostart_enabled()
         && let Err(e) = crate::web::app::set_autostart(form.autostart.is_some(), state.port)
@@ -425,20 +270,8 @@ mod tests {
     use axum::http::{StatusCode, header};
 
     use super::*;
+    use crate::notifications::types::sound::Sound;
     use crate::web::testutil::*;
-
-    #[test]
-    fn sounds_and_addresses_are_parsed() {
-        assert_eq!(parse_sound("pop"), Sound::Pop);
-        assert_eq!(parse_sound("<script>"), Sound::None);
-        let (addresses, invalid) =
-            parse_addresses("192.168.1.20\n fe80::1, 10.0.0.1;192.168.1.20 example.com\n");
-        assert_eq!(
-            addresses,
-            ["192.168.1.20", "fe80::1", "10.0.0.1"].map(|a| a.parse::<IpAddr>().unwrap())
-        );
-        assert_eq!(invalid, ["example.com"]);
-    }
 
     #[tokio::test]
     async fn settings_are_saved() {

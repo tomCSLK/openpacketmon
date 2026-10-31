@@ -33,6 +33,7 @@ mod networking;
 mod notifications;
 mod report;
 mod utils;
+mod view;
 mod web;
 
 /// Name used for the binary, the configuration directory and the window class

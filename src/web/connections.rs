@@ -1,5 +1,4 @@
-//! The connections of the capture: a searchable, sortable list in pages and the details of one
-//! connection (with a latency measurement for live captures).
+//! The pages of the connections: the list in pages and the details of one connection.
 
 use std::fmt::Write;
 use std::net::IpAddr;
@@ -9,33 +8,25 @@ use axum::Form;
 use axum::extract::{Query, State};
 use axum::response::{Redirect, Response};
 use serde::Deserialize;
-use sniffnet_packet_parser::Protocol;
 
-use crate::config::favorite::FavoriteItem;
 use crate::engine::state::EngineState;
-use crate::filter::Filter;
-use crate::networking::manage_packets::get_address_to_lookup;
 use crate::networking::types::address_port_pair::AddressPortPair;
-use crate::networking::types::data_info::DataInfo;
-use crate::networking::types::data_info_host::DataInfoHost;
-use crate::networking::types::data_representation::DataRepr;
 use crate::networking::types::info_address_port_pair::InfoAddressPortPair;
-use crate::networking::types::latency::LatencyStatus;
-use crate::networking::types::program::Program;
-use crate::networking::types::service::Service;
-use crate::networking::types::traffic_direction::TrafficDirection;
 use crate::report::types::sort_type::SortType;
+use crate::view::Jump;
+use crate::view::connections::{
+    ConnectionRow, FILTER_EXAMPLES, Fact, FactValue, ListRequest, connection_detail,
+    connection_list, filter_field_names, latency_allowed,
+};
 use crate::web::auth::Session;
-use crate::web::entries::{encode, host_sub, program_label, service_label};
+use crate::web::entries::encode;
+use crate::web::format::TimeHtml;
 use crate::web::i18n::{self, Lang};
-use crate::web::packets::{filter_error, filters_href};
+use crate::web::jump::Href;
+use crate::web::packets::filters_href;
 use crate::web::pager::Pager;
 use crate::web::pages::{Layout, render};
-use crate::web::{AppState, WebError, format};
-
-/// Page sizes offered in the list
-pub(crate) const PAGE_SIZES: [usize; 4] = [25, 50, 100, 250];
-pub(crate) const DEFAULT_PAGE_SIZE: usize = 50;
+use crate::web::{AppState, WebError};
 
 /// The filter and position of the list, as given in the address
 #[derive(Deserialize, Default, Clone)]
@@ -95,39 +86,6 @@ impl ListQuery {
     }
 }
 
-/// Examples of the help of the connection filter
-const FILTER_EXAMPLES: [&str; 8] = [
-    "ip.addr == 192.168.1.20",
-    "port == 443 and proto == tcp",
-    "domain contains google",
-    "country == US and not as contains amazon",
-    "program contains firefox",
-    "remote == 10.0.0.0/8",
-    "favorite and bytes > 100000",
-    "bytes > 1000000 and direction == outgoing",
-];
-
-/// A connection in the list
-#[allow(clippy::struct_excessive_bools)] // flags of a table row
-pub struct ConnectionRow {
-    pub href: String,
-    pub src: String,
-    pub dst: String,
-    pub outgoing: bool,
-    pub proto: String,
-    pub service: String,
-    pub program: String,
-    /// Service or program do not apply (ARP, ICMP …): the table shows a dash with the text as tooltip
-    pub service_na: bool,
-    pub program_na: bool,
-    /// Name and AS of the remote host, if resolved
-    pub host: String,
-    pub host_sub: String,
-    pub packets: String,
-    pub data: String,
-    pub last: String,
-}
-
 /// Query string that identifies a connection on the details page
 pub(crate) fn connection_query(key: &AddressPortPair) -> String {
     let mut query = format!(
@@ -151,50 +109,6 @@ pub(crate) fn connection_query(key: &AddressPortPair) -> String {
         );
     }
     query
-}
-
-fn connection_row(
-    t: Lang,
-    state: &EngineState,
-    key: &AddressPortPair,
-    info: &InfoAddressPortPair,
-) -> ConnectionRow {
-    let unit = state.conf.data_repr.data_unit;
-    let remote = get_address_to_lookup(key, info.traffic_direction);
-    let (host, host_sub) = match state.addresses_resolved.get(&remote) {
-        Some((rdns, host)) => (
-            if host.domain.is_empty() {
-                rdns.clone()
-            } else {
-                host.domain.clone()
-            },
-            self::host_sub(host),
-        ),
-        None => (String::new(), String::new()),
-    };
-    ConnectionRow {
-        href: format!("/connection?{}", connection_query(key)),
-        src: format::socket(&key.src_ip, key.src_port),
-        dst: format::socket(&key.dst_ip, key.dst_port),
-        outgoing: info.traffic_direction == TrafficDirection::Outgoing,
-        proto: key.protocol.to_string(),
-        service: service_label(t, &info.service),
-        program: program_label(t, &info.program),
-        service_na: info.service == Service::NotApplicable,
-        program_na: info.program == Program::NotApplicable,
-        host,
-        host_sub,
-        packets: format::count(t, info.packets),
-        data: format::amount(
-            t,
-            unit,
-            info.transmitted_data(DataRepr {
-                data_unit: unit,
-                per_second: false,
-            }),
-        ),
-        last: format::time_html(info.final_timestamp),
-    }
 }
 
 #[derive(Template)]
@@ -234,71 +148,43 @@ pub async fn list(
 ) -> Response {
     let t = i18n::current();
     let engine = state.engine.lock();
-    let size = query
-        .size
-        .filter(|s| PAGE_SIZES.contains(s))
-        .or_else(|| Some(engine.conf.page_size).filter(|s| PAGE_SIZES.contains(s)))
-        .unwrap_or(DEFAULT_PAGE_SIZE);
-    let unit = engine.conf.data_repr.data_unit;
-    let repr = DataRepr {
-        data_unit: unit,
-        per_second: false,
-    };
-    let parsed = Filter::parse_connections(query.f.trim());
-    let error = parsed.as_ref().err().map(|e| filter_error(t, e));
-    // a wrong filter shows no connections rather than all of them
-    let filter = parsed.ok().flatten();
-    let requested = query.page.unwrap_or(1).max(1);
-    let (mut entries, total, matching) = if error.is_some() {
-        (Vec::new(), 0, DataInfo::default())
-    } else {
-        engine.searched_entries(filter.as_ref(), query.sort_type(), repr, requested, size)
-    };
-    let pages = total.div_ceil(size).max(1);
-    let page = requested.min(pages);
-    if page != requested {
-        // beyond the last page (e.g. after the list got shorter): show the last one
-        entries = engine
-            .searched_entries(filter.as_ref(), query.sort_type(), repr, page, size)
-            .0;
-    }
-    let rows: Vec<ConnectionRow> = entries
-        .iter()
-        .map(|(key, info)| connection_row(t, &engine, key, info))
-        .collect();
-    let first_row = if total == 0 { 0 } else { (page - 1) * size + 1 };
-    let last_row = first_row + rows.len().saturating_sub(1);
+    let l = connection_list(
+        t,
+        &engine,
+        &ListRequest {
+            filter: &query.f,
+            sort: query.sort_type(),
+            page: query.page,
+            size: query.size,
+        },
+    );
     render(&ConnectionsPage {
         t,
         layout: Layout::new(&engine, &session),
-        running: engine.is_running(),
+        running: l.running,
         filtered: query.is_filtered(),
         hidden_filters: query.hidden_fields(),
-        error,
+        error: l.error,
         examples: FILTER_EXAMPLES,
         protocols: crate::filter::CONNECTION_PROTOCOLS.join(" "),
-        fields: crate::filter::CONNECTION_FIELDS
-            .iter()
-            .map(|(name, _, _)| *name)
-            .collect::<Vec<_>>()
-            .join(" "),
-        rows,
-        total,
-        matching_data: format::amount(t, unit, matching.tot_data(repr)),
-        pages,
-        first_row,
-        last_row,
-        pager: Pager::new(page, pages, |p| query.href(p), "/connections", {
+        fields: filter_field_names().join(" "),
+        rows: l.rows,
+        total: l.total,
+        matching_data: l.matching_data,
+        pages: l.pages,
+        first_row: l.first_row,
+        last_row: l.last_row,
+        pager: Pager::new(l.page, l.pages, |p| query.href(p), "/connections", {
             let mut fields = query.hidden_fields();
             if let Some(size) = query.size {
                 fields.push(("size", size.to_string()));
             }
             fields
         }),
-        sizes: PAGE_SIZES.iter().map(|s| (*s, *s == size)).collect(),
-        programs: engine.capture_source.supports_programs(),
-        unit: crate::web::api::unit_code(unit),
-        back: query.href(page),
+        sizes: l.sizes,
+        programs: l.programs,
+        unit: crate::web::api::unit_code(l.unit),
+        back: query.href(l.page),
         statistics: filters_href("/statistics", "", &query.f),
         query,
     })
@@ -340,48 +226,6 @@ fn find_connection<'a>(
     })
 }
 
-/// A jump from a value of the details page to the list it belongs to
-pub struct FactLink {
-    pub label: String,
-    /// Says where the link leads
-    pub title: String,
-    pub href: String,
-}
-
-/// A labelled value of the details page
-pub struct Fact {
-    pub label: String,
-    pub value: String,
-    /// `value` is markup made by this program (a time), not text
-    pub is_html: bool,
-    pub links: Vec<FactLink>,
-}
-
-impl Fact {
-    fn text(label: String, value: String) -> Self {
-        Self {
-            label,
-            value,
-            is_html: false,
-            links: Vec::new(),
-        }
-    }
-
-    fn time(label: String, ts: crate::utils::types::timestamp::Timestamp) -> Self {
-        Self {
-            label,
-            value: format::time_html(ts),
-            is_html: true,
-            links: Vec::new(),
-        }
-    }
-
-    fn with_links(mut self, links: Vec<FactLink>) -> Self {
-        self.links = links;
-        self
-    }
-}
-
 #[derive(Template)]
 #[template(path = "connection.html")]
 #[allow(clippy::struct_excessive_bools)] // switches of a page or a command line
@@ -398,66 +242,8 @@ struct ConnectionPage {
     measuring: bool,
     self_query: String,
     /// Connections of the remote address
-    address_search: String,
+    address_jump: Jump,
     remote_favorite: bool,
-}
-
-fn latency_text(t: Lang, status: Option<&LatencyStatus>) -> Option<String> {
-    Some(match status? {
-        LatencyStatus::Measuring => t.get("latency-measuring"),
-        LatencyStatus::Measured(d) => {
-            #[allow(clippy::cast_precision_loss)]
-            let ms = d.as_micros() as f64 / 1000.0;
-            t.get1("latency-ms", "ms", (ms * 100.0).round() / 100.0)
-        }
-        LatencyStatus::Failed(e) => t.get1("latency-failed", "error", e.as_str()),
-    })
-}
-
-/// Name, AS and country of the remote host, with a link to its connections
-fn remote_host(t: Lang, engine: &EngineState, remote: IpAddr) -> Vec<Fact> {
-    let Some((rdns, host)) = engine.addresses_resolved.get(&remote) else {
-        return Vec::new();
-    };
-    let filter = FavoriteItem::Host((host.clone(), DataInfoHost::default())).connection_filter();
-    let mut facts = vec![
-        Fact::text(t.get("host-rdns"), rdns.clone()).with_links(vec![FactLink {
-            label: t.get("connection-list"),
-            title: t.get("connection-host-connections"),
-            href: format!(
-                "/connections?{}",
-                crate::web::entries::search_query(&filter)
-            ),
-        }]),
-    ];
-    if !host.asn.name.is_empty() {
-        facts.push(Fact::text(
-            t.get("host-asn"),
-            format!("AS{} {}", host.asn.code, host.asn.name),
-        ));
-    }
-    if host.country != crate::countries::types::country::Country::ZZ {
-        facts.push(Fact::text(t.get("host-country"), host.country.to_string()));
-    }
-    facts
-}
-
-/// Links from the number of packets of a connection to the packets and their statistics, with
-/// the display filter of the connection
-fn packet_links(t: Lang, key: &AddressPortPair) -> Vec<FactLink> {
-    let filter = encode(&crate::web::packets::conversation_filter(key));
-    vec![
-        FactLink {
-            label: t.get("connection-packets"),
-            title: t.get("connection-packets-hint"),
-            href: format!("/packets?f={filter}"),
-        },
-        FactLink {
-            label: t.get("connection-statistics"),
-            title: t.get("connection-statistics-hint"),
-            href: format!("/statistics?f={filter}"),
-        },
-    ]
 }
 
 /// `GET /connection?src=…`: details of one connection
@@ -469,81 +255,21 @@ pub async fn detail(
     let t = i18n::current();
     let engine = state.engine.lock();
     let (key, info) = find_connection(&engine, &query).ok_or(WebError::NotFound)?;
-    let remote = get_address_to_lookup(key, info.traffic_direction);
-    let data = info.data_info();
-    let bytes = DataRepr::bytes(false);
-    let packet_links = if engine.packets.is_some() {
-        packet_links(t, key)
-    } else {
-        Vec::new()
-    };
-    let mut facts = vec![
-        Fact::text(
-            t.get("conn-source"),
-            format::socket(&key.src_ip, key.src_port),
-        ),
-        Fact::text(t.get("conn-source-mac"), format::mac(info.src_mac)),
-        Fact::text(
-            t.get("conn-destination"),
-            format::socket(&key.dst_ip, key.dst_port),
-        ),
-        Fact::text(t.get("conn-destination-mac"), format::mac(info.dst_mac)),
-        Fact::text(t.get("conn-protocol"), key.protocol.to_string()),
-        Fact::text(
-            t.get("conn-direction"),
-            t.get(match info.traffic_direction {
-                TrafficDirection::Outgoing => "direction-out",
-                TrafficDirection::Incoming => "direction-in",
-            }),
-        ),
-        Fact::text(t.get("conn-service"), service_label(t, &info.service)),
-        Fact::text(
-            t.get("conn-program"),
-            match &info.program {
-                Program::NamePath((name, path)) => {
-                    format!("{name} ({path})")
-                }
-                other => program_label(t, other),
-            },
-        ),
-        Fact::text(t.get("conn-packets"), format::count(t, info.packets)).with_links(packet_links),
-        Fact::text(t.get("conn-data"), format::bytes(t, data.tot_data(bytes))),
-        Fact::time(t.get("conn-first"), info.initial_timestamp),
-        Fact::time(t.get("conn-last"), info.final_timestamp),
-    ];
-    if let Some(vlan) = info.vlan_id {
-        facts.push(Fact::text(t.get("conn-vlan"), vlan.to_string()));
-    }
-    if let Some(exporter) = key.exporter {
-        facts.push(Fact::text(t.get("conn-exporter"), exporter.to_string()));
-    }
-    let host_facts = remote_host(t, &engine, remote);
-    let mut message_types: Vec<(String, String)> = info
-        .message_types
-        .iter()
-        .map(|(m, n)| (m.to_string(), format::count(t, *n as u128)))
-        .collect();
-    message_types.sort();
-    let status = engine.latency_statuses.get(&remote);
+    let d = connection_detail(t, &engine, key, info);
     let page = ConnectionPage {
         t,
         layout: Layout::new(&engine, &session),
-        title: format!(
-            "{} → {}",
-            format::socket(&key.src_ip, key.src_port),
-            format::socket(&key.dst_ip, key.dst_port)
-        ),
-        facts,
-        remote: remote.to_string(),
-        host_facts,
-        message_types,
-        latency: latency_text(t, status),
-        latency_supported: engine.capture_source.supports_latency()
-            && !matches!(key.protocol, Protocol::Arp),
-        measuring: matches!(status, Some(LatencyStatus::Measuring)),
+        title: d.title,
+        facts: d.facts,
+        remote: d.remote.to_string(),
+        host_facts: d.host_facts,
+        message_types: d.message_types,
+        latency: d.latency,
+        latency_supported: d.latency_supported,
+        measuring: d.measuring,
         self_query: connection_query(key),
-        address_search: crate::web::entries::search_query(&format!("ip.addr == {remote}")),
-        remote_favorite: engine.conf.favorites.contains_address(&remote),
+        address_jump: d.address_jump,
+        remote_favorite: d.remote_favorite,
     };
     Ok(render(&page))
 }
@@ -566,17 +292,8 @@ pub async fn latency(
 ) -> Result<Redirect, WebError> {
     session.check_csrf(&form.csrf_token)?;
     let ip: IpAddr = form.ip.parse().map_err(|_| WebError::NotFound)?;
-    {
-        let engine = state.engine.lock();
-        // only addresses of the capture, and only where the source allows it
-        let known = engine
-            .info_traffic
-            .map
-            .iter()
-            .any(|(k, v)| get_address_to_lookup(k, v.traffic_direction) == ip);
-        if !known || !engine.capture_source.supports_latency() {
-            return Err(WebError::NotFound);
-        }
+    if !latency_allowed(&state.engine.lock(), ip) {
+        return Err(WebError::NotFound);
     }
     state.engine.measure_latency(ip);
     Ok(Redirect::to(&crate::web::capture::back_path(

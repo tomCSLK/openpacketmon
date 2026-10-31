@@ -47,9 +47,9 @@
       <thead><tr><th>{{ t.get("conn-protocol") }}</th><th class="right">{{ t.get("stats-packets") }}</th><th class="right">%</th><th class="bar-col"></th><th class="right">{{ t.get("stats-bytes") }}</th><th class="right">%</th></tr></thead>
       <tbody>
       {% for r in hierarchy %}
-        <tr><td class="depth-{{ r.depth }}"><a href="{{ r.href }}"><code>{{ r.name }}</code></a></td>
+        <tr><td class="depth-{{ r.depth }}"><a href="{{ r.jump.href() }}"><code>{{ r.name }}</code></a></td>
           <td class="right nowrap num">{{ r.packets }}</td><td class="right nowrap num muted">{{ r.packets_share }}</td>
-          <td class="bar-col"><svg class="bar" viewBox="0 0 100 8" preserveAspectRatio="none" aria-hidden="true"><rect class="bar-in" width="{{ r.bar }}" height="8"/></svg></td>
+          <td class="bar-col"><svg class="bar" viewBox="0 0 100 8" preserveAspectRatio="none" aria-hidden="true"><rect class="bar-in" width="{{ "{:.1}"|format(r.bar) }}" height="8"/></svg></td>
           <td class="right nowrap num">{{ r.bytes }}</td><td class="right nowrap num muted">{{ r.bytes_share }}</td></tr>
       {% endfor %}
       </tbody>
@@ -65,7 +65,7 @@
       <table class="findings">
         <tbody>
         {% for f in findings %}
-          <tr{% if f.problem && f.href.is_some() %} class="problem"{% endif %}><td>{% if let Some(href) = f.href %}<a href="{{ href }}">{{ f.label }}</a>{% else %}{{ f.label }}{% endif %}</td><td class="right nowrap num">{{ f.count }}</td></tr>
+          <tr{% if f.problem && f.jump.is_some() %} class="problem"{% endif %}><td>{% if let Some(jump) = f.jump %}<a href="{{ jump.href() }}">{{ f.label }}</a>{% else %}{{ f.label }}{% endif %}</td><td class="right nowrap num">{{ f.count }}</td></tr>
         {% endfor %}
         </tbody>
       </table>
@@ -79,7 +79,7 @@
         <thead><tr><th></th><th class="right">{{ t.get("stats-count") }}</th><th class="right">{{ t.get("stats-average") }}</th><th class="right">{{ t.get("stats-max") }}</th></tr></thead>
         <tbody>
         {% for r in times %}
-          <tr><td>{% if let Some(href) = r.href %}<a href="{{ href }}">{{ r.label }}</a>{% else %}{{ r.label }}{% endif %}</td><td class="right nowrap num">{{ r.count }}</td><td class="right nowrap num">{{ r.average }}</td><td class="right nowrap num">{{ r.max }}</td></tr>
+          <tr><td>{% if let Some(jump) = r.jump %}<a href="{{ jump.href() }}">{{ r.label }}</a>{% else %}{{ r.label }}{% endif %}</td><td class="right nowrap num">{{ r.count }}</td><td class="right nowrap num">{{ r.average }}</td><td class="right nowrap num">{{ r.max }}</td></tr>
         {% endfor %}
         </tbody>
       </table>

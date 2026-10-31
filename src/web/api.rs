@@ -5,9 +5,9 @@ use axum::Json;
 use axum::extract::{Query, State};
 use serde::{Deserialize, Serialize};
 
-use crate::networking::types::capture_context::CaptureError;
 use crate::networking::types::data_representation::{DataRepr, DataUnit};
-use crate::notifications::types::sound::Sound;
+use crate::view::capture::capture_problem;
+use crate::view::settings::sound_code;
 use crate::web::AppState;
 use crate::web::auth::Session;
 
@@ -68,15 +68,6 @@ pub fn unit_code(unit: DataUnit) -> &'static str {
     }
 }
 
-fn sound_code(sound: Sound) -> &'static str {
-    match sound {
-        Sound::Gulp => "gulp",
-        Sound::Pop => "pop",
-        Sound::Swhoosh => "swhoosh",
-        Sound::None => "none",
-    }
-}
-
 /// `GET /api/live`: state and new traffic samples of the capture
 pub async fn live(
     State(state): State<AppState>,
@@ -104,13 +95,7 @@ pub async fn live(
     let data = &engine.info_traffic.tot_data_info;
     let bytes = DataRepr::bytes(false);
     let packets = DataRepr::packets(false);
-    let error = match &engine.capture_error {
-        Some(CaptureError::Fatal(e)) => Some(e.clone()),
-        Some(CaptureError::IpfixUndecodable) => {
-            Some(crate::web::i18n::current().get("capture-ipfix-undecodable"))
-        }
-        None => None,
-    };
+    let error = capture_problem(crate::web::i18n::current(), &engine);
     Json(Live {
         running: engine.is_running(),
         frozen: engine.frozen,

@@ -1,6 +1,6 @@
 //! The packets that pass a display filter or belong to the connections of a connection filter,
 //! kept per filter and brought up to date as packets arrive: the list, its live updates and the
-//! download then dissect only the new packets.
+//! export then dissect only the new packets.
 //!
 //! The store is locked only to copy a chunk of packets (their bytes are shared); the dissection
 //! runs without the lock, so the capture thread is never held up for long. The packets are
@@ -14,7 +14,7 @@ use crate::engine::analysis;
 use crate::engine::packets::SharedPacketStore;
 use crate::filter::Filter;
 use crate::networking::types::address_port_pair::AddressPortPair;
-use crate::web::packets::{FOLLOWUP_PACKETS, dissect_following, filter_packet};
+use crate::view::packets::{FOLLOWUP_PACKETS, dissect_following, filter_packet};
 
 /// Filters kept at a time (the list, the download, a second tab, both filters of a selection …)
 const ENTRIES: usize = 6;

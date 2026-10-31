@@ -6,8 +6,7 @@ use axum::http::StatusCode;
 use axum::response::{Html, IntoResponse, Response};
 
 use crate::engine::state::EngineState;
-use crate::mmdb::geo;
-use crate::utils::check_updates::UpdateStatus;
+use crate::view::Status;
 use crate::web::auth::Session;
 use crate::web::i18n::Lang;
 
@@ -26,17 +25,18 @@ pub struct Layout {
 
 impl Layout {
     pub fn new(state: &EngineState, session: &Session) -> Self {
-        let country = state.mmdb_readers.country.get();
-        let asn = state.mmdb_readers.asn.get();
+        let Status {
+            unread,
+            update,
+            geo_missing,
+            geo_dbip,
+        } = Status::read(state);
         Self {
             csrf_token: session.csrf_token.clone(),
-            unread: state.unread_notifications,
-            update: match &state.update_status {
-                UpdateStatus::UpdateAvailable(version) => Some(version.clone()),
-                _ => None,
-            },
-            geo_missing: country.source().is_none(),
-            geo_dbip: geo::is_dbip(&country) || geo::is_dbip(&asn),
+            unread,
+            update,
+            geo_missing,
+            geo_dbip,
         }
     }
 }

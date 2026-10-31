@@ -945,7 +945,7 @@ Noch offen, in dieser Reihenfolge:
    Sniffnet nennt, einhalten; die Herkunftsangabe im Advisory prüfen.
 2. Nutzertest 0.2.7 vorläufig abgeschlossen (2026-10-31). Zurück-Knopf und Statistik-Knopf (Phase 3 Punkte 17, 18) sind umgesetzt
    (2026-10-31), Test-Paket **0.2.8** gebaut. Ebenfalls umgesetzt: Vorschläge in den Filterfeldern (Punkt 19).
-   Offen: Zurück-Pfeil, Alt+Links und Vorschläge im Fenster-Programm prüfen, dafür Test-Paket mit dem Pfeil und den Vorschlägen bauen.
+   Test-Paket **0.2.9** gebaut (2026-10-31). Offen: Zurück-Pfeil, Alt+Links und Vorschläge im Fenster-Programm prüfen.
 3. Version **0.3.0** setzen: `Cargo.toml`, `app/Cargo.toml`, `cargo update --workspace --offline`; in `CHANGELOG.md`
    `## [Unreleased]` zu `## [0.3.0]` mit Datum; Release-Hinweise (Englisch) als Datei schreiben; committen, pushen, CI grün.
 4. Trockenlauf `dev/release.sh` (das Skript lief noch nie), Installationstest auf sauberem Ubuntu 24.04 und Debian 13

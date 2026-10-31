@@ -96,7 +96,7 @@ Netzwerkverkehrs-Monitor in Rust (iced-GUI, libpcap). Maßgeblich für Stand, Li
   `/packets.pcap` (`packets::Selection`, `FilterIndex::with_connections`). Der Zurück-Knopf ist seit dem Test ein Pfeil ohne Rahmen im
   Rand links neben dem Titel. **Vorschläge in den Filterfeldern** (Punkt 19, `static/suggest.js`, `src/web/suggest.rs`,
   `/api/filter/names`, `/api/filter/values`): Felder, Operatoren, Verknüpfungen, Erklärungen (`filter-hint-*`), im Verbindungsfilter echte
-  Werte. Enter ohne gewählte Zeile wendet weiter den Filter an. Fenster-Programm damit noch nicht geprüft.
+  Werte. Enter ohne gewählte Zeile wendet weiter den Filter an. Test-Paket **0.2.9**, im Fenster-Programm noch nicht geprüft.
 - **Reihenfolge nach dem Release** (Nutzer, 2026-10-31): 0.3.0 → MCP-Anbindung → Windows-Version.
 - **MCP-Anbindung** (`PLAN.md` 5.4): Claude soll den Mitschnitt abfragen können, etwa beim Untersuchen von Geräten im Heimnetz.
   Paketinhalte sind dabei ungeprüfte Eingaben für das Sprachmodell. Von Anfang an plattformneutral schreiben, damit sie unter

@@ -530,12 +530,13 @@ für Dienste entfallen; die **Mini-Ansicht entfällt**. Umsetzung am 2026-10-29:
 
 17. ✅ **Zurück-Knopf** (Rückmeldung 2026-10-30 zu 0.2.7, umgesetzt 2026-10-31): „In vielen Situationen fehlt er eindeutig.“ Das
     Fenster-Programm hat keine Browser-Leiste, die Sprünge zwischen Verbindung, Paketen, Statistik und Stream führten nur vorwärts.
-    - Knopf „‹ Zurück“ fest links neben dem Titel aller Seiten (`templates/app.html`, `.page-back`, Seitenköpfe eingerückt).
+    - Pfeil ohne Rahmen im Rand links neben dem Titel aller Seiten (`templates/app.html`, `.page-back`). Der erste Entwurf, ein Knopf mit
+      Text, wirkte im Test 0.2.8 zu groß und schob den Titel weg; so bleibt der Titel bündig mit den Karten.
     - Ein Schritt durch die Seiten des Tabs (`static/app.js`): Jeder Verlaufseintrag merkt sich in `history.state` seine Tiefe und
       wie viele Schritte zur vorigen anderen Seite führen. Formulare, die zur selben Seite zurückkehren (Favorit, Einheit, Pause),
       erzeugen sonst Einträge mit gleicher Adresse, und „Zurück“ täte scheinbar nichts. Die Tiefe wandert in `sessionStorage` von Seite zu Seite.
     - Ohne Verlauf (Seite direkt geöffnet): Verbindung → Verbindungen, Paket → Liste, Stream → Paket (`{% block back %}`); die Seiten der
-      Navigation haben kein Ziel, der Knopf ist dann ausgegraut.
+      Navigation haben kein Ziel, der Pfeil fehlt dann.
     - Blättern (nächstes Paket, Text/Hex, Richtung im Stream) legt mit `data-replace` keinen eigenen Schritt an: Zurück führt aus den
       Paketdetails direkt zur Liste. Beim Öffnen eines Pakets schreibt `packets.js` `goto=` in die Adresse der Liste, Zurück landet also
       beim Paket statt am Ende der Liste; die Liste folgt dann nicht mehr den neuen Paketen (Knopf Live).
@@ -557,6 +558,20 @@ für Dienste entfallen; die **Mini-Ansicht entfällt**. Umsetzung am 2026-10-29:
       `bytes` wächst), wird neu ausgewertet, ohne Pakete zu zerlegen; sonst kommen nur neue Pakete dazu. Einträge von 4 auf 6 erhöht.
     - Ohne Paketspeicher oder bei IPFIX führt der Knopf zur Statistik mit deren Hinweis. Es zählen nur Pakete, die noch im Speicher sind;
       die Summen können kleiner sein als in der Verbindungsliste, das sagt der Hinweis.
+
+19. ✅ **Vorschläge in den Filterfeldern** (Wunsch des Nutzers, 2026-10-31, noch vor 0.3.0: „im Moment muss man die Befehle eher raten“).
+    Alle Filterfelder (Verbindungen, Pakete, Statistik) zeigen beim Tippen eine Liste (`static/suggest.js`):
+    - Der Text vor dem Cursor sagt, was als Nächstes kommen kann (kleiner Zustandsautomat, dieselben Wörter wie `tokenize`): Feld oder
+      Protokoll, passende Operatoren (`filter::operators`, ein Test prüft jeden gegen den Parser), Wert, `and`/`or`, `{`, `}`, `)`.
+    - `GET /api/filter/names` (`src/web/suggest.rs`) liefert Namen, Wertart und Operatoren; Erklärungen für die wichtigsten rund 65 Namen
+      in Deutsch und Englisch (`filter-hint-*`, ein Test prüft, dass jede zu einem Namen gehört). Bei Werten steht ein Beispiel (`filter-value-*`).
+    - Im Verbindungsfilter echte Werte: `GET /api/filter/values?field=…&q=…` (`EngineState::connection_field_values`), die häufigsten
+      zuerst, nicht für `packets`, `bytes`, `favorite`. Sie kommen aus dem Netzverkehr und werden nur als Text gesetzt; `filter::literal`
+      setzt Werte mit Leerzeichen in Anführungszeichen. Im Paketfilter bewusst keine Werte, dafür müsste man alle Pakete auswerten.
+    - Bedienung: Pfeile wählen, Tab oder Enter übernimmt die gewählte Zeile, Tab ohne Auswahl die erste, sobald etwas getippt ist.
+      **Enter ohne Auswahl wendet weiter den Filter an.** Esc schließt, Maus geht auch. Keine neue Abhängigkeit.
+    - Geprüft mit echten Tastendrücken in Headless-Chrome (`ip.`-Felder, `in { }`, Klammern, zwei Felder auf einer Seite, 800 px Breite).
+      **Im Fenster-Programm noch nicht geprüft.**
 
 #### Fenster-Programm `openpacketmon-app` (Variante B, erledigt am 2026-10-28)
 
@@ -929,7 +944,8 @@ Noch offen, in dieser Reihenfolge:
 1. **Antwort von Sniffnet** (Gmail-Faden `1a18d94568cbe1f1`, Betreff „Sniffnet IPFIX collector: …“). Einen Termin, den
    Sniffnet nennt, einhalten; die Herkunftsangabe im Advisory prüfen.
 2. Nutzertest 0.2.7 vorläufig abgeschlossen (2026-10-31). Zurück-Knopf und Statistik-Knopf (Phase 3 Punkte 17, 18) sind umgesetzt
-   (2026-10-31), Test-Paket **0.2.8** gebaut. Offen: Zurück-Knopf und Alt+Links im Fenster-Programm prüfen.
+   (2026-10-31), Test-Paket **0.2.8** gebaut. Ebenfalls umgesetzt: Vorschläge in den Filterfeldern (Punkt 19).
+   Offen: Zurück-Pfeil, Alt+Links und Vorschläge im Fenster-Programm prüfen, dafür Test-Paket mit dem Pfeil und den Vorschlägen bauen.
 3. Version **0.3.0** setzen: `Cargo.toml`, `app/Cargo.toml`, `cargo update --workspace --offline`; in `CHANGELOG.md`
    `## [Unreleased]` zu `## [0.3.0]` mit Datum; Release-Hinweise (Englisch) als Datei schreiben; committen, pushen, CI grün.
 4. Trockenlauf `dev/release.sh` (das Skript lief noch nie), Installationstest auf sauberem Ubuntu 24.04 und Debian 13

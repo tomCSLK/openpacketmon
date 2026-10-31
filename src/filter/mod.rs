@@ -24,8 +24,8 @@ mod tests;
 use std::net::IpAddr;
 
 use crate::dissect::{Dissection, Value};
-pub use fields::{CONNECTION_FIELDS, CONNECTION_PROTOCOLS, FIELDS, PROTOCOLS};
-use fields::{FrameField, Kind, Source, lookup, lookup_connection};
+pub use fields::{CONNECTION_FIELDS, CONNECTION_PROTOCOLS, FIELDS, Kind, PROTOCOLS};
+use fields::{FrameField, Source, lookup, lookup_connection};
 
 /// What a packet offers to the filter
 pub struct Packet<'a> {
@@ -209,6 +209,31 @@ pub fn quote(text: &str) -> String {
     }
     quoted.push('"');
     quoted
+}
+
+/// A value as it is written in a filter: a plain word as it is, anything else in quotes
+pub fn literal(text: &str) -> String {
+    match tokenize(text).as_deref() {
+        Ok([(token @ Token::Word(_), _)]) if !token.is(KEYWORDS) => text.to_owned(),
+        _ => quote(text),
+    }
+}
+
+/// The operators that work with a kind of value, the most useful first
+pub fn operators(kind: Kind) -> &'static [&'static str] {
+    match kind {
+        Kind::Num | Kind::Time => &["==", "!=", ">", ">=", "<", "<=", "in"],
+        Kind::Text => &["contains", "==", "!=", "in"],
+        Kind::Ip | Kind::Mac => &["==", "!=", "in"],
+    }
+}
+
+/// The keys of the values of a field of the connection filter
+pub fn connection_keys(name: &str) -> Option<&'static [&'static str]> {
+    CONNECTION_FIELDS
+        .iter()
+        .find(|(n, _, _)| *n == name)
+        .map(|(_, keys, _)| *keys)
 }
 
 // ---- colors -------------------------------------------------------------------------------

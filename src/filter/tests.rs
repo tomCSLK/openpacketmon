@@ -283,3 +283,16 @@ fn connections_have_fields_of_their_own() {
     assert_eq!(quote(r#"a "b" \c"#), r#""a \"b\" \\c""#);
     assert!(matches(&format!("domain == {}", quote("google.com"))));
 }
+
+#[test]
+fn values_are_written_so_that_the_filter_reads_them_back() {
+    assert_eq!(literal("DE"), "DE");
+    assert_eq!(literal("192.168.1.20"), "192.168.1.20");
+    assert_eq!(literal("aa:bb:cc:dd:ee:ff"), "aa:bb:cc:dd:ee:ff");
+    assert_eq!(literal("Amazon Data Services"), "\"Amazon Data Services\"");
+    assert_eq!(literal("in"), "\"in\"");
+    assert_eq!(literal("a=b"), "\"a=b\"");
+    assert_eq!(literal("say \"hi\""), "\"say \\\"hi\\\"\"");
+    assert_eq!(literal(""), "\"\"");
+    assert!(Filter::parse_connections(&format!("program == {}", literal("my \"app"))).is_ok());
+}

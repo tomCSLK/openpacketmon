@@ -21,6 +21,7 @@ mod pages;
 mod settings;
 mod statistics;
 mod stream;
+mod suggest;
 
 use std::net::{Ipv4Addr, SocketAddr};
 use std::sync::Arc;
@@ -133,6 +134,8 @@ pub fn router(state: AppState) -> Router {
         .route("/api/previews", get(api::previews))
         .route("/api/packets", get(packets::rows_api))
         .route("/api/filter", get(packets::check))
+        .route("/api/filter/names", get(suggest::names))
+        .route("/api/filter/values", get(suggest::values))
         .route("/licenses", get(licenses))
         .route("/healthz", get(healthz))
         .route("/static/{*path}", get(assets::serve))

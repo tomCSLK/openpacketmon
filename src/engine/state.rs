@@ -538,6 +538,44 @@ impl EngineState {
             .collect()
     }
 
+    /// The values of the connections under these keys that contain `part` (any case), with how
+    /// many connections have them, the most frequent first
+    pub fn connection_field_values(
+        &self,
+        keys: &[&str],
+        part: &str,
+        limit: usize,
+    ) -> Vec<(String, usize)> {
+        let part = part.to_lowercase();
+        let mut counts: HashMap<String, usize> = HashMap::new();
+        let mut values = Vec::new();
+        for (key, info) in &self.info_traffic.map {
+            self.connection_values(key, info, &mut values);
+            for (name, value) in &values {
+                if !keys.contains(name) {
+                    continue;
+                }
+                let text = match value {
+                    Value::Num(n) => n.to_string(),
+                    Value::Ip(ip) => ip.to_string(),
+                    Value::Text(text) => text.clone(),
+                    Value::Mac(mac) => mac
+                        .iter()
+                        .map(|b| format!("{b:02x}"))
+                        .collect::<Vec<_>>()
+                        .join(":"),
+                };
+                if text.to_lowercase().contains(&part) {
+                    *counts.entry(text).or_default() += 1;
+                }
+            }
+        }
+        let mut found: Vec<(String, usize)> = counts.into_iter().collect();
+        found.sort_by(|a, b| b.1.cmp(&a.1).then_with(|| a.0.cmp(&b.0)));
+        found.truncate(limit);
+        found
+    }
+
     fn selects(
         &self,
         filter: &Filter,

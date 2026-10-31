@@ -21,6 +21,8 @@ First public version. This list describes what differs from Sniffnet.
   go to the download folder, and links to other sites open in the browser. A setting starts it in the tray at sign-in
 - A back button on every page, also for the window without a browser bar. Statistics, packet list and PCAP download can
   take the connection filter, so the Connections page opens the statistics of everything its search selects
+- The filter fields suggest fields, operators and connectors while typing, with short explanations, and in the
+  connection filter the values of the capture
 - Sign-in with a start link (random access key, readable only by the user), session cookie, CSRF tokens, `Host`/`Origin`
   checks and security headers
 - A second start only opens the browser for the running instance, with one start link file per port; options `--port`,

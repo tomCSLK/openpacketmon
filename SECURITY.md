@@ -33,6 +33,7 @@ geolocation databases, the window program `openpacketmon-app`, the Debian packag
 Known and documented, not vulnerabilities in themselves:
 
 - The web interface listens on `127.0.0.1` only and uses plain HTTP; it is meant for the user who runs it, not for remote access.
-- The package gives `/usr/bin/openpacketmon` the capabilities `cap_net_raw` and `cap_net_admin`, so every local user can capture
-  traffic with it, as with Wireshark's `dumpcap` in the group `wireshark`. Remove them with `setcap -r` if that is not wanted.
+- The package gives the helper `/usr/bin/openpacketmon-capture` the capabilities `cap_net_raw` and `cap_net_admin`, so every local
+  user can capture traffic with it, as with Wireshark's `dumpcap` in the group `wireshark`. Remove them with `setcap -r` if that is not
+  wanted. The helper drops them once the adapter is open and does not look into the packets; openpacketmon itself has no special rights.
 - The packet store keeps the captured packets in memory, including their contents, until the capture is stopped.

@@ -301,7 +301,6 @@ impl EngineState {
             self.capture_source.clone(),
             capture_context,
             self.mmdb_readers.clone(),
-            self.conf.filters.clone(),
             tx,
             (freeze_rx, freeze_rx2),
             self.packets.clone(),

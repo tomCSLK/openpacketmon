@@ -9,8 +9,9 @@ möglich (die Abhängigkeiten `ring` und `aws-lc-sys` brauchen einen C-Compiler 
 der Fehler liefert also erst der erste `cargo check` unter Windows.
 
 **Feste Vorgaben:** Npcap wird **nie mitgeliefert**, der Nutzer installiert es selbst (proprietäre Lizenz). Wireshark-Code
-bleibt tabu. Die Arbeitsregeln in `CLAUDE.md` gelten unverändert. Die Arbeit beginnt **erst nach dem Release 0.3.0 und nach
-der MCP-Anbindung** (`PLAN.md` 5.4), die Windows-Version enthält MCP also schon. Der Installer soll, wenn möglich, signiert
+bleibt tabu. Die Arbeitsregeln in `CLAUDE.md` gelten unverändert. Die Arbeit beginnt **erst nach dem ersten Release (0.4.0 oder
+0.5.0) und nach der MCP-Anbindung** (`PLAN.md` 5.4), die Windows-Version enthält MCP also schon. Die geplante Umstellung auf egui
+(`PLAN.md` 5.5) ersetzt Webview und WebView2; die Abschnitte zum Fenster-Programm stammen aus der Zeit davor. Der Installer soll, wenn möglich, signiert
 werden (Nutzer, 2026-10-30/31).
 
 ## 1. Was auf dem Windows-Rechner installiert sein muss
@@ -87,6 +88,7 @@ dabei unverändert weiter bauen; Windows-Code kommt hinter `#[cfg(windows)]`, Li
 | `src/mmdb/geo.rs` `geo_dir` | `HOME`, `.local/share` (`HOME` fehlt unter Windows) | `%LOCALAPPDATA%\openpacketmon\geo` |
 | `src/mmdb/geo.rs` `geoipupdate_file` | `/var/lib/GeoIP/…` | unter Windows weglassen oder den Ordner von `geoipupdate` nehmen, Test anpassen |
 | `src/networking/traffic_preview.rs`, `capture_context.rs` | aus Sniffnet, schon für Windows vorbereitet | prüfen |
+| `capture/src/main.rs` (Helfer) | unter Linux nicht blockierender Adapter mit eigenem `poll`, Rechteabgabe, größere Pipe | außerhalb von Linux liest er blockierend mit dem Timeout von libpcap, die drei Funktionen `drop_rights`, `enlarge_pipe`, `wait_for_packets` tun dort nichts. Prüfen: Kommt unter Npcap der Timeout auch ohne Pakete? Sonst bleibt eine pausierte Aufzeichnung stehen (siehe `open` in der Datei). Pfad mit `.exe` löst `helper_path` schon auf |
 | Adapterliste, `--adapter`, Aufzeichnungsseite | Namen wie `enp0s31f6` | unter Windows heißen sie `\Device\NPF_{GUID}`: überall die Beschreibung zeigen (`get_desc`), den Namen nur intern verwenden |
 | Latenzmessung (`surge-ping`) | unter Linux unprivilegiert | ICMP-Sockets ohne Adminrechte gibt es unter Windows vermutlich nicht: prüfen, sonst Hinweis in der Oberfläche |
 | Programme je Verbindung (`listeners`) | hat einen Windows-Teil | prüfen, auch die Kürzung auf 15 Zeichen in unserem Code (betrifft nur Linux) |
@@ -113,9 +115,9 @@ Hier liegt die meiste Arbeit, die Datei ist durchgehend auf Linux geschrieben:
 Danach prüfen: Downloads (PCAP) in WebView2, neue Fenster und Links, Anmeldung per Startlink, Symbol im Infobereich, Beenden
 über den Infobereich, Verhalten beim Schließen des Fensters.
 
-Die Trennung der Rechte bleibt: Unter Linux hat der Server die Mitschnittrechte, das Fenster nicht. Unter Windows entscheidet
-die Installation von Npcap, ob normale Benutzer mitschneiden dürfen oder nur Administratoren. Das Fenster-Programm soll
-nie als Administrator laufen müssen.
+Die Trennung der Rechte bleibt: Unter Linux hat nur der Helfer `openpacketmon-capture` die Mitschnittrechte und gibt sie nach dem
+Öffnen des Adapters ab, Server und Fenster laufen ohne. Unter Windows entscheidet die Installation von Npcap, ob normale Benutzer
+mitschneiden dürfen oder nur Administratoren. Das Fenster-Programm soll nie als Administrator laufen müssen.
 
 ### Was es unter Windows nicht gibt
 
@@ -127,7 +129,8 @@ nie als Administrator laufen müssen.
 
 1. `cargo test --workspace`: Tests mit Pfaden (`/var/lib/GeoIP`, `/usr/bin/…`) und Rechten scheitern vermutlich zuerst.
 2. Start ohne Npcap: verständlicher Hinweis mit Link auf npcap.com, kein Absturz. Da `wpcap.dll` beim Laden des Programms
-   gebraucht wird, startet das Programm ohne Npcap womöglich gar nicht; dann braucht es verzögertes Laden.
+   gebraucht wird, startet das Programm ohne Npcap womöglich gar nicht; dann braucht es verzögertes Laden. Der Helfer allein löst
+   das noch nicht: `openpacketmon` nutzt `pcap` weiter für die Adapterliste, für Aufnahmedateien und zum Schreiben von PCAP-Dateien.
 3. Mitschnitt auf WLAN, Ethernet und dem Npcap-Loopback-Adapter, jeweils als normaler Benutzer und als Administrator.
 4. Zerleger und Paketliste: Link-Typen unter Windows (kein „Linux cooked capture“), TCP-Analyse mit Offloading (große
    Segmente).
@@ -198,6 +201,6 @@ Was SignPath verlangt und was das für uns heißt:
 7. Installer, Test auf sauberem System, README, erstes Windows-Release, zunächst unsigniert.
 8. Signatur beantragen (Abschnitt 6.1), danach signierte Installer.
 
-**Beginn (Nutzer, 2026-10-30/31):** Reihenfolge 0.3.0 → MCP-Anbindung → Windows. Bis zum Release gilt auch auf dem Windows-Rechner
+**Beginn (Nutzer, 2026-10-30/31):** Reihenfolge erstes Release → MCP-Anbindung → Windows. Bis zum Release gilt auch auf dem Windows-Rechner
 der Haltepunkt aus `PLAN.md` 4.10. Die Abschnitte 4 und 5 stammen aus der Zeit vor MCP: Beim Beginn die Liste um das ergänzen, was
 seitdem dazugekommen ist.

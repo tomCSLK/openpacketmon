@@ -5,9 +5,10 @@ use crate::config::conf::Conf;
 use crate::config::filters::Filters;
 use crate::config::ipfix_socket::MyIpfixSocket;
 use crate::location;
+use crate::networking::types::capture_helper::CaptureHelper;
 use crate::networking::types::my_device::MyDevice;
 use crate::utils::error_logger::{ErrorLogger, Location};
-use pcap::{Active, Address, Capture, Device, Error, Packet, Savefile, Stat};
+use pcap::{Address, Capture, Device, Error, Linktype, Packet, Savefile, Stat};
 use serde::{Deserialize, Serialize};
 use sniffnet_packet_parser::LinkType;
 use std::collections::HashSet;
@@ -40,7 +41,8 @@ impl CaptureContext {
     ) -> Self {
         let mut cap_type = match source {
             CaptureSource::Device(device) => {
-                match CaptureType::from_device(device, pcap_out_path.is_some() || full_packets) {
+                let full = pcap_out_path.is_some() || full_packets;
+                match CaptureType::from_device(device, full, filters) {
                     Ok(c) => c,
                     Err(e) => return Self::Error(e),
                 }
@@ -55,8 +57,10 @@ impl CaptureContext {
         };
 
         // only apply BPF filter if it is active, and return an error if it fails to apply
+        // (a live capture gets it from the helper)
         if filters.is_some_filter_active()
-            && let Err(e) = cap_type.set_bpf(filters.bpf())
+            && let CaptureType::Offline(cap) = &mut cap_type
+            && let Err(e) = cap.filter(filters.bpf(), true)
         {
             return Self::Error(e.to_string());
         }
@@ -67,7 +71,8 @@ impl CaptureContext {
         };
 
         if let Some(out_path) = pcap_out_path {
-            let savefile_res = cap.savefile(out_path);
+            let savefile_res =
+                Capture::dead(Linktype(cap.link_type())).and_then(|dead| dead.savefile(out_path));
             match savefile_res {
                 Ok(s) => Self::new_live_with_savefile(cap, s),
                 Err(e) => Self::Error(e.to_string()),
@@ -77,11 +82,11 @@ impl CaptureContext {
         }
     }
 
-    fn new_live(cap: Capture<Active>) -> Self {
+    fn new_live(cap: CaptureHelper) -> Self {
         Self::Live(Live { cap })
     }
 
-    fn new_live_with_savefile(cap: Capture<Active>, savefile: Savefile) -> Self {
+    fn new_live_with_savefile(cap: CaptureHelper, savefile: Savefile) -> Self {
         Self::LiveWithSavefile(LiveWithSavefile {
             live: Live { cap },
             savefile,
@@ -112,8 +117,10 @@ impl CaptureContext {
 
     pub fn link_type(&self) -> Option<LinkType> {
         match self {
-            Self::Live(on) => Some(LinkType::from_pcap(on.cap.get_datalink())),
-            Self::LiveWithSavefile(onws) => Some(LinkType::from_pcap(onws.live.cap.get_datalink())),
+            Self::Live(on) => Some(LinkType::from_pcap(Linktype(on.cap.link_type()))),
+            Self::LiveWithSavefile(onws) => {
+                Some(LinkType::from_pcap(Linktype(onws.live.cap.link_type())))
+            }
             Self::Offline(off) => Some(LinkType::from_pcap(off.cap.get_datalink())),
             Self::Ipfix(_) | Self::Error(_) => None,
         }
@@ -148,7 +155,7 @@ impl CaptureContext {
 }
 
 pub struct Live {
-    cap: Capture<Active>,
+    cap: CaptureHelper,
 }
 
 pub struct LiveWithSavefile {
@@ -161,7 +168,7 @@ pub struct Offline {
 }
 
 pub enum CaptureType {
-    Live(Capture<Active>),
+    Live(CaptureHelper),
     Offline(Capture<pcap::Offline>),
 }
 
@@ -176,25 +183,18 @@ impl CaptureType {
 
     pub fn stats(&mut self) -> Result<Stat, Error> {
         match self {
-            Self::Live(on) => on.stats(),
+            Self::Live(on) => Ok(on.stats()),
             Self::Offline(off) => off.stats(),
         }
     }
 
     /// `full`: capture whole packets (for the PCAP export or the packet store), not only the
     /// first bytes the traffic statistics need
-    fn from_device(device: &MyDevice, full: bool) -> Result<Self, String> {
-        let inactive = Capture::from_device(device.to_pcap_device()).map_err(|e| e.to_string())?;
+    fn from_device(device: &MyDevice, full: bool, filters: &Filters) -> Result<Self, String> {
         let (snaplen, buffer_size) = live_limits(full);
-        let cap = inactive
-            .promisc(false)
-            .buffer_size(buffer_size)
-            .snaplen(snaplen)
-            .immediate_mode(false)
-            .timeout(150) // ensure UI is updated even if no packets are captured
-            .open()
-            .map_err(|e| e.to_string())?;
-        Ok(Self::Live(cap))
+        let bpf = filters.is_some_filter_active().then(|| filters.bpf());
+        let helper = CaptureHelper::start(device.get_name(), snaplen, buffer_size, bpf)?;
+        Ok(Self::Live(helper))
     }
 
     fn from_file(file: &MyPcapImport) -> Result<Self, String> {
@@ -203,26 +203,15 @@ impl CaptureType {
         ))
     }
 
-    fn set_bpf(&mut self, bpf: &str) -> Result<(), Error> {
-        match self {
-            Self::Live(cap) => cap.filter(bpf, true),
-            Self::Offline(cap) => cap.filter(bpf, true),
-        }
-    }
-
     pub fn pause(&mut self) {
         if let Self::Live(cap) = self {
-            let _ = cap.filter("less 2", true).log_err(location!());
+            cap.pause();
         }
     }
 
-    pub fn resume(&mut self, filters: &Filters) {
+    pub fn resume(&mut self) {
         if let Self::Live(cap) = self {
-            if filters.is_some_filter_active() {
-                let _ = cap.filter(filters.bpf(), true).log_err(location!());
-            } else if cap.filter("", true).log_err(location!()).is_err() {
-                let _ = cap.filter("greater 0", true).log_err(location!());
-            }
+            cap.resume();
         }
     }
 }

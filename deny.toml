@@ -1,5 +1,5 @@
 # cargo deny --workspace check: licenses, sources, duplicate crates and RustSec advisories of the dependencies of
-# openpacketmon and openpacketmon-app (without --workspace only those of openpacketmon are checked).
+# openpacketmon, openpacketmon-app and openpacketmon-capture (without --workspace only those of openpacketmon are checked).
 # https://embarkstudios.github.io/cargo-deny/
 
 [graph]

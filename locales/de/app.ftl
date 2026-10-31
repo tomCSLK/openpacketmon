@@ -71,7 +71,7 @@ capture-adapter = Adapter
 capture-addresses = Adressen
 capture-activity = Pakete (30 s)
 capture-no-adapters = Keine Netzwerkadapter gefunden.
-capture-no-adapters-hint = openpacketmon braucht das Recht, Pakete mitzuschneiden (setcap cap_net_raw,cap_net_admin=eip, beim Paket eingerichtet).
+capture-no-adapters-hint = openpacketmon-capture braucht das Recht, Pakete mitzuschneiden (setcap cap_net_raw,cap_net_admin=eip, beim Paket eingerichtet).
 capture-export-enable = Pakete zusätzlich in eine PCAP-Datei schreiben
 capture-export-dir = Ordner
 capture-export-name = Dateiname

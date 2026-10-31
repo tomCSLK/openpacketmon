@@ -63,6 +63,9 @@ First public version. This list describes what differs from Sniffnet.
 
 ### Changed from Sniffnet
 
+- Capture rights moved to the small helper `openpacketmon-capture`: it opens the adapter, drops its rights for good and
+  passes the packets on without looking into them, so the program that parses foreign traffic runs without special rights.
+  The helper ends with the program. The package sets the capabilities on the helper instead of on `openpacketmon`
 - Service names come from the IANA Service Name and Transport Protocol Port Number Registry (public domain) instead of
   nmap; `dev/update-services.py` regenerates the list. Some names changed (`bootps`/`bootpc` instead of `dhcps`/`dhcpc`,
   `ssdp` instead of `upnp`, `submissions` for port 465), and nmap's names for trojans and unofficial ports are gone:

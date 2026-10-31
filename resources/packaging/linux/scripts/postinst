@@ -4,4 +4,4 @@
 
 set -e
 
-setcap cap_net_raw,cap_net_admin=eip /usr/bin/openpacketmon
+setcap cap_net_raw,cap_net_admin=eip /usr/bin/openpacketmon-capture

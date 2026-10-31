@@ -38,10 +38,10 @@ cargo build --release
 This builds two programs: `openpacketmon` (the capture and the web server) and `openpacketmon-app` (the window
 with the tray icon, without special rights).
 
-Capturing needs raw socket rights. Either run as root or grant the capabilities to the binary:
+Capturing needs raw socket rights. Only the small helper `openpacketmon-capture` gets them; it gives them up as soon as the adapter is open:
 
 ```sh
-sudo setcap cap_net_raw,cap_net_admin=eip target/release/openpacketmon
+sudo setcap cap_net_raw,cap_net_admin=eip target/release/openpacketmon-capture
 ```
 
 To build the Debian package (with start menu entry, icons and a systemd user service):

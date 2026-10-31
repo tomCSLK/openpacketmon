@@ -937,6 +937,8 @@ Vorbereitet (2026-10-30):
 Stand 2026-10-30: Commit `55f5213` gepusht, CI grün. Test-Paket **0.2.7** gebaut (enthält gegenüber 0.2.6 nur die
 korrigierten Paket-Abhängigkeiten). Von Sniffnet noch keine Antwort.
 
+**Geändert (Nutzer, 2026-10-31):** Das erste Release wird 0.4.0 oder 0.5.0 statt 0.3.0, siehe 5.5. Der Haltepunkt gilt unverändert.
+
 **Entschieden (Nutzer, 2026-10-30):** Antwort von Sniffnet abwarten, dann umschalten und **0.3.0** als erstes Release
 veröffentlichen. Bleibt die Antwort aus, entscheidet der Nutzer über das weitere Vorgehen.
 
@@ -1174,13 +1176,13 @@ Alles, was für die Fortsetzung auf einem Windows-Rechner nötig ist, steht in *
 Zugänge, Einrichten, die Linux-Bindungen im Code mit ihrer Lösung, Tests, Installer, CI und Reihenfolge. Der Code baut unter
 Windows noch nicht; die größte Baustelle ist `app/src/main.rs`. Npcap wird nie mitgeliefert.
 
-Entschieden (Nutzer, 2026-10-30/31): **Beginn erst nach dem Release 0.3.0 und nach der MCP-Anbindung (5.4)**, die
+Entschieden (Nutzer, 2026-10-30/31): **Beginn erst nach dem ersten Release (seit 2026-10-31 0.4.0 oder 0.5.0, siehe 5.5) und nach der MCP-Anbindung (5.4)**, die
 Windows-Version enthält MCP also schon; der Installer soll, **wenn möglich, eine Code-Signatur**
 bekommen. Weg (`docs/windows.md` 6.1): zuerst kostenlos über die SignPath Foundation, das setzt ein unsigniertes Windows-Release und
 einen Build in GitHub Actions voraus, und die Zusage ist nicht sicher, weil deren Regel „No hacking tools“ ein
 Mitschnitt-Programm treffen könnte. Sonst ein OV-Zertifikat; Azure Artifact Signing gibt es für Einzelentwickler in Deutschland nicht.
 
-#### 5.4 MCP-Anbindung (Idee des Nutzers, 2026-10-31, beschlossen: nach dem Release 0.3.0)
+#### 5.4 MCP-Anbindung (Idee des Nutzers, 2026-10-31, beschlossen: nach dem ersten Release; Entwurf vor der Umstellung aus 5.5 geschrieben)
 
 Beim Untersuchen von Geräten im Heimnetz mit Claude in einer anderen Instanz (`../Abfrage_Geraete_im_Heimnetzwerk`) wäre es sehr
 hilfreich, wenn Claude den Mitschnitt von openpacketmon direkt abfragen könnte, statt dass der Nutzer Werte abliest oder PCAPs
@@ -1202,12 +1204,94 @@ weitergibt. Erster Entwurf, noch nicht geprüft:
   - Erweitert den Geltungsbereich von `SECURITY.md`, und die Prüfungen aus 4.8 gelten auch hier.
 - **Abhängigkeit:** vermutlich eine MCP-Crate; Lizenz und Abhängigkeiten über `cargo deny` prüfen, `THIRD-PARTY-LICENSES.txt`
   neu erzeugen. Alternativ das kleine JSON-RPC-Protokoll selbst umsetzen.
-- **Zeitpunkt:** nach dem Release 0.3.0 und **vor der Windows-Version** (Nutzer, 2026-10-31): Reihenfolge 0.3.0 → MCP → Windows.
+- **Zeitpunkt:** nach dem ersten Release (0.4.0 oder 0.5.0) und **vor der Windows-Version** (Nutzer, 2026-10-31): Reihenfolge Release → MCP → Windows.
   Die Windows-Version enthält MCP dann schon.
 - **Windows gleich mitdenken:** MCP-Code ohne `std::os::unix`, Unix-Sockets, `XDG_*` oder `HOME` schreiben. stdio und HTTP auf
   `127.0.0.1` gehen auf beiden Systemen. Den Startlink nur über `web::auth::start_link_path`/`read_start_link` lesen, nicht
   über einen eigenen Pfad, damit die Anpassung aus `docs/windows.md` 4 auch für MCP gilt. Keine Pfade in Beispielen der
   Einrichtung fest verdrahten (Aufruf `openpacketmon mcp` bzw. `openpacketmon.exe mcp`).
+
+#### 5.5 Umstellung der Oberfläche auf egui (Wunsch des Nutzers, 2026-10-31, Mitschnitt-Helfer umgesetzt, Oberfläche noch nicht begonnen)
+
+Der Nutzer möchte für Client-Software eine native Oberfläche statt Browser-Technik (egui, bekannt aus den ArtCraft-Programmen).
+Der Probebau lief im Scratchpad (Ergebnis unten). Im Repo ist bisher nur der Mitschnitt-Helfer umgesetzt (Abschnitt „Stand Helfer“ unten).
+
+Entschieden (Nutzer, 2026-10-31):
+
+- **Wireshark-Muster:** Fenster schließen beendet das Programm, mit Rückfrage bei laufender Aufzeichnung oder ungesicherten Paketen.
+  Kein Dauerwächter, also kein Infobereich und kein Autostart; Benachrichtigungen nur, solange das Programm läuft.
+- **Erstes Release** nicht 0.3.0, sondern **0.4.0 oder 0.5.0**. Der Haltepunkt aus 4.10 gilt unverändert.
+
+Aufbau (Plan B, vom Nutzer am 2026-10-31 bestätigt):
+
+- `openpacketmon-capture`: kleiner Helfer, nur er hat die Rechte; öffnet Adapter, setzt den BPF-Filter, schreibt Pakete in eine Pipe,
+  schreibt keine Dateien. Unter Windows läuft er ohne Sonderrechte; lädt nur er `wpcap.dll`, startet das Programm auch ohne Npcap.
+- `openpacketmon`: egui-Programm ohne Rechte mit Engine, Zerlegern und Oberfläche. Die Webschicht fällt weg (Server, Startlink, CSRF,
+  Host-Prüfung, systemd-Dienst). MCP braucht dann einen kleinen, abschaltbaren Zugang auf `127.0.0.1`, 5.4 ist entsprechend neu zu fassen.
+
+Befunde aus dem Code (2026-10-31):
+
+- Der Kern (18 916 Zeilen) hängt nicht an der Weboberfläche, nur `src/cli/mod.rs` nennt `web::DEFAULT_PORT`. Ersetzt werden Templates,
+  JavaScript und CSS (2964 Zeilen), der HTML-Teil von `src/web` (7205 Zeilen, 58 von 311 Tests) und `app/`.
+- Der Server behält `cap_net_admin,cap_net_raw` die ganze Laufzeit und zerlegt dabei fremde Pakete; der Code gibt die Rechte nirgends ab.
+  Das gilt auch ohne egui und spricht für den Helfer. Mit dem Helfer behoben (2026-11-01).
+- Nahtstellen für den Helfer: `packet_stream` in `parse_packets.rs` und `traffic_preview.rs`. Mitziehen müssen Adapter-Vorschau, Pause,
+  Speichern als PCAP, Statistik verworfener Pakete und Link-Typ. Die Latenzmessung braucht den Helfer nicht (`ping_group_range`).
+- `Engine::lock` hält den Mitschnitt auf: Die Oberfläche arbeitet mit Abzügen, Filter über 500 000 Pakete laufen im Hintergrund.
+- Crates: Fenster-Programm heute 143, eframe mit `egui_extras` und `egui_plot` 197 (OpenGL) oder 221 (wgpu).
+- Prüfen ohne Headless Chrome: `egui_kittest` 0.37; `egui_mcp` nur auf ausdrücklichen Wunsch.
+
+Aufwand (Schätzung): 8 bis 11 Arbeitstage ohne Infobereich, dazu 1 bis 2 Tage für den MCP-Zugang.
+
+Probebau (2026-10-31, nur im Scratchpad, erfundene Daten statt echter Pakete, UHD 620, Wayland, 2560×1080 ohne Skalierung): egui 0.37 mit
+`egui_extras`-Tabelle, Seitenleiste mit Verlauf, Details mit Hex-Dump, `egui_plot`, Filter im Hintergrund, Rückfrage beim Schließen.
+
+| Messung | OpenGL | wgpu |
+|---|---|---|
+| Scrollen, Bilder/s (CPU je Bild) | 56 (6,2 ms) | 57 (4,6 ms) |
+| Springen an zufällige Stellen, Bilder/s | 59 | 58 |
+| Live, 3000 Pakete/s, CPU eines Kerns | 8,6 % | 6,1 % |
+| Leerlauf, CPU eines Kerns | 0,4 % | 0,4 % |
+| RAM bei 524 000 Zeilen | 111 MiB | 126 MiB |
+
+Filter über 524 000 Zeilen: rund 0,5 s, die Oberfläche läuft dabei mit 60 Bildern/s weiter. 2 Millionen Zeilen: 54 bis 56 Bilder/s,
+157 MiB, Filter 2 s, Zeilen auch am Ende sauber ausgerichtet. Die Rückfrage hält das Schließen unter Wayland an. Daraus folgt:
+
+- **wgpu** statt OpenGL: etwas weniger CPU, unter Windows DirectX 12 statt OpenGL, 15 MiB mehr RAM und 24 Crates mehr sind vertretbar.
+- **Inter** als eingebaute Schrift (Lizenz SIL OFL, in `THIRD-PARTY-LICENSES.txt` aufnehmen): Die Standardschrift von egui hat keinen `→`.
+- Noch zu erledigen: „Gehe zu Paket“ muss das Listenende begrenzen (ein Sprung darüber hinaus zeigt eine Leerfläche), Spaltenlücken in der
+  Zeilenfarbe füllen, Gitter des Diagramms im dunklen Design dämpfen.
+- Nicht geprüft: echte Pakete und Engine, Skalierung über 100 %, Markieren und Kopieren.
+- Vom Nutzer von Hand getestet (2026-10-31): alles gut, bis auf **„Mitlaufen“**: Man musste erst selbst nach unten scrollen. In der
+  echten Fassung springt die Liste beim Einschalten sofort ans Ende.
+
+Reihenfolge: Helfer (erledigt, läuft mit der Browser-Oberfläche), dann Seitendaten aus den Handlern lösen, dann die Seiten.
+
+Stand Helfer (2026-11-01, freigegeben vom Nutzer, Test-Paket 0.3.0, kein Release: das erste Release bleibt 0.4.0 oder 0.5.0):
+
+- Neue Crate `capture/` im Workspace: Binary `openpacketmon-capture`, dazu eine Bibliothek mit dem Format auf der Pipe (`Ready`, `Packet`,
+  `Stats`, `Timeout`, `Failed`, mit Grenzen beim Lesen). Abhängigkeiten nur `pcap` und `rustix`, `unsafe` bleibt verboten.
+  In `src/networking/types/capture_helper.rs` steckt die Gegenseite: `CaptureHelper` ersetzt `Capture<Active>` in `capture_context.rs`,
+  `parse_packets.rs` und `traffic_preview.rs` bleiben fast unverändert. PCAP-Export über `Capture::dead(…).savefile(…)`.
+- Ablauf im Helfer: Adapter muss in `Device::list()` stehen, öffnen, BPF setzen, **alle Capabilities abgeben und `no_new_privs` setzen**
+  (scheitert das, bricht er ab), `Ready` senden. Befehle `pause`/`resume` über stdin; schließt sich stdin, endet er, kann also das
+  Programm nicht überleben. Er sieht nicht in die Pakete und schreibt keine Dateien.
+- **Befund beim Live-Test:** libpcap überlässt bei TPACKET_V3 den Timeout dem Kernel, und der liefert leere Blöcke nicht aus. Ein
+  blockierendes `next_packet` kommt ohne passende Pakete also nie zurück: Mit dem Pausenfilter `less 2` wäre die Aufzeichnung nie
+  wieder angelaufen, und Pakete wären im Puffer des Helfers hängen geblieben. Daher unter Linux **nicht blockierend mit eigenem `poll`**.
+  Nebenfolge: Pseudoquellen wie `nfqueue` melden „nichts da“ als Fehlertext, den wertet `nothing_yet` als Leerlauf.
+- Getestet: `capture/tests/live.rs` läuft in einem privaten Netz-Namensraum (dort sind keine `setcap`-Rechte nötig; wo Namensräume
+  fehlen, sagt der Test das und endet ohne Prüfung): Rechte weg, BPF wirkt, Pause, Fortsetzen samt Filter, Ende beim Schließen von stdin,
+  unbekannter Adapter. Von Hand im Namensraum mit dem ganzen Programm auf `lo`: Stopp ohne Zombie, nach `kill -9` des Programms kein Helfer
+  mehr. Last im Release-Bau: 200 000 Datagramme in 1,2 s auf `lo` (400 000 Pakete), keines verloren, wie beim Paket 0.2.9 ohne Helfer
+  (je 3 Läufe); CPU-Zeit des Programms 1,5 s statt 2 s.
+- Nicht getestet: echte Adapter mit `setcap` und die Installation des `.deb` (Test-Paket 0.3.0, der Nutzer installiert), Betrieb über Tage.
+- Bekannte Grenze: Stirbt der Helfer mitten im Mitschnitt, steht die Meldung nur auf stderr, die Aufzeichnung steht still. Die Meldung in der
+  Oberfläche kommt mit der egui-Fassung. `cap_net_raw,cap_net_admin` auf dem Helfer erlauben weiter jedem lokalen Benutzer den Mitschnitt,
+  wie zuvor auf `openpacketmon` (siehe `SECURITY.md`).
+
+Entschieden (Nutzer, 2026-10-31): Der Paketspeicher bleibt im RAM, die Grenze wird wählbar (bis etwa 2 GiB mit passender Paketzahl).
+Eine temporäre Datei wie bei Wireshark kommt nur, falls das später nicht reicht, weil sonst unverschlüsselter Verkehr auf der SSD läge.
 
 ---
 

@@ -1,0 +1,28 @@
+[package]
+name = "openpacketmon-capture"
+version = "0.3.0"
+description = "Capture helper of openpacketmon: the only part with the rights to capture packets"
+authors.workspace = true
+edition.workspace = true
+homepage.workspace = true
+repository.workspace = true
+license.workspace = true
+publish = false
+
+[lints]
+workspace = true
+
+[lib]
+name = "openpacketmon_capture"
+path = "src/lib.rs"
+doc = false
+
+[[bin]]
+name = "openpacketmon-capture"
+path = "src/main.rs"
+
+[dependencies]
+pcap.workspace = true
+
+[target.'cfg(target_os = "linux")'.dependencies]
+rustix = { version = "1.1.5", default-features = false, features = ["event", "pipe", "std", "thread"] }

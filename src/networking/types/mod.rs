@@ -5,6 +5,7 @@ pub mod address_port_pair;
 pub mod asn;
 pub mod bogon;
 pub mod capture_context;
+pub mod capture_helper;
 pub mod data_info;
 pub mod data_info_host;
 pub mod data_representation;

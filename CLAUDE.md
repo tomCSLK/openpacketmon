@@ -97,13 +97,29 @@ Netzwerkverkehrs-Monitor in Rust (iced-GUI, libpcap). Maßgeblich für Stand, Li
   Rand links neben dem Titel. **Vorschläge in den Filterfeldern** (Punkt 19, `static/suggest.js`, `src/web/suggest.rs`,
   `/api/filter/names`, `/api/filter/values`): Felder, Operatoren, Verknüpfungen, Erklärungen (`filter-hint-*`), im Verbindungsfilter echte
   Werte. Enter ohne gewählte Zeile wendet weiter den Filter an. Test-Paket **0.2.9**, im Fenster-Programm noch nicht geprüft.
-- **Reihenfolge nach dem Release** (Nutzer, 2026-10-31): 0.3.0 → MCP-Anbindung → Windows-Version.
+- **Mitschnitt-Helfer `openpacketmon-capture`** (2026-11-01, `capture/`, `src/networking/types/capture_helper.rs`, `PLAN.md` 5.5
+  „Stand Helfer“, Test-Paket **0.3.0**, kein Release): Nur er hat die Rechte, gibt sie nach dem Öffnen des Adapters ab und reicht Pakete über eine Pipe weiter;
+  `openpacketmon` läuft ohne Sonderrechte. Das `.deb` setzt `setcap` auf den Helfer. Live-Test `capture/tests/live.rs` im Netz-Namensraum.
+- **Umstellung auf egui** (Wunsch des Nutzers, 2026-10-31, `PLAN.md` 5.5, Helfer fertig, Oberfläche noch nicht begonnen): native Oberfläche statt Browser-Technik.
+  Entschieden: **Wireshark-Muster** (Fenster schließen beendet das Programm, mit Rückfrage; kein Infobereich, kein Autostart) und
+  **erstes Release 0.4.0 oder 0.5.0** statt 0.3.0; der Haltepunkt gilt unverändert. Ebenfalls entschieden: **Plan B** mit kleinem
+  Mitschnitt-Helfer und egui-Programm ohne Rechte, ohne Webschicht; Paketspeicher bleibt im RAM mit wählbarer Grenze. Probebau im Scratchpad bestanden (flüssig mit 2 Millionen
+  Zeilen, 0,4 % CPU im Leerlauf, Ergebnis in `PLAN.md` 5.5): wgpu und eingebaute Schrift Inter; Bedienung von Hand steht noch aus.
+- **Reihenfolge** (Nutzer, 2026-10-31): erstes Release (0.4.0 oder 0.5.0) → MCP-Anbindung → Windows-Version.
 - **MCP-Anbindung** (`PLAN.md` 5.4): Claude soll den Mitschnitt abfragen können, etwa beim Untersuchen von Geräten im Heimnetz.
   Paketinhalte sind dabei ungeprüfte Eingaben für das Sprachmodell. Von Anfang an plattformneutral schreiben, damit sie unter
   Windows ohne Umbau läuft.
-- **Windows-Version** (vorgesehen, Beginn nach 0.3.0 und MCP, enthält MCP also schon): Alles für die Fortsetzung auf einem Windows-Rechner
+- **Windows-Version** (vorgesehen, Beginn nach dem ersten Release und MCP, enthält MCP also schon): Alles für die Fortsetzung auf einem Windows-Rechner
   steht in `docs/windows.md` (Software, Einrichten, Linux-Bindungen im Code, Tests, Installer, Code-Signatur, CI, Reihenfolge).
   Der Installer soll, wenn möglich, signiert werden: zuerst SignPath Foundation, sonst OV-Zertifikat.
+- **Hinweis zur Oberflächentechnik** (Stand 2026-10-31, Hintergrund zur Umstellung aus `PLAN.md` 5.5): Die Craft-Programme (WordCraft, DeckCraft,
+  GridCraft, PdfCraft, PhotoCraft u. a. sowie der ArtCraft Launcher, Organisation `github.com/storytold`, MIT OR Apache-2.0) sind Rust-Programme
+  mit **egui + eframe 0.37** (Fenster über `winit`, Zeichnen über `egui-wgpu`/`egui_glow`; egui und winit aus eigenen Forks mit festen Commits;
+  geprüft in der jeweiligen `Cargo.toml` auf `main`). Laut deren READMEs laufen sie nativ unter Linux, Windows, macOS, FreeBSD und im Browser
+  (WebAssembly); nicht selbst getestet, Stand „early alpha“. openpacketmon nutzt bis zur Umstellung die Browser-Oberfläche (axum/askama) und das
+  Fenster-Programm über wry/WebKitGTK.
+  Zum Entwickeln mit egui gibt es den MCP-Server `egui_mcp` (Rerun, `github.com/rerun-io/egui_crates`, MIT/Apache; steuert eine laufende
+  egui-App über `eframe/inspection`); er ist **nicht** installiert und wird nur auf ausdrücklichen Wunsch eingerichtet.
 - **Bedienung nachgebessert** (2026-10-30, `PLAN.md` Phase 3 Punkt 16): Verbindungsseite ohne
   Knopfleiste, Sprünge direkt in den Zeilen („Pakete 77 · anzeigen · Statistik“, `Fact.links`); Paketdetails mit
   Blätter-Gruppe und „Verbindung: Pakete, Statistik, Stream, Details“; Hinweis auf die Verbindung über Pakete und
@@ -144,11 +160,11 @@ Netzwerkverkehrs-Monitor in Rust (iced-GUI, libpcap). Maßgeblich für Stand, Li
 - Rust Edition 2024, Workspace mit `lib/sniffnet-packet-parser`; Build unter Linux braucht `libpcap-dev` und `libwebkit2gtk-4.1-dev` (Fenster-Programm).
 - Prüfen: `cargo deny --workspace check` (cargo-deny 0.20.2; ohne `--workspace` fehlt `openpacketmon-app`), `cargo test --workspace`, `cargo clippy -- -D warnings` (ohne `--all-targets`, wie Upstream; der Testcode hat viele Pedantic-Meldungen), `cargo fmt --all -- --check`.
 - Paket: **`dev/build-deb.sh`** (2026-10-29) baut alles mit der Version aus `Cargo.toml` und nennt den Installationsbefehl.
-  **Versionen wie bei opennetmon** (Wunsch des Nutzers): `0.x.y` ohne Datum, vor jedem neuen Test-Paket in `Cargo.toml` und
-  `app/Cargo.toml` erhöhen, danach `cargo update --workspace --offline` (sonst scheitert die Lizenzprüfung im Skript an
-  `Cargo.lock`) – `y` bei Kleinigkeiten, `x` bei größeren Schritten (nächster größerer Sprung: `0.3.0`, erstes Release;
+  **Versionen wie bei opennetmon** (Wunsch des Nutzers): `0.x.y` ohne Datum, vor jedem neuen Test-Paket in `Cargo.toml`,
+  `app/Cargo.toml` und `capture/Cargo.toml` erhöhen, danach `cargo update --workspace --offline` (sonst scheitert die Lizenzprüfung im Skript an
+  `Cargo.lock`) – `y` bei Kleinigkeiten, `x` bei größeren Schritten (erstes Release wird `0.4.0` oder `0.5.0`, siehe `PLAN.md` 5.5;
   Ablauf mit `dev/release.sh` in `PLAN.md` 4.10). Das Skript hält an, wenn die
   Version nicht neuer als die installierte ist, weil `apt install ./….deb` ein Paket gleicher Version stillschweigend
   überspringt („… wird an Stelle von … gewählt“); `--force` baut trotzdem, dann `apt install --reinstall`. Von Hand:
   `cargo build --release --workspace && cargo deb` (`cargo deb` allein baut `openpacketmon-app` nicht neu). Jeder `cargo build`
-  entfernt die `setcap`-Rechte des Binarys (Live-Mitschnitt dann nur nach erneutem `sudo setcap`).
+  entfernt die `setcap`-Rechte des Binarys (Live-Mitschnitt aus `target/` dann nur nach `sudo setcap cap_net_raw,cap_net_admin=eip target/…/openpacketmon-capture`; das Hauptprogramm braucht keine Rechte).

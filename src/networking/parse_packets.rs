@@ -3,7 +3,6 @@
 
 //! `pcap`-based capture backend
 
-use crate::config::filters::Filters;
 use crate::engine::packets::SharedPacketStore;
 use crate::location;
 use crate::mmdb::types::mmdb_reader::MmdbReaders;
@@ -32,7 +31,6 @@ pub fn parse_packets(
     mut cs: CaptureSource,
     mmdb_readers: &MmdbReaders,
     capture_context: CaptureContext,
-    filters: Filters,
     tx: &Sender<BackendTrafficMessage>,
     freeze_rxs: (Receiver<()>, Receiver<()>),
     packet_store: Option<&SharedPacketStore>,
@@ -60,7 +58,7 @@ pub fn parse_packets(
     let (pcap_tx, pcap_rx) = std::sync::mpsc::sync_channel(10_000);
     let _ = thread::Builder::new()
         .name("thread_packet_stream".to_string())
-        .spawn(move || packet_stream(cap, &pcap_tx, &mut freeze_rx_2, &filters))
+        .spawn(move || packet_stream(cap, &pcap_tx, &mut freeze_rx_2))
         .log_err(location!());
 
     loop {
@@ -236,7 +234,6 @@ fn packet_stream(
     mut cap: CaptureType,
     tx: &std::sync::mpsc::SyncSender<(Result<PacketOwned, pcap::Error>, Option<pcap::Stat>)>,
     freeze_rx: &mut Receiver<()>,
-    filters: &Filters,
 ) {
     loop {
         // check if we need to freeze the parsing
@@ -246,7 +243,7 @@ fn packet_stream(
             // wait until unfreeze
             let _ = freeze_rx.blocking_recv();
             // resume the capture
-            cap.resume(filters);
+            cap.resume();
         }
 
         let packet_res = cap.next_packet();

@@ -22,6 +22,7 @@ their top that they were modified ("Modified for openpacketmon"):
   .gitignore
   Cargo.toml
   build.rs
+  capture/src/main.rs  (from src/networking/types/capture_context.rs)
   lib/sniffnet-packet-parser/Cargo.toml
   resources/packaging/linux/openpacketmon.desktop  (from resources/packaging/linux/sniffnet.desktop)
   resources/packaging/linux/scripts/postinst
@@ -55,6 +56,7 @@ their top that they were modified ("Modified for openpacketmon"):
   src/networking/types/info_address_port_pair.rs
   src/networking/types/info_traffic.rs
   src/networking/types/mod.rs
+  src/networking/types/my_device.rs
   src/networking/types/program.rs
   src/networking/types/program_lookup.rs
   src/networking/types/service.rs

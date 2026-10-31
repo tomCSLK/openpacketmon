@@ -3,7 +3,7 @@
 
 [package]
 name = "openpacketmon"
-version = "0.2.9"
+version = "0.3.0"
 description = "Network traffic monitor with a browser UI, based on Sniffnet"
 readme = "README.md"
 keywords = ["network", "packet", "traffic", "monitor", "pcap"]
@@ -32,6 +32,7 @@ workspace = true
 
 [dependencies]
 
+openpacketmon-capture = { path = "capture" }
 sniffnet-packet-parser = { path = "lib/sniffnet-packet-parser", version = "0.2.1" }
 
 pcap.workspace = true
@@ -49,6 +50,7 @@ hyper = { version = "1.12.0", features = ["http1", "server"] }
 hyper-util = { version = "0.1.21", features = ["tokio", "service"] }
 ipnet = "2.12.2"
 jiff = "0.2.38"
+libc = "0.2.191"
 listeners = "0.6.1"
 maxminddb = "0.32.0"
 nom = "8.0.0"
@@ -99,6 +101,7 @@ recommends = "libayatana-appindicator3-1"
 assets = [
     ["target/release/openpacketmon", "/usr/bin/", "755"],
     ["target/release/openpacketmon-app", "/usr/bin/", "755"],
+    ["target/release/openpacketmon-capture", "/usr/bin/", "755"],
     ["resources/packaging/linux/openpacketmon.desktop", "/usr/share/applications/", "644"],
     ["resources/packaging/linux/openpacketmon.service", "/usr/lib/systemd/user/", "644"],
     ["NOTICE", "/usr/share/doc/openpacketmon/", "644"],
@@ -126,8 +129,8 @@ assets = [
 #═══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
 
 [workspace]
-members = [".", "app", "lib/sniffnet-packet-parser"]
-default-members = [".", "app", "lib/sniffnet-packet-parser"]
+members = [".", "app", "capture", "lib/sniffnet-packet-parser"]
+default-members = [".", "app", "capture", "lib/sniffnet-packet-parser"]
 
 #───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
 

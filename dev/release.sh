@@ -6,7 +6,7 @@
 #   dev/release.sh --publish --notes notes.md       # additionally tag vX.Y.Z, push the tag, create the release
 #   dev/release.sh --publish --notes notes.md --prerelease   # the same, marked as pre-release
 #
-# The version comes from Cargo.toml (bump it there and in app/Cargo.toml and commit first); CHANGELOG.md needs a section
+# The version comes from Cargo.toml (bump it there, in app/Cargo.toml and in capture/Cargo.toml and commit first); CHANGELOG.md needs a section
 # "## [X.Y.Z]". Before anything is published the script requires a public repository, a clean work tree on main that
 # matches origin/main, a green CI run for this commit and a version without an existing tag. Every run checks fmt,
 # clippy, tests, cargo deny, THIRD-PARTY-LICENSES.txt, the notices of changed Sniffnet files and the contents of the .deb.
@@ -36,12 +36,14 @@ fail() { printf 'error: %s\n' "$*" >&2; exit 1; }
 
 VERSION=$(sed -n 's/^version = "\(.*\)"$/\1/p' Cargo.toml | head -n 1)
 APP_VERSION=$(sed -n 's/^version = "\(.*\)"$/\1/p' app/Cargo.toml | head -n 1)
+CAPTURE_VERSION=$(sed -n 's/^version = "\(.*\)"$/\1/p' capture/Cargo.toml | head -n 1)
 TAG="v$VERSION"
 DEB="openpacketmon_$VERSION-1_amd64.deb"
 DIST="target/dist"
 
 step "checking the repository for $TAG"
 [ "$APP_VERSION" = "$VERSION" ] || fail "app/Cargo.toml has version $APP_VERSION, Cargo.toml $VERSION"
+[ "$CAPTURE_VERSION" = "$VERSION" ] || fail "capture/Cargo.toml has version $CAPTURE_VERSION, Cargo.toml $VERSION"
 grep -qF "## [$VERSION]" CHANGELOG.md || fail "CHANGELOG.md has no section ## [$VERSION]"
 if [ "$PUBLISH" = yes ]; then
   [ -n "$NOTES" ] && [ -f "$NOTES" ] || fail "--publish needs --notes FILE with the release notes"

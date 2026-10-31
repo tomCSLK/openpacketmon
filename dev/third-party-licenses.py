@@ -21,7 +21,7 @@ TARGET = "x86_64-unknown-linux-gnu"
 OUTPUT = pathlib.Path("THIRD-PARTY-LICENSES.txt")
 LICENSE_FILE = re.compile(r"^(licen[cs]e|copying|notice|unlicense)([-._].*)?$", re.IGNORECASE)
 # the programs whose dependencies are listed
-ROOTS = ("openpacketmon", "openpacketmon-app")
+ROOTS = ("openpacketmon", "openpacketmon-app", "openpacketmon-capture")
 
 BUNDLED = [
     ("uPlot 1.6.32", "static/vendor/uplot/", "MIT", "static/vendor/uplot/LICENSE"),

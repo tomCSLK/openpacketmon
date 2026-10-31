@@ -1,4 +1,7 @@
-use pcap::{Address, Device, DeviceFlags};
+// Modified for openpacketmon (2026), see NOTICE. Based on `src/networking/types/my_device.rs` of Sniffnet
+// (https://github.com/GyulyVGC/sniffnet), Copyright (c) 2022 Giuliano Bellini, MIT OR Apache-2.0.
+
+use pcap::{Address, Device};
 
 use sniffnet_packet_parser::LinkType;
 
@@ -14,20 +17,6 @@ pub struct MyDevice {
 }
 
 impl MyDevice {
-    pub fn to_pcap_device(&self) -> Device {
-        for device in Device::list().unwrap_or_default() {
-            if device.name.eq(&self.name) {
-                return device;
-            }
-        }
-        Device {
-            name: String::new(),
-            desc: None,
-            addresses: vec![],
-            flags: DeviceFlags::empty(),
-        }
-    }
-
     pub fn from_pcap_device(device: Device) -> Self {
         MyDevice {
             name: device.name,

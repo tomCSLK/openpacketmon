@@ -1,9 +1,9 @@
 //! openpacketmon as a desktop application: the browser UI of the openpacketmon server in a window of
 //! its own, with an icon in the tray.
 //!
-//! The window is a separate program on purpose: `/usr/bin/openpacketmon` has the capture
-//! capabilities (`cap_net_raw`, `cap_net_admin`), and the web engine should not run with them. This
-//! program has no special rights. It starts the server if none is running for the port (or uses the
+//! Neither this program nor the server has special rights: only the helper
+//! `/usr/bin/openpacketmon-capture` gets the capture capabilities (`cap_net_raw`, `cap_net_admin`),
+//! and it gives them up once the adapter is open. This program starts the server if none is running for the port (or uses the
 //! one of the systemd user service), signs in with the start link the server writes for its user, and
 //! talks to the server only over HTTP on 127.0.0.1.
 //!

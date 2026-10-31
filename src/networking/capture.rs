@@ -13,7 +13,6 @@ use std::thread;
 use std::time::{Duration, Instant};
 use tokio::sync::broadcast::Receiver;
 
-use crate::config::filters::Filters;
 use crate::engine::packets::SharedPacketStore;
 use crate::location;
 use crate::mmdb::asn::get_asn;
@@ -44,7 +43,6 @@ pub fn spawn_capture_thread(
     capture_source: CaptureSource,
     capture_context: CaptureContext,
     mmdb_readers: MmdbReaders,
-    filters: Filters,
     tx: Sender<BackendTrafficMessage>,
     freeze_rxs: (Receiver<()>, Receiver<()>),
     packet_store: Option<SharedPacketStore>,
@@ -67,7 +65,6 @@ pub fn spawn_capture_thread(
                         capture_source,
                         &mmdb_readers,
                         capture_context,
-                        filters,
                         &tx,
                         freeze_rxs,
                         packet_store.as_ref(),

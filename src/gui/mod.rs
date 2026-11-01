@@ -38,6 +38,7 @@ use crate::APP_TITLE;
 use crate::config::favorite::Favorite;
 use crate::config::settings::ThemeChoice;
 use crate::engine::Engine;
+use crate::mcp::Access;
 use crate::networking::types::address_port_pair::AddressPortPair;
 use crate::networking::types::capture_context::CaptureSource;
 use crate::networking::types::data_representation::DataUnit;
@@ -208,6 +209,8 @@ impl Live {
 /// The window
 pub struct App {
     pub engine: Engine,
+    /// The access for AI assistants
+    pub mcp: Access,
     pub t: Lang,
     /// The packets that pass the display filters in use
     pub index: Arc<FilterIndex>,
@@ -225,7 +228,7 @@ pub struct App {
 }
 
 impl App {
-    fn new(ctx: &Context, engine: Engine) -> Self {
+    fn new(ctx: &Context, engine: Engine, mcp: Access) -> Self {
         egui_extras::install_image_loaders(ctx);
         theme::install(ctx);
         let (language, choice) = {
@@ -243,6 +246,7 @@ impl App {
         Self {
             sound_seen: live.sound.0,
             engine,
+            mcp,
             t,
             index: Arc::new(FilterIndex::default()),
             live,
@@ -654,7 +658,7 @@ fn window_icon() -> Option<egui::IconData> {
 }
 
 /// Opens the window and returns when it is closed
-pub fn run(engine: Engine) -> Result<(), eframe::Error> {
+pub fn run(engine: Engine, mcp: Access) -> Result<(), eframe::Error> {
     let mut viewport = ViewportBuilder::default()
         .with_title(APP_TITLE)
         .with_app_id(crate::APP_NAME)
@@ -671,6 +675,6 @@ pub fn run(engine: Engine) -> Result<(), eframe::Error> {
     eframe::run_native(
         crate::APP_NAME,
         options,
-        Box::new(move |cc| Ok(Box::new(App::new(&cc.egui_ctx, engine)))),
+        Box::new(move |cc| Ok(Box::new(App::new(&cc.egui_ctx, engine, mcp)))),
     )
 }

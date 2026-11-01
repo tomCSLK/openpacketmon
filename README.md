@@ -95,9 +95,24 @@ At startup openpacketmon asks the GitHub API for the latest version; no data abo
 Updates* switches this off. Apart from that it only contacts the network for the download above, for reverse DNS lookups of
 the addresses it sees, and for the latency measurement you start on a connection page.
 
+### AI assistants
+
+openpacketmon can answer AI assistants over the Model Context Protocol (MCP), for example to look into a device on your
+network together with Claude Code. This is off until you turn it on in *Settings → AI assistants (MCP)*, and it only works
+while the window is open. Then connect the assistant once:
+
+```sh
+claude mcp add openpacketmon -- openpacketmon mcp
+```
+
+So far an assistant can ask for the state of the capture: its source and how many packets and bytes it has seen. It can only
+read. **What an assistant queries goes to its AI service**, and names and texts in a capture can come from other devices,
+so treat its answers with the usual care and keep the permission prompts of your assistant on.
+
 ### Security
 
-openpacketmon opens no network port and has no special rights. Only the helper `openpacketmon-capture` may capture; it
+openpacketmon has no special rights and opens no network port, except for the access for AI assistants: when you turn that
+on, the window listens on `127.0.0.1` only and answers just to the token in a file only your user can read. Only the helper `openpacketmon-capture` may capture; it
 drops its rights once the adapter is open and hands the packets on without looking into them. Packets are analyzed in the
 program without rights, because their content comes from other computers. Please report vulnerabilities privately, see
 [SECURITY.md](SECURITY.md).

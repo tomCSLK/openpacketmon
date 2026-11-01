@@ -1182,34 +1182,62 @@ bekommen. Weg (`docs/windows.md` 6.1): zuerst kostenlos über die SignPath Found
 einen Build in GitHub Actions voraus, und die Zusage ist nicht sicher, weil deren Regel „No hacking tools“ ein
 Mitschnitt-Programm treffen könnte. Sonst ein OV-Zertifikat; Azure Artifact Signing gibt es für Einzelentwickler in Deutschland nicht.
 
-#### 5.4 MCP-Anbindung (Idee des Nutzers, 2026-10-31, beschlossen: nach dem ersten Release; Entwurf vor der Umstellung aus 5.5 geschrieben)
+#### 5.4 MCP-Anbindung (Idee des Nutzers, 2026-10-31; neu gefasst und begonnen 2026-11-02, vom Nutzer freigegeben; Stufe 1 erledigt)
 
-Beim Untersuchen von Geräten im Heimnetz mit Claude in einer anderen Instanz (`../Abfrage_Geraete_im_Heimnetzwerk`) wäre es sehr
-hilfreich, wenn Claude den Mitschnitt von openpacketmon direkt abfragen könnte, statt dass der Nutzer Werte abliest oder PCAPs
-weitergibt. Erster Entwurf, noch nicht geprüft:
+Beim Untersuchen von Geräten im Heimnetz mit Claude in einer anderen Instanz (`../Abfrage_Geraete_im_Heimnetzwerk`) soll Claude den Mitschnitt
+von openpacketmon direkt abfragen können, statt dass der Nutzer Werte abliest oder PCAPs weitergibt. Der erste Entwurf stammte aus der Browser-Zeit
+(Server, Startlink); beides gibt es seit der Umstellung auf egui nicht mehr.
 
-- **Form:** Unterbefehl `openpacketmon mcp` (stdio), der als MCP-Server läuft und mit dem laufenden Server auf `127.0.0.1` spricht.
-  So bleibt der Mitschnitt in einem Prozess, und nichts lauscht zusätzlich. Die Anmeldung nutzt den Startlink des Benutzers wie
-  das Fenster-Programm.
-- **Zuerst nur lesen:** Aufzeichnungsstatus, Verbindungen und Pakete mit den vorhandenen Filtern, Paketdetails, Statistik, Hosts,
-  Programme. Später vielleicht Start und Stopp einer Aufzeichnung auf einem Adapter, dann nur mit Bestätigung.
-- **Grenzen:** Jede Antwort mit fester Obergrenze (Zeilen, Bytes) und Seiten, weil 500 000 Pakete nicht in eine Antwort passen.
-  Der Filter als Pflichtweg, Zusammenfassungen vor Rohdaten.
-- **Sicherheit, vor allem anderen klären:**
-  - Paketinhalte, DNS-Namen, TLS-Servernamen und HTTP-Köpfe stammen von fremden Geräten. Sie sind **ungeprüfte Eingaben für das
-    Sprachmodell** und können versteckte Anweisungen enthalten (Prompt Injection). Die Antworten müssen sie als Daten kennzeichnen,
-    und schreibende Werkzeuge dürfen nicht ohne Bestätigung laufen.
-  - Der Mitschnitt enthält private Inhalte, die mit jeder Abfrage an den KI-Dienst gehen. Rohdaten (Stream, Hex-Dump) nur auf
-    ausdrücklichen Wunsch, standardmäßig nur Kopfdaten und Statistik. Das gehört in README und Einstellungen.
-  - Erweitert den Geltungsbereich von `SECURITY.md`, und die Prüfungen aus 4.8 gelten auch hier.
-- **Abhängigkeit:** vermutlich eine MCP-Crate; Lizenz und Abhängigkeiten über `cargo deny` prüfen, `THIRD-PARTY-LICENSES.txt`
-  neu erzeugen. Alternativ das kleine JSON-RPC-Protokoll selbst umsetzen.
-- **Zeitpunkt:** nach dem ersten Release (0.4.0 oder 0.5.0) und **vor der Windows-Version** (Nutzer, 2026-10-31): Reihenfolge Release → MCP → Windows.
-  Die Windows-Version enthält MCP dann schon.
-- **Windows gleich mitdenken:** MCP-Code ohne `std::os::unix`, Unix-Sockets, `XDG_*` oder `HOME` schreiben. stdio und HTTP auf
-  `127.0.0.1` gehen auf beiden Systemen. Den Startlink nur über `web::auth::start_link_path`/`read_start_link` lesen, nicht
-  über einen eigenen Pfad, damit die Anpassung aus `docs/windows.md` 4 auch für MCP gilt. Keine Pfade in Beispielen der
-  Einrichtung fest verdrahten (Aufruf `openpacketmon mcp` bzw. `openpacketmon.exe mcp`).
+**Zeitpunkt (Nutzer, 2026-11-02):** MCP kommt jetzt **vor** dem ersten Release, weil das Release am Haltepunkt 4.10 wartet. Es bleibt alles im
+privaten Repo, und MCP wird mit dem ersten Release veröffentlicht; dessen Sicherheitsdurchsicht muss es also einschließen. Windows bleibt danach.
+
+Entschieden (Nutzer, 2026-11-02):
+
+```
+Claude Code ──stdio──> openpacketmon mcp ──127.0.0.1 + Token──> laufendes Fenster
+                       (MCP-Server, ohne Daten)                 (Mitschnitt, Engine)
+```
+
+- **`openpacketmon mcp`** (`src/mcp/server.rs`): startet der Assistent selbst. Spricht MCP auf stdio (`rmcp`, offizielles SDK, Apache-2.0), kennt die
+  Werkzeuge, öffnet weder Fenster noch Mitschnitt und liest die Einstellungen nicht (Abzweig in `main` vor `CONF`, weil das Laden sie bei einem Fehler
+  zurücksetzen würde). stdout gehört allein MCP (Test `tests/mcp.rs`).
+- **Zugang im Fenster** (`src/mcp/access.rs`): lauscht nur auf `127.0.0.1`, zufälliger Port, neuer Token je Einschalten, Datei `mcp-access.json` neben den
+  Einstellungen (Rechte `0600`). Je Frage eine Verbindung mit einer JSON-Zeile hin und zurück (`src/mcp/protocol.rs`), kein MCP im lauschenden Teil.
+  Höchstens 4 gleichzeitige Clients, 64 KiB je Frage, 5 s zum Fragen, Token-Vergleich in fester Zeit.
+- **Standardmäßig aus**, eingeschaltet in den Einstellungen (Karte „KI-Assistenten (MCP)“); dort stehen Zustand, Zahl der Abfragen und der Befehl
+  `claude mcp add openpacketmon -- openpacketmon mcp`.
+- **Reihenfolge egal:** Ist das Fenster zu, sagt das Werkzeug verständlich, was zu tun ist; `openpacketmon mcp` scheitert daran nicht. Sobald das Fenster
+  offen ist, geht es ohne neue Verbindung des Assistenten weiter.
+- **Abgelehnt:** MCP über HTTP direkt im Fenster (kein Teilprozess, aber wieder ein Webserver, den wir gerade entfernt haben).
+- **Nutzdaten** (Stream, Bytes) nur mit eigenem Schalter, standardmäßig aus.
+
+Stufen, jede einzeln nach Freigabe:
+
+1. **Erledigt (2026-11-02):** Zugang, Einstellung, `openpacketmon mcp`, Werkzeug `capture_status`
+   (`src/mcp/tools.rs`: Zustand, Quelle ohne Ordner, Pakete, Bytes, Verluste, Paketspeicher). 18 neue Crates, `cargo deny` sauber, `THIRD-PARTY-LICENSES.txt`
+   neu erzeugt. Tests: 9 in `src/mcp/access.rs` mit echten Verbindungen (aus bis eingeschaltet, Rechte der Datei, falscher Token, falsche Fragen,
+   untätige Clients, neuer Token, zweites Fenster), 6 in `tests/mcp.rs` mit dem echten Prozess, 1 in `src/gui/tests.rs`. Von Hand mit einer Testinstanz
+   geprüft: Port nur auf `127.0.0.1`, Datei `0600`, Abfrage über stdio und mit echtem Claude Code (`claude -p`, Antwort korrekt), Meldung nach dem
+   Beenden des Fensters. Das Einschalten in der echten Oberfläche prüft nur der Test im Speicher, nicht die Bedienung von Hand.
+2. Lesewerkzeuge: `overview`, `connections`, `packets`, `packet_detail`, `statistics`, `filter_help`, mit Seiten und festen Obergrenzen (etwa 200 Zeilen),
+   Filter als Pflichtweg, Texte immer Englisch (`Lang::En`), Antworten mit Zeitlimit. Zu prüfen: Bremsen große Filterläufe das Fenster? Texte von fremden
+   Geräten kürzen, Steuerzeichen entfernen, als ungeprüfte Daten kennzeichnen.
+3. Schalter für Nutzdaten mit `follow_stream` und `packet_bytes`, sichtbare Anzeige im Fenster, solange der Zugang offen ist (Seitenleiste).
+4. Zufallstests der Werkzeuge, Angriffe auf den Zugang wie in 4.8, Doku.
+5. Später vielleicht Start und Stopp einer Aufzeichnung, nur mit Bestätigung im Fenster, nicht beim Assistenten.
+
+Risiken, die offen bleiben:
+
+- **Prompt Injection:** DNS-Namen, TLS-Servernamen, HTTP-Köpfe und Paketinhalte stammen von fremden Geräten und können versteckte Anweisungen enthalten.
+  Kennzeichnen hilft, ist aber kein Schutz. Die Werkzeuge lesen nur, doch der Assistent hat in derselben Sitzung andere Werkzeuge; die Freigaben im
+  Assistenten bleiben die wichtigste Bremse. Darum in dieser Stufe nur Quellenname und Zahlen; `INSTRUCTIONS` in `server.rs` sagt es dem Modell.
+- **Datenschutz:** Jede Abfrage geht an den KI-Dienst, schon Metadaten zeigen Geräte und besuchte Seiten. Steht in README und Einstellungen.
+- **Andere Benutzer desselben Rechners** erreichen den Port, brauchen aber den Token. Nach einem harten Beenden bleibt die Datei stehen; der Token ist dann
+  wertlos, und das Fenster legt beim nächsten Einschalten einen neuen an. Ein fremder Benutzer könnte den alten Port übernehmen und falsche Antworten
+  geben. In Stufe 4 bewerten.
+- **Zwei Fenster:** Es antwortet das zuletzt eingeschaltete; schließt es, ist das ältere bis zum erneuten Einschalten nicht erreichbar. Bewusst so gelassen.
+- **Windows:** Der Code nutzt keine Unix-Sockets, und `0o600` gilt nur unter Unix (`cfg(unix)`). Unter Windows schützen die Rechte des Benutzerordners die
+  Datei; das beim Windows-Start prüfen (`docs/windows.md`). Aufruf dort `openpacketmon.exe mcp`.
 
 #### 5.5 Umstellung der Oberfläche auf egui (Wunsch des Nutzers, 2026-10-31, umgesetzt 2026-11-01, Bedienung von Hand steht aus)
 
@@ -1227,7 +1255,7 @@ Aufbau (Plan B, vom Nutzer am 2026-10-31 bestätigt):
 - `openpacketmon-capture`: kleiner Helfer, nur er hat die Rechte; öffnet Adapter, setzt den BPF-Filter, schreibt Pakete in eine Pipe,
   schreibt keine Dateien. Unter Windows läuft er ohne Sonderrechte; lädt nur er `wpcap.dll`, startet das Programm auch ohne Npcap.
 - `openpacketmon`: egui-Programm ohne Rechte mit Engine, Zerlegern und Oberfläche. Die Webschicht fällt weg (Server, Startlink, CSRF,
-  Host-Prüfung, systemd-Dienst). MCP braucht dann einen kleinen, abschaltbaren Zugang auf `127.0.0.1`, 5.4 ist entsprechend neu zu fassen.
+  Host-Prüfung, systemd-Dienst). MCP braucht dann einen kleinen, abschaltbaren Zugang auf `127.0.0.1` (umgesetzt, siehe 5.4).
 
 Befunde aus dem Code (2026-10-31):
 
@@ -1333,8 +1361,9 @@ Stand egui (2026-11-01, Stufen 1 bis 4 freigegeben vom Nutzer, Test-Pakete **0.3
   1. **Top-Listen der Übersicht:** Klicks auf Top-Hosts und Top-Dienste taten nichts, weil jede Karte in `top_card` (`src/gui/pages/overview.rs`) `*action = …` schrieb, auch `None`, und so die Klicks der Karten davor löschte. Das traf auch den Favoriten-Stern. Jetzt setzt nur eine Karte mit Klick die Aktion. Test `every_top_list_of_the_overview_opens_its_entries` (schlug vorher fehl).
   2. **Griff des Lautstärkereglers:** egui leitet ihn aus der Höhe des Reglers ab, und `interact_size.y = 32` machte ihn fast 13 Punkte im Radius. In dieser Zeile gilt jetzt die Texthöhe als `interact_size.y` (`src/gui/pages/settings.rs`), kleiner als die Texthöhe rutscht der Regler aus der Mitte. Der Wert steht als Text daneben (`show_value(false)`), eintippen lässt er sich nicht mehr.
 - **CI wieder ohne Grafikkarte lauffähig** (2026-11-01, kein neues Paket, nur Testcode): Seit `c30c68b` schlugen 9 Oberflächen-Tests in der CI mit `No adapter found` fehl, weil `window_of_size` (`src/gui/tests.rs`) jedes Testfenster mit dem wgpu-Renderer baute. Das Programm war nicht betroffen. Den Renderer braucht nur `shots`, er wird jetzt nur bei gesetztem `GUI_SHOTS` eingeschaltet.
+- **Offen, aus dem Test (2026-11-01, noch nicht umgesetzt):** Adapter ohne IP-Verkehr (`bluetooth0`, `bluetooth-monitor`, `nflog`, `nfqueue`) zeigen in der Vorschau „0“ und eine leere Kurve, obwohl die Vorschau sie wegen des nicht unterstützten Link-Typs gar nicht öffnet (`traffic_preview.rs`, trotz laufender Bluetooth-Kopfhörer). Wählt man sie, endet `parse_packets` sofort ohne Meldung. Bluetooth selbst bleibt laut 5.1 außerhalb des Umfangs. Entschieden (Nutzer, 2026-11-01): solche Adapter ausgrauen, nicht wählbar, Hinweis „Kein IP-Verkehr, wird nicht ausgewertet“ statt Kurve; nicht ausblenden. Umsetzung erst auf Ansage, der Nutzer testet weiter.
 - **Nicht von Hand geprüft:** Bedienung im echten Fenster, Live-Mitschnitt in der Oberfläche, Ton, Dateidialoge, Skalierung des Bildschirms, Geo-Download, `.deb` auf anderen Systemen. Auf dem Laptop bleibt nach dem Umstieg `~/.config/autostart/openpacketmon-app.desktop` stehen und muss von Hand weg.
-- Vor dem Release: `deny.toml`-Ausnahmen neu bewerten (RUSTSEC-2026-0370/0371/0372, Schriftlizenzen); `test_increments_ping_sequence` beheben; Sicherheitsdurchsicht der geänderten Teile: Webangriffe (4.8) fallen weg, neu ist, dass Paketinhalte als Text im Fenster stehen (fehlende Zeichen zeigt das Programm als Kästchen, `MissingGlyphPolicy::Tofu`). 5.4 neu fassen: MCP braucht nun einen eigenen, abschaltbaren Zugang auf `127.0.0.1`.
+- Vor dem Release: `deny.toml`-Ausnahmen neu bewerten (RUSTSEC-2026-0370/0371/0372, Schriftlizenzen); `test_increments_ping_sequence` beheben; Sicherheitsdurchsicht der geänderten Teile: Webangriffe (4.8) fallen weg, neu ist, dass Paketinhalte als Text im Fenster stehen (fehlende Zeichen zeigt das Programm als Kästchen, `MissingGlyphPolicy::Tofu`). MCP (5.4) gehört in diese Durchsicht, es wird mit dem ersten Release veröffentlicht.
 
 Entschieden (Nutzer, 2026-10-31): Der Paketspeicher bleibt im RAM, die Grenze wird wählbar (bis etwa 2 GiB mit passender Paketzahl).
 Eine temporäre Datei wie bei Wireshark kommt nur, falls das später nicht reicht, weil sonst unverschlüsselter Verkehr auf der SSD läge.

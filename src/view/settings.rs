@@ -137,6 +137,7 @@ pub struct Settings {
     pub packets_enabled: bool,
     pub packets_max: Vec<(String, usize, bool)>,
     pub packets_headers: bool,
+    pub mcp_enabled: bool,
 }
 
 pub fn settings(t: Lang, engine: &EngineState) -> Settings {
@@ -184,6 +185,7 @@ pub fn settings(t: Lang, engine: &EngineState) -> Settings {
         packets_enabled: conf.packet_store.enabled,
         packets_max: packets_max_choices(t, conf.packet_store),
         packets_headers: conf.packet_store.headers_only,
+        mcp_enabled: conf.mcp.enabled,
     }
 }
 
@@ -216,6 +218,7 @@ pub struct SettingsChange {
     /// The memory of the packet store in MiB; `None` leaves it as it is
     pub packets_memory: Option<usize>,
     pub packets_headers: bool,
+    pub mcp_enabled: bool,
 }
 
 /// Puts new values into the settings; saving them is up to the caller
@@ -250,6 +253,7 @@ pub fn apply_settings(engine: &mut EngineState, change: &SettingsChange) {
         conf.packet_store.megabytes = megabytes;
     }
     conf.packet_store.headers_only = change.packets_headers;
+    conf.mcp.enabled = change.mcp_enabled;
 
     if conf.updates.disable_checks() == change.update_checks {
         conf.updates.toggle_disable_checks();
@@ -307,6 +311,7 @@ mod tests {
             packets_max: 250_000,
             packets_memory: Some(2048),
             packets_headers: true,
+            mcp_enabled: true,
         }
     }
 

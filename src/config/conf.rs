@@ -9,6 +9,7 @@ use crate::config::favorite::FavoriteKey;
 use crate::config::favorite::Favorites;
 use crate::config::filters::Filters;
 use crate::config::ipfix_socket::MyIpfixSocket;
+use crate::config::mcp::McpConf;
 use crate::config::packet_store::PacketStoreConf;
 use crate::config::settings::Settings;
 use crate::networking::types::capture_context::CaptureSourcePicklist;
@@ -109,6 +110,9 @@ pub struct Conf {
     /// Packets kept in memory for the packet list and details
     #[serde(deserialize_with = "deserialize_or_default")]
     pub packet_store: PacketStoreConf,
+    /// Access for AI assistants
+    #[serde(deserialize_with = "deserialize_or_default")]
+    pub mcp: McpConf,
 }
 
 impl Conf {

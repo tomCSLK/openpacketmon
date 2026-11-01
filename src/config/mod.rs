@@ -8,5 +8,6 @@ pub mod export_pcap;
 pub mod favorite;
 pub mod filters;
 pub mod ipfix_socket;
+pub mod mcp;
 pub mod packet_store;
 pub mod settings;

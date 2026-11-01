@@ -119,7 +119,8 @@ mitschneiden dürfen oder nur Administratoren. Das Programm soll nie als Adminis
    keine Nachfrage aus.
 7. Sicherheit: Der Sicherheitstest aus `PLAN.md` 4.8 für die geänderten Stellen, vor allem die Rechte des Helfers.
 8. Sauberes System: Installer, Deinstallation, Update über eine ältere Version.
-9. MCP-Anbindung (`PLAN.md` 5.4): `openpacketmon.exe mcp` mit Claude Code unter Windows.
+9. MCP-Anbindung (`PLAN.md` 5.4): `openpacketmon.exe mcp` mit Claude Code unter Windows. Dabei prüfen, dass nur der Benutzer `mcp-access.json` im
+   Ordner der Einstellungen lesen kann: Die Rechte `0600` setzt der Code nur unter Unix.
 
 ## 6. Installer und Release
 
@@ -180,6 +181,6 @@ Was SignPath verlangt und was das für uns heißt:
 6. Installer, Test auf sauberem System, README, erstes Windows-Release, zunächst unsigniert.
 7. Signatur beantragen (Abschnitt 6.1), danach signierte Installer.
 
-**Beginn (Nutzer, 2026-10-30/31):** Reihenfolge erstes Release → MCP-Anbindung → Windows. Bis zum Release gilt auch auf dem Windows-Rechner
+**Beginn (Nutzer, 2026-10-30/31, geändert 2026-11-02):** Reihenfolge MCP-Anbindung und erstes Release (MCP zuerst, weil das Release am Haltepunkt wartet) → Windows. Bis zum Release gilt auch auf dem Windows-Rechner
 der Haltepunkt aus `PLAN.md` 4.10. Die Abschnitte 4 und 5 stammen aus der Zeit vor MCP: Beim Beginn die Liste um das ergänzen, was
 seitdem dazugekommen ist.

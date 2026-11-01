@@ -2,7 +2,7 @@
 
 use std::net::IpAddr;
 
-use eframe::egui::{self, ComboBox, ScrollArea, Slider, TextEdit, Ui};
+use eframe::egui::{self, ComboBox, RichText, ScrollArea, Slider, TextEdit, Ui};
 
 use crate::config::packet_store::PacketStoreConf;
 use crate::config::settings::ThemeChoice;
@@ -11,11 +11,15 @@ use crate::gui::load::Task;
 use crate::gui::pages::head;
 use crate::gui::widgets::{self, Kind};
 use crate::gui::{App, language_of, sound, theme_preference};
+use crate::mcp::Status;
 use crate::mmdb::geo::DownloadError;
 use crate::view::i18n::Lang;
 use crate::view::settings::{
     Settings, SettingsChange, apply_settings, parse_addresses, parse_sound, settings, sound_code,
 };
+
+/// How to connect Claude Code, which starts this command itself
+const MCP_COMMAND: &str = "claude mcp add openpacketmon -- openpacketmon mcp";
 
 /// What the form holds until it is saved
 struct Form {
@@ -33,6 +37,7 @@ struct Form {
     packets_max: usize,
     packets_memory: usize,
     packets_headers: bool,
+    mcp_enabled: bool,
 }
 
 impl Form {
@@ -71,6 +76,7 @@ impl Form {
                 .map_or(100_000, |(_, n, _)| *n),
             packets_memory: state.conf.packet_store.max_megabytes(),
             packets_headers: s.packets_headers,
+            mcp_enabled: s.mcp_enabled,
         }
     }
 }
@@ -136,6 +142,7 @@ pub fn show(app: &mut App, ui: &mut Ui) {
         |_| {},
     );
     let downloading = app.pages.settings.geo.busy();
+    let mcp = app.mcp.status();
     let (mut save, mut download, mut preview) = (false, false, false);
     let state = &mut app.pages.settings;
     if let Some(flash) = &state.flash {
@@ -160,6 +167,7 @@ pub fn show(app: &mut App, ui: &mut Ui) {
             &mut download,
         );
         store_card(ui, t, view, form);
+        mcp_card(ui, t, form, mcp);
         widgets::card(
             ui,
             &t.get("settings-updates"),
@@ -433,6 +441,26 @@ fn store_card(ui: &mut Ui, t: Lang, view: &Settings, form: &mut Form) {
     );
 }
 
+fn mcp_card(ui: &mut Ui, t: Lang, form: &mut Form, status: Status) {
+    widgets::card(
+        ui,
+        &t.get("settings-mcp"),
+        |_| {},
+        |ui| {
+            if status == Status::Failed {
+                widgets::error(ui, &t.get("settings-mcp-failed"));
+            }
+            ui.checkbox(&mut form.mcp_enabled, t.get("settings-mcp-enabled"));
+            widgets::hint(ui, &t.get("settings-mcp-hint"));
+            if let Status::Active { calls } = status {
+                ui.label(t.get1("settings-mcp-active", "calls", calls.to_string()));
+            }
+            ui.label(t.get("settings-mcp-command"));
+            ui.label(RichText::new(MCP_COMMAND).monospace());
+        },
+    );
+}
+
 fn store(app: &mut App, ctx: &egui::Context) {
     let t = app.t;
     let Some((_, form)) = &app.pages.settings.view else {
@@ -453,6 +481,7 @@ fn store(app: &mut App, ctx: &egui::Context) {
         packets_max: form.packets_max,
         packets_memory: Some(form.packets_memory),
         packets_headers: form.packets_headers,
+        mcp_enabled: form.mcp_enabled,
     };
     let theme = form.theme;
     {
@@ -461,6 +490,7 @@ fn store(app: &mut App, ctx: &egui::Context) {
         state.conf.settings.theme = theme;
     }
     app.engine.store_conf();
+    app.mcp.apply(change.mcp_enabled);
     ctx.set_theme(theme_preference(theme));
     let language = app.engine.lock().conf.language.clone();
     app.t = language_of(&language);

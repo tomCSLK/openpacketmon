@@ -11,7 +11,8 @@ use clap::Parser;
     name = APP_NAME,
     bin_name = APP_NAME,
     version = APP_VERSION,
-    about = "Monitor your network traffic"
+    about = "Monitor your network traffic",
+    after_help = "Commands:\n  mcp  Answer an AI assistant on the standard streams; the assistant starts this itself"
 )]
 pub(crate) struct Args {
     /// Start capturing from this network adapter right away
@@ -69,6 +70,7 @@ mod tests {
     use crate::config::export_pcap::ExportPcap;
     use crate::config::favorite::{FavoriteKey, Favorites};
     use crate::config::filters::Filters;
+    use crate::config::mcp::McpConf;
     use crate::config::settings::Settings;
     use crate::networking::types::capture_context::CaptureSourcePicklist;
     use crate::networking::types::data_representation::DataRepr;
@@ -103,6 +105,7 @@ mod tests {
             host_sort_type: SortType::Descending,
             service_sort_type: SortType::Neutral,
             program_sort_type: SortType::Neutral,
+            mcp: McpConf { enabled: true },
             filters: Filters {
                 bpf: "tcp".to_string(),
                 expanded: true,

@@ -96,7 +96,9 @@ fn window_of_size(
         builder = builder.wgpu();
     }
     let mut harness = builder.build_eframe(move |cc| {
-        let mut app = App::new(&cc.egui_ctx, engine);
+        // never started, so without a place for its file
+        let mcp = crate::mcp::Access::new(engine.clone(), None);
+        let mut app = App::new(&cc.egui_ctx, engine, mcp);
         app.t = lang;
         // so that the warnings of egui fail the test: their icon is in no font
         cc.egui_ctx
@@ -120,6 +122,29 @@ fn shot(harness: &mut Harness<'static, App>, folder: &Path, name: &str) {
     settle(harness);
     let image = harness.render().unwrap();
     image.save(folder.join(format!("{name}.png"))).unwrap();
+}
+
+#[test]
+#[serial]
+fn the_access_for_assistants_is_turned_on_in_the_settings() {
+    let fixture = engine_with(0);
+    let mut harness = window_of_size(&fixture, Theme::Light, Lang::En, 2_000.0);
+    harness.state_mut().page = Page::Settings;
+    settle(&mut harness);
+    assert!(!fixture.engine.lock().conf.mcp.enabled);
+    assert_eq!(harness.state().mcp.status(), crate::mcp::Status::Off);
+
+    harness
+        .get_by_label("Allow AI assistants to access openpacketmon")
+        .click();
+    harness.step();
+    harness.get_by_label("Save").click();
+    settle(&mut harness);
+    assert!(fixture.engine.lock().conf.mcp.enabled);
+    // this window has no place for the file of the access, so it says it could not set it up
+    assert_eq!(harness.state().mcp.status(), crate::mcp::Status::Failed);
+    let error = harness.state().t.get("settings-mcp-failed");
+    let _ = harness.get_by_label(&error);
 }
 
 #[test]

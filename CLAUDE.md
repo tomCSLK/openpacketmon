@@ -6,8 +6,9 @@
 Sprache: Deutsch. Fork und Weiterentwicklung von **Sniffnet** (https://github.com/GyulyVGC/sniffnet), einem
 Netzwerkverkehrs-Monitor in Rust (iced-GUI, libpcap). Maßgeblich für Stand, Lizenzprüfung und Vorgehen ist **`PLAN.md`**.
 
-## Status (2026-11-01)
+## Status (2026-11-02)
 
+- **MCP-Anbindung begonnen, Stufe 1 erledigt** (2026-11-02, `src/mcp/`, `PLAN.md` 5.4, vom Nutzer freigegeben): `openpacketmon mcp` (stdio, `rmcp`) fragt das offene Fenster über `127.0.0.1` mit Token aus `mcp-access.json` (`0600`). Standardmäßig aus, Einstellungskarte „KI-Assistenten (MCP)“, bisher nur das Lesewerkzeug `capture_status`. Geprüft mit Tests und einer Testinstanz, auch mit echtem Claude Code. `README.md` „opens no network port“ gilt nur, solange der Zugang aus ist. Vor dem Release: Sicherheitsdurchsicht einschließen.
 - **Oberfläche ist jetzt egui, Stufen 1 bis 4 erledigt** (2026-11-01, `src/gui/`, `PLAN.md` 5.5 „Stand egui“, Test-Pakete **0.3.5** bis **0.3.7**, kein Release): `openpacketmon` öffnet das Fenster (Wireshark-Muster: Fenster schließen beendet das Programm, Rückfrage bei laufender Aufzeichnung). **Entfernt:** `src/web/`, `app/` (`openpacketmon-app`), `templates/`, `static/`, systemd-Dienst, Optionen `--port`/`--no-browser`/`--gui`. Alles, was unten über Browser-Oberfläche, Fenster-Programm, Startlink, Dienst, `templates/` oder `static/` steht, ist **Verlauf**. Geprüft über Tests, gerenderte Bilder und kurze Starts; **die Bedienung im echten Fenster, Live-Mitschnitt, Ton, Dateidialog, Skalierung und Geo-Download sind im Nutzertest nicht einzeln bestätigt; der Nutzer fand nach 0.3.6 nichts Weiteres (2026-11-01).** Aus dem Test von 0.3.5: weißes Aufblitzen der Paketliste beim Folgen behoben und Filterleisten enden am Seitenrand (beides in 0.3.6, `PLAN.md` 5.5). Aus dem Test von 0.3.6 umgesetzt (in 0.3.7): Kopieren in den Paketdetails, Ladeanzeige, Hinweistext zum Paketspeicher, Kartenkopf der Benachrichtigungen, Zähler wieder rechteckig, Top-Listen der Übersicht klickbar, kleinerer Griff am Lautstärkeregler (`PLAN.md` 5.5).
 - Aufbau heute: `openpacketmon-capture` (Helfer mit Rechten, `capture/`) → `src/engine/`, `src/dissect/`, `src/filter/` → `src/view/` (Seitendaten, ohne Oberfläche) → `src/gui/`. Paketspeicher wählbar bis 2 GiB und 2 Millionen Pakete. Stirbt der Mitschnitt-Helfer, meldet das die Oberfläche (`CaptureStopped`).
 
@@ -111,7 +112,7 @@ Netzwerkverkehrs-Monitor in Rust (iced-GUI, libpcap). Maßgeblich für Stand, Li
   **erstes Release 0.4.0 oder 0.5.0** statt 0.3.0; der Haltepunkt gilt unverändert. Ebenfalls entschieden: **Plan B** mit kleinem
   Mitschnitt-Helfer und egui-Programm ohne Rechte, ohne Webschicht; Paketspeicher bleibt im RAM mit wählbarer Grenze. Probebau im Scratchpad bestanden (flüssig mit 2 Millionen
   Zeilen, 0,4 % CPU im Leerlauf, Ergebnis in `PLAN.md` 5.5): wgpu und eingebaute Schrift Inter; Bedienung von Hand steht noch aus.
-- **Reihenfolge** (Nutzer, 2026-10-31): erstes Release (0.4.0 oder 0.5.0) → MCP-Anbindung → Windows-Version.
+- **Reihenfolge** (Nutzer, 2026-10-31, geändert 2026-11-02): MCP-Anbindung, weil das Release am Haltepunkt wartet → erstes Release (0.4.0 oder 0.5.0) → Windows-Version.
 - **MCP-Anbindung** (`PLAN.md` 5.4): Claude soll den Mitschnitt abfragen können, etwa beim Untersuchen von Geräten im Heimnetz.
   Paketinhalte sind dabei ungeprüfte Eingaben für das Sprachmodell. Von Anfang an plattformneutral schreiben, damit sie unter
   Windows ohne Umbau läuft.

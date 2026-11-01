@@ -25,6 +25,7 @@ mod filter;
 #[cfg(test)]
 mod fuzz;
 mod gui;
+mod mcp;
 mod mmdb;
 mod networking;
 mod notifications;
@@ -40,6 +41,11 @@ pub const APP_TITLE: &str = "openpacketmon";
 /// Entry point of application execution
 #[allow(clippy::print_stdout, clippy::print_stderr)]
 fn main() {
+    // an assistant starts this next to the window: it must not read or restore the settings
+    if std::env::args_os().nth(1).is_some_and(|arg| arg == "mcp") {
+        std::process::exit(mcp::server::run());
+    }
+
     let conf = CONF.clone();
     let args = cli::Args::handle();
 
@@ -70,7 +76,11 @@ fn main() {
     if !start_requested_capture(&engine, args.adapter, args.import) {
         std::process::exit(1);
     }
-    if let Err(e) = gui::run(engine.clone()) {
+    let access = mcp::Access::new(engine.clone(), mcp::access_path());
+    access.apply(engine.lock().conf.mcp.enabled);
+    let window = gui::run(engine.clone(), access.clone());
+    access.apply(false);
+    if let Err(e) = window {
         eprintln!("Could not open the window: {e}");
         std::process::exit(1);
     }

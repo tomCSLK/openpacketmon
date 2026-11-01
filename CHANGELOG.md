@@ -22,7 +22,7 @@ First public version. This list describes what differs from Sniffnet.
   PCAP can take the connection filter, so the Connections page opens the statistics of everything its search selects
 - The filter fields suggest fields, operators and connectors while typing, with short explanations, and in the
   connection filter the values of the capture
-- AI assistants can read the state of the capture over MCP (`openpacketmon mcp`), off until turned on in the settings
+- AI assistants can read the capture over MCP (`openpacketmon mcp`): state, overview, connections, packets without their contents and statistics, off until turned on in the settings
 - Options `--adapter`, `--import` and `--list-adapters`
 - Debian package with a start menu entry
 - Connections are filtered with one field in the grammar of the display filter, with fields of their own (`ip.addr`,

@@ -37,6 +37,9 @@ Known and documented, not vulnerabilities in themselves:
   wanted. The helper drops them once the adapter is open and does not look into the packets; openpacketmon itself has no special rights.
 - The access for AI assistants is off by default. Turned on, it is reachable by every local user on `127.0.0.1` and answers only to a
   token in a file readable by the user alone. What an assistant queries goes to its AI service, and text from a capture can come from
-  other devices and may try to instruct the assistant (prompt injection); openpacketmon marks it as data, but only the assistant and
-  its permission prompts can act on that.
+  other devices and may try to instruct the assistant (prompt injection); openpacketmon removes control and invisible characters,
+  limits the length and marks it as data, but only the assistant and its permission prompts can act on that.
+- The answers to an assistant carry no payload, and HTTP cookies, authorization headers and the queries of URLs are hidden. That is a
+  list of known places, not a guarantee: a secret in the path of a URL stays, and the display filter still matches on hidden values, so
+  an assistant could find out such a value by trying.
 - The packet store keeps the captured packets in memory, including their contents, until the capture is stopped or the program ends.

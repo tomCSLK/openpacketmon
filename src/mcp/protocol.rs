@@ -50,6 +50,8 @@ pub enum Answer {
 pub enum AskError {
     /// No window to ask: closed, or the access is off
     NotAvailable,
+    /// The window took the question but no answer came: busy, or closed in the meantime
+    NoAnswer,
     /// The window turned the question down, or its answer made no sense
     Refused,
     /// The tool could not answer
@@ -106,7 +108,7 @@ pub fn ask(path: &Path, tool: &str, arguments: Value) -> Result<Value, AskError>
         .map_err(|_| AskError::NotAvailable)?;
     write_line(&mut stream, &request).map_err(|_| AskError::NotAvailable)?;
     let line =
-        read_line(&mut stream, MAX_ANSWER_BYTES, ANSWER_TIMEOUT).ok_or(AskError::NotAvailable)?;
+        read_line(&mut stream, MAX_ANSWER_BYTES, ANSWER_TIMEOUT).ok_or(AskError::NoAnswer)?;
     match serde_json::from_slice(&line) {
         Ok(Answer::Ok(value)) => Ok(value),
         Ok(Answer::Error(text)) => Err(AskError::Tool(text)),

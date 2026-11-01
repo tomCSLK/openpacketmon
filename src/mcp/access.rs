@@ -15,6 +15,7 @@ use crate::APP_NAME;
 use crate::engine::Engine;
 use crate::mcp::protocol::{AccessFile, Answer, MAX_REQUEST_BYTES, Request, read_line, write_line};
 use crate::mcp::tools;
+use crate::view::filter_index::FilterIndex;
 
 /// How often the listener looks for connections and for the end of the access
 const POLL: Duration = Duration::from_millis(50);
@@ -135,6 +136,7 @@ impl Access {
             stop: stop.clone(),
             calls: self.calls.clone(),
             clients: Arc::default(),
+            index: Arc::default(),
         };
         let thread = thread::Builder::new()
             .name("thread_mcp_access".to_string())
@@ -196,6 +198,8 @@ struct Door {
     stop: Arc<AtomicBool>,
     calls: Arc<AtomicU64>,
     clients: Arc<AtomicUsize>,
+    /// The filters of the assistants, apart from those of the window
+    index: Arc<FilterIndex>,
 }
 
 impl Door {
@@ -250,7 +254,7 @@ impl Door {
             return Answer::Refused;
         }
         self.calls.fetch_add(1, Ordering::Relaxed);
-        tools::call(&self.engine, &request.tool)
+        tools::call(&self.engine, &self.index, &request.tool, &request.arguments)
     }
 }
 
@@ -264,7 +268,7 @@ mod tests {
     use crate::config::conf::Conf;
     use crate::engine::tests::{frame, write_pcap};
     use crate::mcp::protocol::{AskError, ask};
-    use crate::mcp::tools::CAPTURE_STATUS;
+    use crate::mcp::tools::{CAPTURE_STATUS, FILTER_HELP};
     use crate::networking::types::capture_context::CaptureSourcePicklist;
 
     struct Fixture {
@@ -365,7 +369,10 @@ mod tests {
         // the port itself can take a moment while a parallel test starts a process, which holds
         // on to it until it runs, but nobody answers there any more
         write_access_file(&fixture.path(), &first).unwrap();
-        assert_eq!(fixture.status(), Err(AskError::NotAvailable));
+        assert!(matches!(
+            fixture.status(),
+            Err(AskError::NotAvailable | AskError::NoAnswer)
+        ));
         fs::remove_file(fixture.path()).unwrap();
 
         fixture.access.apply(true);
@@ -419,6 +426,16 @@ mod tests {
             fixture.answer_to(question.to_string().as_bytes()),
             Some(Answer::Error("unknown tool".to_owned()))
         );
+    }
+
+    #[test]
+    fn the_arguments_reach_the_tool() {
+        let fixture = Fixture::new("arguments");
+        fixture.access.apply(true);
+        let help = ask(&fixture.path(), FILTER_HELP, json!({ "connections": true })).unwrap();
+        assert!(help["examples"].to_string().contains("program contains"));
+        let wrong = ask(&fixture.path(), FILTER_HELP, json!({ "connections": 1 }));
+        assert!(matches!(wrong, Err(AskError::Tool(_))));
     }
 
     #[test]

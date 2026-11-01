@@ -105,9 +105,14 @@ while the window is open. Then connect the assistant once:
 claude mcp add openpacketmon -- openpacketmon mcp
 ```
 
-So far an assistant can ask for the state of the capture: its source and how many packets and bytes it has seen. It can only
-read. **What an assistant queries goes to its AI service**, and names and texts in a capture can come from other devices,
-so treat its answers with the usual care and keep the permission prompts of your assistant on.
+An assistant can read the state of the capture, an overview, the connections, the packets with their protocol fields, and the
+statistics, narrowed down with the same filters as in the window. It cannot change anything, and it gets no packet contents:
+no bytes, no streams, and neither the query of a URL nor secrets such as cookies in HTTP headers. A token in the path of a
+URL looks like any other path, so it is not hidden.
+
+**What an assistant queries goes to its AI service**: addresses, host names and connections show what your devices do. Names
+and texts in a capture can come from other devices, so treat the answers with the usual care and keep the permission prompts
+of your assistant on.
 
 ### Security
 

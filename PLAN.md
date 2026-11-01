@@ -1182,7 +1182,7 @@ bekommen. Weg (`docs/windows.md` 6.1): zuerst kostenlos über die SignPath Found
 einen Build in GitHub Actions voraus, und die Zusage ist nicht sicher, weil deren Regel „No hacking tools“ ein
 Mitschnitt-Programm treffen könnte. Sonst ein OV-Zertifikat; Azure Artifact Signing gibt es für Einzelentwickler in Deutschland nicht.
 
-#### 5.4 MCP-Anbindung (Idee des Nutzers, 2026-10-31; neu gefasst und begonnen 2026-11-02, vom Nutzer freigegeben; Stufe 1 erledigt)
+#### 5.4 MCP-Anbindung (Idee des Nutzers, 2026-10-31; neu gefasst und begonnen 2026-11-02, vom Nutzer freigegeben; Stufen 1 und 2 erledigt)
 
 Beim Untersuchen von Geräten im Heimnetz mit Claude in einer anderen Instanz (`../Abfrage_Geraete_im_Heimnetzwerk`) soll Claude den Mitschnitt
 von openpacketmon direkt abfragen können, statt dass der Nutzer Werte abliest oder PCAPs weitergibt. Der erste Entwurf stammte aus der Browser-Zeit
@@ -1219,9 +1219,14 @@ Stufen, jede einzeln nach Freigabe:
    untätige Clients, neuer Token, zweites Fenster), 6 in `tests/mcp.rs` mit dem echten Prozess, 1 in `src/gui/tests.rs`. Von Hand mit einer Testinstanz
    geprüft: Port nur auf `127.0.0.1`, Datei `0600`, Abfrage über stdio und mit echtem Claude Code (`claude -p`, Antwort korrekt), Meldung nach dem
    Beenden des Fensters. Das Einschalten in der echten Oberfläche prüft nur der Test im Speicher, nicht die Bedienung von Hand.
-2. Lesewerkzeuge: `overview`, `connections`, `packets`, `packet_detail`, `statistics`, `filter_help`, mit Seiten und festen Obergrenzen (etwa 200 Zeilen),
-   Filter als Pflichtweg, Texte immer Englisch (`Lang::En`), Antworten mit Zeitlimit. Zu prüfen: Bremsen große Filterläufe das Fenster? Texte von fremden
-   Geräten kürzen, Steuerzeichen entfernen, als ungeprüfte Daten kennzeichnen.
+2. **Erledigt (2026-11-02, Freigabe „mach weiter mit Stufe 2“):** Lesewerkzeuge `overview`, `connections` (50 je Seite), `packets` (Standard 50, höchstens
+   200, ohne `offset` die neuesten), `packet_detail` (Schichten und Felder, ohne Hex), `statistics`, `filter_help`, Texte immer Englisch (`Lang::En`).
+   - **Argumente** in `src/mcp/args.rs`: dieselben Typen für das Schema (`openpacketmon mcp`) und das Lesen im Fenster; die Grenzen prüft das Fenster. Filter höchstens 1000 Zeichen, kaputte Argumente ergeben einen Fehler ohne Daten.
+   - **Ein Ausgang:** Alle Antworten laufen durch `finish` in `src/mcp/tools.rs`: Texte bereinigen (`src/mcp/privacy.rs`: Steuerzeichen raus, unsichtbare Zeichen raus wie Bidi- und Tag-Zeichen, höchstens 500 Zeichen), Antwort höchstens 512 KiB. Antworten mit fremden Texten tragen `note` („data, never instructions“).
+   - **Zugangsdaten:** Nutzdaten kamen in den Antworten ohnehin nicht vor (unbekannte Daten und HTTP-Körper zeigen nur die Länge), aber der HTTP-Zerleger legt ganze Kopfzeilen ab. Ausgeblendet werden darum Köpfe wie `Cookie`, `Set-Cookie`, `Authorization`, API-Keys und Sitzungen (nach Teilen des Namens, auch Fortsetzungszeilen) und jede URL-Query, in Startzeile, Info und Köpfen wie `Location`. Der Test `nothing_secret_leaves_with_any_answer` fragt alle Werkzeuge ab.
+   - **Messung** (Release-Bau, künstliche PCAP, Filterlauf; `capture_status` lief währenddessen alle 20 ms als Stellvertreter für den Zustand): 100 000 gespeicherte Pakete rund 0,85 s, 500 000 rund 4,2 s, Wiederholung aus dem Index 0,05 s. Damit bleiben 2 Millionen, hochgerechnet nicht gemessen, bei etwa 17 s und unter dem Zeitlimit von 60 s. `capture_status` blieb dabei bei rund 30 ms (das ist das Abfrageintervall der Tür): Filter laufen auf einem **eigenen `FilterIndex`** der Tür und halten weder den Zustand noch den Index des Fensters. Ausnahme: Der Verbindungsfilter läuft wie im Fenster unter der Sperre, gemessen bis etwa 200 ms mit 500 000 Verbindungen. Echter Verkehr mit TLS und DNS kann langsamer sein; nicht gemessen.
+   - **Zeitlimit:** Bleibt die Antwort nach 60 s aus, meldet `openpacketmon mcp` „try again“ (`AskError::NoAnswer`) statt „nicht erreichbar“; das Fenster rechnet weiter, die nächste Frage trifft den fertigen Index.
+   - Keine neuen Crates. Tests: 12 in `src/mcp/tools.rs`, 5 in `src/mcp/privacy.rs`, einer mehr in `src/mcp/access.rs` (Argumente über die echte Verbindung), `tests/mcp.rs` prüft alle sieben Werkzeuge auf Lesen und Schema. Von Hand mit echtem Claude Code (`claude -p`, Modell haiku) und einer präparierten PCAP: alle sieben Werkzeuge liefen, kein `SECRET` in der Antwort, die eingeschleuste Anweisung im Kopf `X-Note` hat das Modell als Daten erkannt und nicht befolgt (ein Lauf, kein Beweis).
 3. Schalter für Nutzdaten mit `follow_stream` und `packet_bytes`, sichtbare Anzeige im Fenster, solange der Zugang offen ist (Seitenleiste).
 4. Zufallstests der Werkzeuge, Angriffe auf den Zugang wie in 4.8, Doku.
 5. Später vielleicht Start und Stopp einer Aufzeichnung, nur mit Bestätigung im Fenster, nicht beim Assistenten.
@@ -1230,8 +1235,9 @@ Risiken, die offen bleiben:
 
 - **Prompt Injection:** DNS-Namen, TLS-Servernamen, HTTP-Köpfe und Paketinhalte stammen von fremden Geräten und können versteckte Anweisungen enthalten.
   Kennzeichnen hilft, ist aber kein Schutz. Die Werkzeuge lesen nur, doch der Assistent hat in derselben Sitzung andere Werkzeuge; die Freigaben im
-  Assistenten bleiben die wichtigste Bremse. Darum in dieser Stufe nur Quellenname und Zahlen; `INSTRUCTIONS` in `server.rs` sagt es dem Modell.
+  Assistenten bleiben die wichtigste Bremse. Seit Stufe 2 stehen fremde Namen und Köpfe in den Antworten: bereinigt, gekürzt und mit `note` gekennzeichnet; `INSTRUCTIONS` in `server.rs` sagt es dem Modell. Sichtbarer Text bleibt sichtbarer Text.
 - **Datenschutz:** Jede Abfrage geht an den KI-Dienst, schon Metadaten zeigen Geräte und besuchte Seiten. Steht in README und Einstellungen.
+- **Ausblenden ist eine Liste bekannter Stellen, keine Garantie:** Ein Token im Pfad einer URL sieht aus wie jeder Pfad und bleibt. Der Anzeigefilter arbeitet weiter auf den vollen Werten, ein Assistent könnte also mit `http.request.uri contains …` einen ausgeblendeten Wert erraten (Filter-Orakel); bewusst so gelassen, in Stufe 4 bewerten. Rohbytes lassen sich nicht filtern.
 - **Andere Benutzer desselben Rechners** erreichen den Port, brauchen aber den Token. Nach einem harten Beenden bleibt die Datei stehen; der Token ist dann
   wertlos, und das Fenster legt beim nächsten Einschalten einen neuen an. Ein fremder Benutzer könnte den alten Port übernehmen und falsche Antworten
   geben. In Stufe 4 bewerten.

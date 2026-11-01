@@ -104,10 +104,33 @@ fn every_tool_only_reads() {
     assistant.send(&json!({ "jsonrpc": "2.0", "id": 2, "method": "tools/list" }));
     let answer = assistant.answer(2);
     let tools = answer["result"]["tools"].as_array().unwrap();
-    assert!(tools.iter().any(|t| t["name"] == "capture_status"));
+    let mut names: Vec<_> = tools.iter().filter_map(|t| t["name"].as_str()).collect();
+    names.sort_unstable();
+    assert_eq!(
+        names,
+        [
+            "capture_status",
+            "connections",
+            "filter_help",
+            "overview",
+            "packet_detail",
+            "packets",
+            "statistics",
+        ]
+    );
     for tool in tools {
         assert_eq!(tool["annotations"]["readOnlyHint"], true, "{tool}");
+        assert_eq!(tool["annotations"]["openWorldHint"], false, "{tool}");
+        assert!(!tool["description"].as_str().unwrap().is_empty(), "{tool}");
+        assert_eq!(tool["inputSchema"]["type"], "object", "{tool}");
     }
+    let packets = tools.iter().find(|t| t["name"] == "packets").unwrap();
+    let properties = packets["inputSchema"]["properties"].as_object().unwrap();
+    for name in ["filter", "connection_filter", "offset", "limit"] {
+        assert!(properties.contains_key(name), "{packets}");
+    }
+    let detail = tools.iter().find(|t| t["name"] == "packet_detail").unwrap();
+    assert_eq!(detail["inputSchema"]["required"], json!(["number"]));
 }
 
 #[test]

@@ -88,18 +88,21 @@ fn window_of_size(
     height: f32,
 ) -> Harness<'static, App> {
     let engine = fixture.engine.clone();
-    let mut harness = Harness::builder()
+    let mut builder = Harness::builder()
         .with_size(egui::vec2(1280.0, height))
-        .with_theme(theme)
-        .wgpu()
-        .build_eframe(move |cc| {
-            let mut app = App::new(&cc.egui_ctx, engine);
-            app.t = lang;
-            // so that the warnings of egui fail the test: their icon is in no font
-            cc.egui_ctx
-                .set_missing_glyph_policy(egui::MissingGlyphPolicy::Panic);
-            app
-        });
+        .with_theme(theme);
+    // only pictures need a renderer, and with it a graphics adapter; the CI has none
+    if std::env::var_os("GUI_SHOTS").is_some() {
+        builder = builder.wgpu();
+    }
+    let mut harness = builder.build_eframe(move |cc| {
+        let mut app = App::new(&cc.egui_ctx, engine);
+        app.t = lang;
+        // so that the warnings of egui fail the test: their icon is in no font
+        cc.egui_ctx
+            .set_missing_glyph_policy(egui::MissingGlyphPolicy::Panic);
+        app
+    });
     harness.state_mut().pages = pages::Pages::default();
     harness
 }

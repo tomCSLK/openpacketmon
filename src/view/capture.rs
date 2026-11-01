@@ -275,3 +275,90 @@ pub fn capture_problem(t: Lang, engine: &EngineState) -> Option<String> {
         None => None,
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serial_test::serial;
+
+    use crate::config::conf::Conf;
+    use crate::engine::Engine;
+
+    fn engine() -> (tokio::runtime::Runtime, Engine) {
+        let runtime = tokio::runtime::Runtime::new().unwrap();
+        let engine = Engine::new(Conf::default(), runtime.handle().clone());
+        (runtime, engine)
+    }
+
+    fn request(packets: Option<PacketChoice>) -> StartRequest {
+        StartRequest {
+            source: CaptureSourcePicklist::File,
+            device: String::new(),
+            file: "/nonexistent/x.pcap".to_owned(),
+            ipfix_addr: String::new(),
+            ipfix_port: String::new(),
+            bpf: String::new(),
+            export: false,
+            export_dir: String::new(),
+            export_name: String::new(),
+            packets,
+            packets_max: 10_000,
+        }
+    }
+
+    #[test]
+    #[serial]
+    fn the_start_request_chooses_what_the_packet_store_keeps() {
+        let (_runtime, engine) = engine();
+        assert_eq!(
+            apply_start(&mut engine.lock(), &request(Some(PacketChoice::Headers))),
+            None
+        );
+        let conf = engine.lock().conf.packet_store;
+        assert!(conf.enabled && conf.headers_only && !conf.full_packets());
+        assert_eq!(conf.max_packets, 10_000);
+
+        apply_start(&mut engine.lock(), &request(Some(PacketChoice::Off)));
+        assert!(!engine.lock().conf.packet_store.enabled);
+        apply_start(&mut engine.lock(), &request(Some(PacketChoice::Full)));
+        assert!(engine.lock().conf.packet_store.full_packets());
+        // without a choice it stays
+        apply_start(&mut engine.lock(), &request(None));
+        assert!(engine.lock().conf.packet_store.full_packets());
+    }
+
+    #[test]
+    #[serial]
+    fn what_is_missing_is_reported_before_starting() {
+        let (_runtime, engine) = engine();
+        let mut no_file = request(None);
+        no_file.file = "  ".to_owned();
+        assert_eq!(
+            apply_start(&mut engine.lock(), &no_file),
+            Some("capture-file-missing")
+        );
+        let mut no_adapter = request(None);
+        no_adapter.source = CaptureSourcePicklist::Device;
+        no_adapter.device = "no-such-adapter".to_owned();
+        assert_eq!(
+            apply_start(&mut engine.lock(), &no_adapter),
+            Some("capture-adapter-missing")
+        );
+        assert!(!engine.lock().is_running());
+    }
+
+    #[test]
+    #[serial]
+    fn a_file_that_cannot_be_read_is_explained() {
+        let (_runtime, engine) = engine();
+        apply_start(&mut engine.lock(), &request(None));
+        assert!(!engine.start());
+        let state = engine.lock();
+        assert!(!state.is_running());
+        assert!(!start_error(Lang::En, &state, None).is_empty());
+        assert_eq!(
+            start_error(Lang::En, &state, Some("capture-adapter-missing")),
+            Lang::En.get("capture-adapter-missing")
+        );
+    }
+}

@@ -1,7 +1,6 @@
-# Texte der Seiten (templates/ und src/web/). Deutsch ist die Ausgangssprache.
+# Texte der Oberfläche (src/gui/ und src/view/). Deutsch ist die Ausgangssprache.
 
 ## Rahmen und Navigation
-nav-main = Hauptnavigation
 nav-traffic = Verkehr
 nav-overview = Übersicht
 nav-connections = Verbindungen
@@ -15,23 +14,19 @@ nav-setup = Einrichtung
 nav-capture = Aufzeichnung
 nav-settings = Einstellungen
 nav-theme = Design
-nav-theme-toggle = Design umschalten
 source-code = Quellcode
 licenses = Lizenzen
 based-on-sniffnet = basiert auf Sniffnet
 update-available = Version { $version } verfügbar
-back = Zurück
 back-hint = Zur vorherigen Seite (Alt+Links)
 apply = Anwenden
 save = Speichern
 unknown = unbekannt
 not-applicable = nicht zutreffend
 show-all = Alle anzeigen
-unit = Einheit
 unit-bytes = Bytes
 unit-bits = Bits
 unit-packets = Pakete
-sort = Sortierung
 sort-desc = Größte zuerst
 sort-asc = Kleinste zuerst
 sort-recent = Neueste zuerst
@@ -47,16 +42,7 @@ geo-missing = Ohne Geodatenbank bleiben Länder und Netzbetreiber leer.
 geo-missing-link = In den Einstellungen herunterladen
 flash-settings-saved = Einstellungen gespeichert.
 flash-geo-downloaded = Geodatenbanken heruntergeladen. Sie gelten für Adressen, die ab jetzt erkannt werden; für die bisherigen die Aufzeichnung neu starten.
-flash-notifications-cleared = Benachrichtigungen gelöscht.
-flash-capture-stopped = Aufzeichnung beendet, die Daten wurden verworfen.
 
-## Anmeldung und Fehler
-signed-out-title = Nicht angemeldet
-signed-out-text = Öffne openpacketmon über das Startmenü oder mit diesem Befehl, dann meldet sich der Browser selbst an:
-signed-out-hint = Der Startlink mit dem Zugangsschlüssel gilt, solange openpacketmon läuft, und ist nur für deinen Benutzer lesbar.
-error-title = Fehler
-error-forbidden = Die Anfrage wurde abgelehnt (abgelaufenes Formular oder fremde Seite). Lade die Seite neu und versuche es noch einmal.
-error-not-found = Diese Seite gibt es nicht (mehr). Eine Verbindung verschwindet z. B., wenn die Aufzeichnung beendet wird.
 
 ## Aufzeichnung
 capture-title = Aufzeichnung
@@ -78,7 +64,7 @@ capture-export-name = Dateiname
 capture-packets-full = Vollständige Pakete
 capture-packets-headers = Nur Kopfdaten
 capture-packets-off = Aus
-capture-packets-hint = Gespeicherte Pakete zeigen die Seiten Pakete, Paketdetails und Stream folgen und lassen sich als PCAP herunterladen. Vollständige Pakete brauchen mehr Arbeitsspeicher (höchstens 512 MiB), nur damit sind Inhalte wie der TLS-Servername (SNI) und Stream folgen vollständig. „Nur Kopfdaten“ behält die ersten 128 Bytes jedes Pakets.
+capture-packets-hint = Gespeicherte Pakete zeigen die Seiten Pakete, Paketdetails und Stream folgen und lassen sich als PCAP speichern. Vollständige Pakete brauchen mehr Arbeitsspeicher (höchstens 512 MiB), nur damit sind Inhalte wie der TLS-Servername (SNI) und Stream folgen vollständig. „Nur Kopfdaten“ behält die ersten 128 Bytes jedes Pakets.
 capture-packets-full-max = vollständige Pakete, höchstens { $max } Pakete
 capture-packets-headers-max = nur Kopfdaten (128 Bytes je Paket), höchstens { $max } Pakete
 capture-file-path = Pfad der Datei (PCAP oder PCAPNG)
@@ -173,7 +159,6 @@ category-other = Sonstige
 connections-subtitle = Alle Verbindungen der Aufzeichnung mit Filter und Seiten.
 filter-reset = Zurücksetzen
 connections-none = Keine Verbindungen
-connections-filter = Verbindungsfilter
 connections-filter-placeholder = Verbindungsfilter, z. B. ip.addr == 192.168.1.20 oder port == 443 oder domain contains google
 connections-filter-help = Hilfe zum Verbindungsfilter
 connections-filter-help-text = Dieselbe Sprache wie der Anzeigefilter der Pakete, mit Feldern der Verbindungen. Ein Protokoll allein (tcp, udp, icmp, arp, ipv6) wählt die Verbindungen dieses Protokolls; favorite allein die Verbindungen von Favoriten (Hosts, Programme, Adressen). Vergleiche: == != < <= > >= contains und in {"{"}80 443{"}"}, verknüpft mit and, or, not und Klammern. Text ohne Groß-/Kleinschreibung, Adressen auch als Netz (ip.addr == 192.168.1.0/24). remote ist die Gegenstelle, domain der Name des Hosts (auch Reverse-DNS), as.name und country kommen aus der Geolokalisierung, program sucht in Name und Pfad, direction ist incoming oder outgoing. Beispiele:
@@ -224,22 +209,19 @@ filter-connections-open = Zu den Verbindungen
 
 # Pakete
 packets-subtitle = Die gespeicherten Pakete der Aufzeichnung mit Schichten und Bytes.
-packets-download = Als PCAP herunterladen
-packets-download-filtered = Auswahl als PCAP herunterladen
+packets-download = Als PCAP speichern
+packets-download-filtered = Auswahl als PCAP speichern
 packets-unavailable-source = Für IPFIX-Aufzeichnungen gibt es keine einzelnen Pakete.
 packets-disabled = Der Paketspeicher ist ausgeschaltet. In den Einstellungen lässt er sich für die nächste Aufzeichnung einschalten.
 packets-none-filtered = Kein Paket passt zum Filter.
 packets-empty = Noch keine Pakete.
-packets-loading = Pakete werden geladen …
 packets-follow-hint = Am Ende der Liste folgt sie den neuen Paketen; hochscrollen hält sie an.
-packets-noscript = Die Paketliste braucht JavaScript.
 packets-goto = Gehe zu Paket
 packets-goto-placeholder = Nr.
 packets-goto-key = Paketnummer eingeben und Enter drücken (Strg+G)
 packets-kept = { $count } Pakete gespeichert
 packets-dropped = { $count } ältere verworfen
 packets-headers-only = nur Kopfdaten
-packets-filter = Anzeigefilter
 packets-filter-placeholder = Anzeigefilter, z. B. dns oder tls.sni contains amazon oder ip.addr == 192.168.1.20
 packets-filter-help = Hilfe zum Anzeigefilter
 packets-filter-help-text = Ein Protokoll allein (dns, tcp) wählt die Pakete, die es enthalten; ein Feld allein (tls.sni, tcp.flags.syn) die Pakete, die es haben. Vergleiche: == != < <= > >= contains und in {"{"}80 443{"}"}. Verknüpfen mit and, or, not und Klammern. Text ohne Groß-/Kleinschreibung, Adressen auch als Netz (ip.addr == 192.168.1.0/24). domain sucht in DNS-Namen, TLS-SNI und HTTP-Host. Die TCP-Analyse liefert tcp.analysis.* (z. B. tcp.analysis.flags für alle Probleme, tcp.analysis.retransmission); Zeiten wie dns.time oder tcp.analysis.ack_rtt in Sekunden (0.1) oder mit Einheit (100ms, 800us). Beispiele:
@@ -278,13 +260,13 @@ stream-counts = { $bytes } in { $packets } Paketen
 stream-gap = … { $bytes } Bytes fehlen (nicht mitgeschnitten oder schon verworfen) …
 stream-empty = Diese Verbindung hat in den gespeicherten Paketen keine Nutzdaten.
 stream-headers-only = Es werden nur Kopfdaten gespeichert; die Nutzdaten fehlen daher.
-stream-cut = Angezeigt ist das erste MiB; den ganzen Inhalt enthält der PCAP-Download.
+stream-cut = Angezeigt ist das erste MiB; den ganzen Inhalt enthält die PCAP-Datei.
 packet-stream = Stream
 packet-truncated = Das Paket wurde nicht vollständig mitgeschnitten.
 packet-truncated-headers = Von diesem Paket sind nur die Kopfdaten gespeichert (Einstellung „Nur Kopfdaten“).
 packet-layers = Schichten
 packet-bytes = Bytes
-packet-hex-cut = Angezeigt sind die ersten { $bytes } Bytes; das ganze Paket enthält der PCAP-Download.
+packet-hex-cut = Angezeigt sind die ersten { $bytes } Bytes; das ganze Paket enthält die PCAP-Datei.
 packet-assembled = Zusammengesetzt mit den Paketen { $packets }: Die Bytes ab { $offset } stammen aus diesen Paketen.
 packet-acks = ← ACK für Paket { $packet } (nach { $time })
 packet-acked-by = → bestätigt in Paket { $packet } (nach { $time })
@@ -318,7 +300,6 @@ notification-favorite-text = { $name }: { $data }
 settings-subtitle = Gelten für alle Aufzeichnungen.
 settings-display = Anzeige
 settings-language = Sprache
-language-browser = Wie der Browser
 settings-page-size = Verbindungen pro Seite
 settings-sound = Ton
 settings-favorite-notification = Benachrichtigen, wenn ein Favorit Daten austauscht
@@ -327,7 +308,6 @@ settings-favorite-addresses = Favorisierte IP-Adressen
 settings-favorite-addresses-hint = Eine Adresse je Zeile (IPv4 oder IPv6). Auch über den Stern auf der Seite einer Verbindung.
 settings-addresses-invalid = Nicht gespeichert, keine IP-Adresse: { $words }
 settings-volume = Lautstärke
-settings-sound-hint = Der Ton wird in geöffneten openpacketmon-Seiten abgespielt, nachdem du einmal in die Seite geklickt hast.
 settings-geo = Geodaten
 settings-geo-country = Länder
 settings-geo-asn = Netzbetreiber (AS)
@@ -346,13 +326,10 @@ settings-mmdb-country = Eigene Länderdatenbank (MMDB, optional)
 settings-mmdb-asn = Eigene ASN-Datenbank (MMDB, optional)
 settings-mmdb-hint = Pfad zu einer eigenen Datei, z. B. MaxMind GeoLite2 oder IPinfo Lite. Leer lassen: die heruntergeladenen Daten von DB-IP, sonst die Dateien von geoipupdate in /var/lib/GeoIP.
 settings-packet-store = Paketspeicher
-settings-packets-enabled = Pakete speichern (Paketliste, Paketdetails, PCAP-Download)
+settings-packets-enabled = Pakete speichern (Paketliste, Paketdetails, PCAP-Datei)
 settings-packets-max = Höchstens Pakete
 settings-packets-headers = Nur Kopfdaten speichern (die ersten 128 Bytes jedes Pakets)
 settings-packets-hint = Gilt ab der nächsten Aufzeichnung (auch auf der Seite Aufzeichnung wählbar). Mit „Nur Kopfdaten“ fehlen Inhalte wie der TLS-Servername (SNI) teilweise, und Stream folgen ist unvollständig. Die Pakete liegen nur im Arbeitsspeicher; ist eine der Grenzen erreicht, fallen die ältesten heraus.
-settings-desktop = Desktop
-settings-autostart = Beim Anmelden im Infobereich starten
-settings-autostart-hint = Startet openpacketmon mit der Anmeldung am Desktop als Symbol im Infobereich; das Fenster öffnet sich über das Symbol. Die Aufzeichnung läuft weiter, wenn das Fenster geschlossen wird.
 settings-updates = Aktualisierungen
 settings-update-checks = Beim Start nach einer neuen Version suchen
 settings-update-hint = Fragt GitHub nach der neuesten Version von openpacketmon; es werden keine Daten über dein Netz gesendet.
@@ -361,18 +338,7 @@ sound-pop = Plopp
 sound-swhoosh = Wusch
 sound-none = Kein Ton
 
-# quit
-quit-title = Programm
-quit-hint = Beendet openpacketmon: Die laufende Aufzeichnung endet, die Einstellungen bleiben gespeichert. Läuft openpacketmon als Dienst (systemctl --user), startet er erst nach „systemctl --user start openpacketmon“ wieder.
-quit-button = openpacketmon beenden
-quit-done-title = openpacketmon wurde beendet
-quit-done-text = Du kannst dieses Fenster schließen. Zum erneuten Start openpacketmon über das Startmenü öffnen oder diesen Befehl ausführen:
 
-# Fenster und Infobereich (openpacketmon-app)
-app-open = openpacketmon öffnen
-app-browser = Im Browser öffnen
-app-quit = openpacketmon beenden
-app-saved = Gespeichert unter { $path }
 
 ## Statistik
 stats-subtitle = Protokolle, TCP-Probleme und Antwortzeiten der gespeicherten Pakete, für alle oder die des Anzeigefilters.
@@ -407,7 +373,7 @@ stats-handshake = TCP-Verbindungsaufbau
 stats-ack-rtt = TCP-Bestätigung (ACK)
 stats-dns-time = DNS-Antwort
 
-# Vorschläge in den Filterfeldern (src/web/suggest.rs)
+# Vorschläge in den Filterfeldern (src/view/suggest.rs)
 filter-value-num = Zahl, z. B. 443
 filter-value-ip = IP-Adresse oder Netz, z. B. 192.168.1.20 oder 10.0.0.0/8
 filter-value-text = Text, z. B. google
@@ -478,7 +444,7 @@ filter-hint-bytes = Datenmenge der Verbindung in Bytes
 filter-hint-favorite = Verbindung zu einem Favoriten
 filter-hint-exporter = Absender der IPFIX-Daten
 
-# Fenster (egui)
+# Fenster
 gui-close-title = Aufzeichnung läuft
 gui-close-text = Beim Schließen endet die Aufzeichnung, und ihre Pakete gehen verloren, sofern sie nicht gespeichert sind.
 gui-close-confirm = Beenden
@@ -495,3 +461,12 @@ gui-theme-dark = Dunkel
 gui-packets-memory = Höchstens Arbeitsspeicher
 gui-sound-hint = Der Ton erklingt, solange das Fenster offen ist.
 gui-connection-gone = Diese Verbindung ist nicht mehr in der Aufzeichnung.
+rate-now = jetzt: %1 ein, %2 aus
+chart-in = Eingehend
+chart-out = Ausgehend
+packets-none = Keine Pakete
+packets-range = Pakete %1–%2 von %3
+packets-goto-other = Paket %1 ist nicht in der Liste; markiert ist Paket %2.
+packets-goto-none = Paket %1 ist nicht in der Liste.
+packet-direction-out = ausgehend
+packet-direction-in = eingehend

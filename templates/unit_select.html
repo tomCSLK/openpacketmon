@@ -1,8 +1,0 @@
-{# unit selection of the page heads; needs `unit`, `t`, `layout`, `back` #}
-<form method="post" action="/display" class="segmented small" aria-label="{{ t.get("unit") }}">
-  <input type="hidden" name="csrf_token" value="{{ layout.csrf_token }}">
-  <input type="hidden" name="back" value="{{ back }}">
-  <button type="submit" name="unit" value="bytes"{% if unit == "bytes" %} aria-pressed="true"{% endif %}>{{ t.get("unit-bytes") }}</button>
-  <button type="submit" name="unit" value="bits"{% if unit == "bits" %} aria-pressed="true"{% endif %}>{{ t.get("unit-bits") }}</button>
-  <button type="submit" name="unit" value="packets"{% if unit == "packets" %} aria-pressed="true"{% endif %}>{{ t.get("unit-packets") }}</button>
-</form>

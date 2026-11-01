@@ -2,8 +2,7 @@
 //! `locales/<code>/*.ftl` (embedded into the binary).
 //!
 //! German is the source language; every catalog must contain the same messages with the same
-//! variables (checked by the tests). Templates get the language as a field `t` and call
-//! `t.get("nav-overview")`. Messages whose id starts with `js-` are handed to the browser scripts.
+//! variables (checked by the tests). Pages call `t.get("nav-overview")`.
 
 use std::collections::BTreeMap;
 use std::sync::LazyLock;
@@ -108,15 +107,6 @@ impl Lang {
         bundle
             .format_pattern(pattern, Some(&fluent_args), &mut errors)
             .into_owned()
-    }
-
-    /// Texts of the browser scripts (`js-*` messages, all without variables) as a JSON object for
-    /// the page's data block `#i18n`, keyed without the prefix. `<` is escaped so the block cannot
-    /// end early.
-    pub fn js_texts(self) -> &'static str {
-        static TEXTS: LazyLock<Vec<String>> = LazyLock::new(|| Lang::ALL.map(js_catalog).into());
-        let index = Lang::ALL.iter().position(|l| *l == self).unwrap_or(0);
-        &TEXTS[index]
     }
 
     /// Decimal separator of numbers written by the program
@@ -226,27 +216,6 @@ fn load(lang: Lang) -> Bundle {
     bundle
 }
 
-/// Ids of the `js-*` messages of a language
-fn js_ids(lang: Lang) -> Vec<String> {
-    sources(lang)
-        .values()
-        .flat_map(|source| source.lines())
-        .filter_map(|line| line.split_once(" =").map(|(id, _)| id))
-        .filter(|id| id.starts_with("js-"))
-        .map(str::to_owned)
-        .collect()
-}
-
-fn js_catalog(lang: Lang) -> String {
-    let texts: BTreeMap<String, String> = js_ids(lang)
-        .into_iter()
-        .map(|id| (id["js-".len()..].to_owned(), lang.get(&id)))
-        .collect();
-    serde_json::to_string(&texts)
-        .unwrap_or_else(|_| "{}".to_owned())
-        .replace('<', "\\u003c")
-}
-
 /// Numbers in German texts use a decimal comma
 fn decimal_comma<M>(value: &FluentValue<'_>, _: &M) -> Option<String> {
     match value {
@@ -343,15 +312,15 @@ mod tests {
         }
     }
 
-    /// Every id used in a template or in the web code (`t.get("…")`, `t.get1("…"` …) exists
-    #[test]
-    fn used_messages_exist() {
+    /// The Rust files that ask for messages
+    fn source_files() -> Vec<(String, String)> {
         fn walk(dir: &std::path::Path, out: &mut Vec<(String, String)>) {
             for entry in std::fs::read_dir(dir).unwrap().flatten() {
                 let path = entry.path();
                 if path.is_dir() {
                     walk(&path, out);
-                } else if path.extension().is_some_and(|e| e == "rs" || e == "html") {
+                } else if path.extension().is_some_and(|e| e == "rs") && !path.ends_with("i18n.rs")
+                {
                     out.push((
                         path.display().to_string(),
                         std::fs::read_to_string(&path).unwrap(),
@@ -359,25 +328,48 @@ mod tests {
                 }
             }
         }
-        let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"));
         let mut files = Vec::new();
-        walk(&root.join("templates"), &mut files);
-        walk(&root.join("src/web"), &mut files);
+        walk(
+            &std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("src"),
+            &mut files,
+        );
+        files
+    }
+
+    /// Every id used in the code (`t.get("…")`, `t.get1("…"` …) exists
+    #[test]
+    fn used_messages_exist() {
         let known = all_messages(Lang::De);
-        for (path, text) in files {
-            if path.ends_with("i18n.rs") {
-                continue;
-            }
+        for (path, text) in source_files() {
             for call in [".get(\"", ".get1(\"", ".get2(\"", ".fmt(\""] {
                 for (pos, _) in text.match_indices(call) {
                     let rest = &text[pos + call.len()..];
                     let id: String = rest.chars().take_while(|c| *c != '"').collect();
-                    if id.is_empty() || id.contains(' ') {
+                    // other things have a `get` as well, a web client for example
+                    if id.is_empty() || id.contains([' ', ':']) {
                         continue;
                     }
                     assert!(known.contains_key(&id), "{path}: unknown message {id}");
                 }
             }
+        }
+    }
+
+    /// No message is left over: each appears in the code in quotes, or belongs to a family whose
+    /// ids are put together at run time
+    #[test]
+    fn every_message_is_used() {
+        const FAMILIES: [&str; 3] = ["filter-hint-", "filter-value-", "sound-"];
+        const PUT_TOGETHER: [&str; 3] =
+            ["hosts-subtitle", "services-subtitle", "programs-subtitle"];
+        let code: String = source_files().into_iter().map(|(_, text)| text).collect();
+        for id in all_messages(Lang::De).keys() {
+            let dynamic =
+                FAMILIES.iter().any(|f| id.starts_with(f)) || PUT_TOGETHER.contains(&id.as_str());
+            assert!(
+                dynamic || code.contains(&format!("\"{id}\"")),
+                "message {id} is not used"
+            );
         }
     }
 
@@ -401,6 +393,5 @@ mod tests {
         assert_eq!(Lang::De.get1("latency-ms", "ms", 1.5), "1,5 ms");
         assert_eq!(Lang::En.get1("latency-ms", "ms", 1.5), "1.5 ms");
         assert_eq!(Lang::De.get("no-such-message"), "no-such-message");
-        assert!(Lang::De.js_texts().starts_with('{'));
     }
 }

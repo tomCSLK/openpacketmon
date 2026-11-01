@@ -1,6 +1,6 @@
 # Contributing to openpacketmon
 
-Thanks for your interest! openpacketmon is a fork of [Sniffnet](https://github.com/GyulyVGC/sniffnet) with a browser interface and a
+Thanks for your interest! openpacketmon is a fork of [Sniffnet](https://github.com/GyulyVGC/sniffnet) with a native interface and a
 small packet analyzer. It runs on Linux for now. Testing it on your machine and telling us what breaks is a valuable contribution.
 
 ## Reporting bugs and ideas
@@ -16,7 +16,7 @@ to review than large ones.
 
 ## Development
 
-Requirements: a current stable Rust toolchain (edition 2024), `libpcap-dev`, `libasound2-dev` (sound of the native window) and, for the window program, `libwebkit2gtk-4.1-dev`.
+Requirements: a current stable Rust toolchain (edition 2024), `libpcap-dev` and `libasound2-dev`.
 Building is described in the README under [Building](README.md#building). Before you open a pull request, all of these must pass:
 
 ```bash
@@ -34,9 +34,8 @@ Install it with `cargo install cargo-deny --locked`.
 
 - **Language:** code, identifiers, code comments, commit messages, the README and the changelog are English; only the internal
   planning files `PLAN.md` and `CLAUDE.md` are German.
-- **UI texts** only through the Fluent catalogs in `locales/<code>/app.ftl`, never as fixed text in templates, Rust or JavaScript.
+- **UI texts** only through the Fluent catalogs in `locales/<code>/app.ftl`, never as fixed text in Rust.
   Add every new message in German (`de`) and English (`en`).
-- **No inline styles or scripts:** the Content Security Policy forbids them. Styles go into `static/app.css`, scripts into `static/`.
 - **No code from Wireshark.** Wireshark is GPL-licensed; do not copy its code, dissectors or display filter grammar, and do not
   translate them. Write dissectors from the protocol specifications (RFCs). Test packets are written by hand or generated in the tests.
 - **Files of Sniffnet:** keep their license and copyright notices. When you change a file that is still unchanged from Sniffnet

@@ -3,8 +3,8 @@
 # openpacketmon
 
 openpacketmon shows what your computer is talking to on the network: hosts, countries, services, programs and live traffic
-charts. It runs as a small local service on your own computer and is operated from the browser, in the style of
-[opennetmon](https://github.com/tomCSLK/opennetmon). The web server only listens on 127.0.0.1.
+charts, down to the single packet. It is a native program with its own window, in the style of
+[opennetmon](https://github.com/tomCSLK/opennetmon).
 
 > **Status: early version.** Expect rough edges, and please report what you find.
 
@@ -31,20 +31,18 @@ from here on; it is not affiliated with or endorsed by the Sniffnet project.
 ## Building
 
 ```sh
-sudo apt install libpcap-dev libwebkit2gtk-4.1-dev libasound2-dev
+sudo apt install libpcap-dev libasound2-dev
 cargo build --release
 ```
 
-This builds two programs: `openpacketmon` (the capture and the web server) and `openpacketmon-app` (the window
-with the tray icon, without special rights).
-
-Capturing needs raw socket rights. Only the small helper `openpacketmon-capture` gets them; it gives them up as soon as the adapter is open:
+This builds two programs: `openpacketmon` (the window and the analysis, without special rights) and `openpacketmon-capture`.
+Capturing needs raw socket rights. Only this small helper gets them; it gives them up as soon as the adapter is open:
 
 ```sh
 sudo setcap cap_net_raw,cap_net_admin=eip target/release/openpacketmon-capture
 ```
 
-To build the Debian package (with start menu entry, icons and a systemd user service):
+To build the Debian package (with start menu entry and icons):
 
 ```sh
 cargo install cargo-deb
@@ -59,43 +57,28 @@ steps).
 
 ## Usage
 
-Start openpacketmon from the application menu: it opens in its own window with an icon in the tray
-(`openpacketmon-app`). The window starts the local server (`http://127.0.0.1:7380`) if it is not running yet
-and signs in with the server's start link. Closing the window keeps the capture running; the tray menu opens the
-window again, opens the browser, or quits openpacketmon. *Settings → Desktop* can start it in the
-tray at sign-in.
+Start openpacketmon from the application menu. Choose a network adapter, a capture file or an IPFIX collector on the first
+page and start the capture; overview, connections, hosts, services, programs and notifications follow it live. Closing the
+window ends the program and the capture; it asks first while a capture is running. Notifications and their sounds therefore
+only come while the program is open, and nothing keeps running in the background.
 
-Without the window, `openpacketmon` starts the server and opens the browser with a start link that signs it in.
-Starting it a second time only opens the browser again. Choose a network adapter, a capture file or an IPFIX collector on the first page and start
-the capture; overview, connections, hosts, services, programs and notifications follow it live. The *Connections* page filters with one field in the same grammar as the display filter
-(`port == 443 and country == US`, `program contains firefox`, `favorite`). Hosts, programs and IP addresses can be
-favorites; a notification reports new traffic of a favorite. The *Packets* page
-lists the single packets in one continuous list that follows the capture live (with "Go to packet"), with a display filter (`dns`, `tls.sni contains amazon`, `ip.addr == 192.168.1.0/24`)
-and coloring rules; it shows their layers (including DNS, DHCP, TLS server names, HTTP, SSDP, NTP and QUIC) and bytes,
-follows TCP and UDP streams and downloads the packets as a PCAP file for Wireshark. A TCP analysis marks
-retransmissions, gaps, duplicate ACKs and zero windows and measures round trip, handshake and DNS response times; the
-*Statistics* page shows the protocol hierarchy, these findings and a traffic chart for any display filter. The capture page also chooses
-whether the packets are kept whole, as headers only (less memory) or not at all.
+The *Connections* page filters with one field in the same grammar as the display filter (`port == 443 and country == US`,
+`program contains firefox`, `favorite`). Hosts, programs and IP addresses can be favorites; a notification reports new traffic
+of a favorite. The *Packets* page lists the single packets in one continuous list that follows the capture live (with "Go to
+packet"), with a display filter (`dns`, `tls.sni contains amazon`, `ip.addr == 192.168.1.0/24`) and coloring rules; it shows
+their layers (including DNS, DHCP, TLS server names, HTTP, SSDP, NTP and QUIC) and bytes, follows TCP and UDP streams and saves
+the packets as a PCAP file for Wireshark. A TCP analysis marks retransmissions, gaps, duplicate ACKs and zero windows and
+measures round trip, handshake and DNS response times; the *Statistics* page shows the protocol hierarchy, these findings and
+a traffic chart for any display filter. The capture page also chooses whether the packets are kept whole, as headers only
+(less memory) or not at all. The packets stay in memory, up to the limits chosen in the settings (2 million packets, 2 GiB);
+when a limit is reached, the oldest ones are dropped.
 
 ```sh
-openpacketmon-app                    # window and tray icon (start menu entry)
-openpacketmon-app --hidden           # tray icon only
-openpacketmon                        # start the server and open the browser
-openpacketmon --no-browser           # only start the server (prints the start link)
+openpacketmon                        # open the window
 openpacketmon --adapter enp0s31f6    # start capturing on this adapter right away
 openpacketmon --import capture.pcap  # analyze a PCAP file right away
-openpacketmon --port 7381            # use another port
 openpacketmon --list-adapters        # show the network adapters and exit
 ```
-
-To keep it running in the background, enable the user service that comes with the package:
-
-```sh
-systemctl --user enable --now openpacketmon
-```
-
-openpacketmon can be stopped with Ctrl+C, with *Settings → Quit openpacketmon*, or with
-`systemctl --user stop openpacketmon`.
 
 ### Countries and network operators
 
@@ -114,10 +97,9 @@ the addresses it sees, and for the latency measurement you start on a connection
 
 ### Security
 
-The pages are only reachable from this computer (127.0.0.1). Signing in uses a random access key in the start link,
-which is stored in `$XDG_RUNTIME_DIR/openpacketmon/start-link-<port>` and readable only by your user; the session cookie is
-`HttpOnly` and `SameSite=Strict`, forms carry a CSRF token, and requests with a foreign `Host` or `Origin` are
-rejected (protection against DNS rebinding and cross-site requests). Please report vulnerabilities privately, see
+openpacketmon opens no network port and has no special rights. Only the helper `openpacketmon-capture` may capture; it
+drops its rights once the adapter is open and hands the packets on without looking into them. Packets are analyzed in the
+program without rights, because their content comes from other computers. Please report vulnerabilities privately, see
 [SECURITY.md](SECURITY.md).
 
 ## Contributing
@@ -137,6 +119,6 @@ The sample databases of IPinfo used by the tests are licensed under CC BY 4.0 (s
 The geolocation data is not part of openpacketmon; data downloaded from DB-IP is licensed under
 [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/) ([IP Geolocation by DB-IP](https://db-ip.com)).
 [THIRD-PARTY-LICENSES.txt](THIRD-PARTY-LICENSES.txt) lists the licenses of all crates compiled into openpacketmon and
-openpacketmon-app, of the bundled uPlot and of the data above, with the license texts; `dev/third-party-licenses.py`
+openpacketmon-capture, of the bundled font Inter and of the data above, with the license texts; `dev/third-party-licenses.py`
 regenerates it from `Cargo.lock`. The package installs it to `/usr/share/doc/openpacketmon/`, and the link *Licenses* at
 the bottom of the sidebar shows it together with NOTICE.

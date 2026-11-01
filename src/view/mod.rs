@@ -1,6 +1,5 @@
 //! What the pages of the user interface show, without the user interface: the data of every page,
-//! translated and formatted, as plain Rust values. The browser pages render them to HTML; nothing
-//! here knows about HTML, addresses of a site or a web server, so another interface can use it.
+//! translated and formatted, as plain Rust values. [`crate::gui`] draws them.
 //!
 //! Links are [`Jump`]s: they say where a link leads, and the interface decides how to get there.
 
@@ -41,8 +40,6 @@ pub enum Jump {
     Packets { filter: String, connections: String },
     /// The statistics of a display and a connection filter
     Statistics { filter: String, connections: String },
-    /// The stream a packet belongs to
-    Stream(u64),
 }
 
 /// What the frame around every page shows
@@ -75,27 +72,13 @@ impl Status {
 
 #[cfg(test)]
 mod tests {
-    /// This module is what another interface builds on: it knows no web server, no HTML templates
-    /// and no addresses of the site
+    use super::LICENSES;
+
     #[test]
-    fn the_view_knows_nothing_of_the_browser_pages() {
-        let dir = concat!(env!("CARGO_MANIFEST_DIR"), "/src/view");
-        let mut files = 0;
-        for file in std::fs::read_dir(dir).unwrap() {
-            let path = file.unwrap().path();
-            let text = std::fs::read_to_string(&path).unwrap();
-            // the words are put together, so this test does not find itself
-            for word in [
-                ["ax", "um"].concat(),
-                ["ask", "ama"].concat(),
-                ["crate::", "web"].concat(),
-                ["hr", "ef"].concat(),
-                ["<", "a "].concat(),
-            ] {
-                assert!(!text.contains(&word), "{} has {word}", path.display());
-            }
-            files += 1;
+    fn the_licenses_name_what_the_program_is_built_on() {
+        assert!(LICENSES.starts_with("openpacketmon\n"));
+        for part in ["Giuliano Bellini", "Inter", "IANA", "DB-IP", "eframe "] {
+            assert!(LICENSES.contains(part), "{part}");
         }
-        assert!(files > 10);
     }
 }

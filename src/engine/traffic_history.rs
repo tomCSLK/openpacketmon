@@ -50,9 +50,6 @@ pub struct TrafficHistory {
     no_more_packets: bool,
     /// Timestamp of the first packet of the capture
     first_packet_timestamp: Timestamp,
-    /// Increases whenever samples already handed out change (compaction), so a client that
-    /// fetches only new samples knows to fetch all of them again
-    generation: u32,
 }
 
 impl TrafficHistory {
@@ -68,7 +65,6 @@ impl TrafficHistory {
             is_live_capture,
             no_more_packets: false,
             first_packet_timestamp: Timestamp::default(),
-            generation: 0,
         }
     }
 
@@ -117,7 +113,6 @@ impl TrafficHistory {
 
     /// Halves the number of samples by averaging neighbouring pairs
     fn compact(&mut self) {
-        self.generation = self.generation.wrapping_add(1);
         let old = std::mem::take(&mut self.samples);
         let mut iter = old.iter();
         while let Some(a) = iter.next() {
@@ -138,10 +133,6 @@ impl TrafficHistory {
 
     pub fn first_packet_timestamp(&self) -> Timestamp {
         self.first_packet_timestamp
-    }
-
-    pub fn generation(&self) -> u32 {
-        self.generation
     }
 }
 
@@ -205,7 +196,6 @@ mod tests {
         assert!(history.samples().len() <= MAX_SAMPLES);
         assert_eq!(history.samples().front().map(|s| s.second), Some(0));
         assert!(history.samples().iter().all(|s| s.in_bytes == 10));
-        assert_eq!(history.generation(), 1);
     }
 
     #[test]

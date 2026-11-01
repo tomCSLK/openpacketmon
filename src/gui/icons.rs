@@ -18,4 +18,4 @@ pub const THEME: ImageSource<'static> = include_image!("../../resources/icons/th
 pub const BACK: ImageSource<'static> = include_image!("../../resources/icons/back.svg");
 pub const STAR: ImageSource<'static> = include_image!("../../resources/icons/star.svg");
 pub const STAR_ON: ImageSource<'static> = include_image!("../../resources/icons/star-on.svg");
-pub const LOGO: ImageSource<'static> = include_image!("../../static/logo-mark.png");
+pub const LOGO: ImageSource<'static> = include_image!("../../resources/icons/logo-mark.png");

@@ -75,6 +75,8 @@ pub struct State {
     goto_note: Option<String>,
     /// The scroll position to take in the next frame
     scroll_to: Option<f32>,
+    /// The scroll position of the last frame
+    offset: f32,
     first: usize,
     visible: usize,
     height: f32,
@@ -144,6 +146,18 @@ impl State {
             }
         }
         self.was_at_end = at_end;
+    }
+
+    /// A key moves the list: leaving the end ends following, going there takes it up again
+    fn step(&mut self, step: Step, live: bool) {
+        let max = self.max_offset();
+        let to = match step {
+            Step::First => 0.0,
+            Step::Last => max,
+            Step::Rows(rows) => (self.offset + rows as f32 * ROW_H).clamp(0.0, max),
+        };
+        self.follow = to >= max && live && !self.paused;
+        self.scroll_to = Some(to);
     }
 
     fn max_offset(&self) -> f32 {
@@ -447,6 +461,30 @@ fn color_legend(ui: &mut Ui, t: Lang) {
     });
 }
 
+/// Where a key moves the list
+#[derive(Clone, Copy, Debug, PartialEq)]
+enum Step {
+    First,
+    Last,
+    Rows(i32),
+}
+
+/// The keys of a packet analyzer; `page` rows make one page
+fn pressed_step(input: &mut egui::InputState, page: i32) -> Option<Step> {
+    let command = egui::Modifiers::COMMAND;
+    let plain = egui::Modifiers::NONE;
+    [
+        (command, Key::Home, Step::First),
+        (command, Key::End, Step::Last),
+        (plain, Key::PageUp, Step::Rows(-page)),
+        (plain, Key::PageDown, Step::Rows(page)),
+        (plain, Key::ArrowUp, Step::Rows(-1)),
+        (plain, Key::ArrowDown, Step::Rows(1)),
+    ]
+    .into_iter()
+    .find_map(|(modifiers, key, step)| input.consume_key(modifiers, key).then_some(step))
+}
+
 /// What the user asked for in this frame
 #[derive(Default)]
 struct Actions {
@@ -570,10 +608,10 @@ fn list(app: &mut App, ui: &mut Ui, filtered: bool, live: bool, actions: &mut Ac
     let state = &mut app.pages.packets;
     let shown_to = (state.first + state.visible).min(state.total);
     let title = if state.total == 0 {
-        t.get("js-packets-none")
+        t.get("packets-none")
     } else {
         fill(
-            &t.get("js-packets-range"),
+            &t.get("packets-range"),
             &[
                 format::count(t, (state.first + 1) as u128),
                 format::count(t, shown_to as u128),
@@ -582,8 +620,8 @@ fn list(app: &mut App, ui: &mut Ui, filtered: bool, live: bool, actions: &mut Ac
         )
     };
     let note = state.goto_note.clone().map(|asked| match state.target {
-        Some(found) => fill(&t.get("js-packets-goto-other"), &[asked, found.to_string()]),
-        None => fill(&t.get("js-packets-goto-none"), &[asked]),
+        Some(found) => fill(&t.get("packets-goto-other"), &[asked, found.to_string()]),
+        None => fill(&t.get("packets-goto-none"), &[asked]),
     });
     if let Some(note) = note {
         widgets::notice_text(ui, &note);
@@ -668,6 +706,13 @@ fn table(
         widgets::empty(ui, &t.get(text));
         return;
     }
+    // the keys belong to a text field that has the focus
+    if !ui.ctx().egui_wants_keyboard_input() {
+        let page = state.visible.saturating_sub(1).max(1) as i32;
+        if let Some(step) = ui.input_mut(|i| pressed_step(i, page)) {
+            state.step(step, live);
+        }
+    }
     let explicit = state.scroll_to.is_some();
     let pointer = ui.input(|i| i.pointer.hover_pos());
     // the gaps between the columns take the color of the row
@@ -704,7 +749,7 @@ fn table(
         (t.get("packet-length"), true),
         (t.get("packet-info"), false),
     ];
-    let (out_text, in_text) = (t.get("js-direction-out"), t.get("js-direction-in"));
+    let (out_text, in_text) = (t.get("packet-direction-out"), t.get("packet-direction-in"));
     let target = state.target;
     let rows = &state.rows;
     let total = state.total;
@@ -786,8 +831,9 @@ fn table(
     }
     state.height = output.inner_rect.height();
     state.visible = (state.height / ROW_H).ceil() as usize;
-    state.first = (output.state.clamped_offset().y / ROW_H).floor() as usize;
-    let at_end = output.state.clamped_offset().y >= state.max_offset() - 1.0;
+    state.offset = output.state.clamped_offset().y;
+    state.first = (state.offset / ROW_H).floor() as usize;
+    let at_end = state.offset >= state.max_offset() - 1.0;
     state.after_scrolling(at_end, explicit, live);
 }
 
@@ -867,6 +913,36 @@ mod tests {
         s.toggle_follow();
         s.after_scrolling(false, false, true);
         s.after_scrolling(true, false, true);
+        assert!(!s.follow);
+    }
+
+    #[test]
+    fn the_keys_move_the_list_and_stop_at_its_ends() {
+        let mut s = state();
+        s.offset = 240.0;
+        s.step(Step::Rows(-1), false);
+        assert_eq!(s.scroll_to, Some(240.0 - ROW_H));
+        s.step(Step::Rows(-100), false);
+        assert_eq!(s.scroll_to, Some(0.0));
+        s.step(Step::Rows(100_000), false);
+        assert_eq!(s.scroll_to, Some(s.max_offset()));
+        s.step(Step::First, false);
+        assert_eq!(s.scroll_to, Some(0.0));
+        s.step(Step::Last, false);
+        assert_eq!(s.scroll_to, Some(s.max_offset()));
+    }
+
+    #[test]
+    fn a_key_up_ends_following_and_the_end_takes_it_up_again() {
+        let mut s = state();
+        s.offset = s.max_offset();
+        s.step(Step::Rows(-1), true);
+        assert!(!s.follow);
+        s.step(Step::Last, true);
+        assert!(s.follow);
+        // switched off by hand it stays off
+        s.toggle_follow();
+        s.step(Step::Last, true);
         assert!(!s.follow);
     }
 

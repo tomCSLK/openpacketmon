@@ -17,14 +17,16 @@ else
   git -C "$upstream" checkout --quiet "$base"
 fi
 
-# Files at the same paths as Sniffnet's that were written anew for openpacketmon (after those of opennetmon), not
-# derived from Sniffnet's: they share only the keys of GitHub's issue form format
+# Files at the same paths as Sniffnet's that were written anew for openpacketmon, not derived from Sniffnet's: the
+# project files after those of opennetmon (they share only the keys of GitHub's issue form format) and the new interface
 replaced="
 SECURITY.md
 CONTRIBUTING.md
 .github/ISSUE_TEMPLATE/bug_report.yml
 .github/ISSUE_TEMPLATE/config.yml
 .github/ISSUE_TEMPLATE/feature_request.yml
+src/gui/mod.rs
+src/gui/pages/mod.rs
 "
 
 missing=$(git ls-files | while read -r f; do

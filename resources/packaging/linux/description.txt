@@ -1,5 +1,4 @@
-openpacketmon runs as a local service and shows its interface in its own window with a tray icon,
-or in the browser (127.0.0.1 only).
+openpacketmon shows the network traffic of this computer in its own window.
 Based on Sniffnet.
 Features:
 Choose a network adapter, a capture file (PCAP/PCAPNG) or an IPFIX collector as the source;
@@ -8,7 +7,7 @@ View overall statistics and a live chart of the traffic (bytes, bits or packets 
 Get domain names, network providers (AS) and countries of the remote hosts;
 See which programs exchange traffic;
 Search, sort and inspect every network connection;
-List single packets with their layers and bytes and download them as PCAP;
-Mark hosts, services and programs as favorites;
-Get notified about data thresholds, favorites and blacklisted addresses (also via webhook);
+List single packets with their layers and bytes, with a display filter, and save them as PCAP;
+Follow streams and see TCP problems and response times in the statistics;
+Mark hosts, programs and IP addresses as favorites and get notified about their traffic;
 Light and dark design, English and German.

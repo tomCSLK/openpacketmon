@@ -3,16 +3,12 @@
 
 //! Module containing the entry point of application execution.
 //!
-//! openpacketmon runs a local web server (127.0.0.1) and opens the browser with a start link that
-//! signs it in. Started a second time, it only opens the browser for the running instance.
-
-use std::sync::Arc;
+//! openpacketmon is a program with a window: closing the window ends the program and the capture.
 
 // used throughout the crate as `crate::…`
 use networking::types::info_traffic::InfoTraffic;
 use networking::types::service::Service;
 use sniffnet_packet_parser::Protocol;
-use utils::formatted_strings::print_cli_welcome_message;
 
 use crate::config::conf::CONF;
 use crate::engine::Engine;
@@ -35,7 +31,6 @@ mod notifications;
 mod report;
 mod utils;
 mod view;
-mod web;
 
 /// Name used for the binary, the configuration directory and the window class
 pub const APP_NAME: &str = "openpacketmon";
@@ -70,68 +65,16 @@ fn main() {
         return;
     }
 
-    if args.gui {
-        let engine = Engine::new(conf, runtime.handle().clone());
-        engine.check_newer_release();
-        if !start_requested_capture(&engine, args.adapter, args.import) {
-            std::process::exit(1);
-        }
-        if let Err(e) = gui::run(engine.clone()) {
-            eprintln!("Could not open the window: {e}");
-            std::process::exit(1);
-        }
-        engine.stop();
-        engine.store_conf();
-        drop(runtime);
-        return;
-    }
-
-    let Ok(listener) = runtime.block_on(web::bind(args.port)) else {
-        // the port is taken: by a running openpacketmon of this user, or by something else
-        if runtime.block_on(web::is_running(args.port))
-            && let Some(link) = web::auth::read_start_link(args.port)
-        {
-            println!("openpacketmon is already running: {link}");
-            if args.adapter.is_some() || args.import.is_some() {
-                eprintln!("The capture options are ignored; choose the source in the browser.");
-            }
-            if !args.no_browser {
-                open_browser(&link);
-            }
-            return;
-        }
-        eprintln!(
-            "Port {} on 127.0.0.1 is in use by another program or user; choose another one with --port.",
-            args.port
-        );
-        std::process::exit(1);
-    };
-
-    print_cli_welcome_message();
     let engine = Engine::new(conf, runtime.handle().clone());
     engine.check_newer_release();
     if !start_requested_capture(&engine, args.adapter, args.import) {
         std::process::exit(1);
     }
-
-    let auth = Arc::new(web::auth::Auth::new());
-    let link = auth.start_link(args.port);
-    match web::auth::write_start_link(args.port, &link) {
-        Ok(_) => {}
-        Err(e) => eprintln!("Could not save the start link: {e}"),
+    if let Err(e) = gui::run(engine.clone()) {
+        eprintln!("Could not open the window: {e}");
+        std::process::exit(1);
     }
-    println!("Open in the browser: {link}");
-    println!("Press Ctrl+C to quit.\n");
-    if !args.no_browser {
-        open_browser(&link);
-    }
-
-    let state = web::AppState::new(engine.clone(), auth, args.port);
-    if let Err(e) = runtime.block_on(web::serve(state, listener)) {
-        eprintln!("The web server stopped: {e}");
-    }
-
-    web::auth::remove_start_link(args.port);
+    engine.stop();
     engine.store_conf();
     drop(runtime);
 }
@@ -167,20 +110,6 @@ fn start_requested_capture(
         _ => eprintln!("Could not start the capture"),
     }
     false
-}
-
-/// Opens the start link in the user's browser
-#[allow(clippy::print_stderr)]
-fn open_browser(link: &str) {
-    let opened = std::process::Command::new("xdg-open")
-        .arg(link)
-        .stdin(std::process::Stdio::null())
-        .stdout(std::process::Stdio::null())
-        .stderr(std::process::Stdio::null())
-        .spawn();
-    if opened.is_err() {
-        eprintln!("Could not open the browser; open the link above yourself.");
-    }
 }
 
 #[allow(clippy::print_stdout)]

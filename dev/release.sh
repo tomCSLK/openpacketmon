@@ -6,7 +6,7 @@
 #   dev/release.sh --publish --notes notes.md       # additionally tag vX.Y.Z, push the tag, create the release
 #   dev/release.sh --publish --notes notes.md --prerelease   # the same, marked as pre-release
 #
-# The version comes from Cargo.toml (bump it there, in app/Cargo.toml and in capture/Cargo.toml and commit first); CHANGELOG.md needs a section
+# The version comes from Cargo.toml (bump it there and in capture/Cargo.toml and commit first); CHANGELOG.md needs a section
 # "## [X.Y.Z]". Before anything is published the script requires a public repository, a clean work tree on main that
 # matches origin/main, a green CI run for this commit and a version without an existing tag. Every run checks fmt,
 # clippy, tests, cargo deny, THIRD-PARTY-LICENSES.txt, the notices of changed Sniffnet files and the contents of the .deb.
@@ -35,14 +35,12 @@ step() { printf '==> %s\n' "$*"; }
 fail() { printf 'error: %s\n' "$*" >&2; exit 1; }
 
 VERSION=$(sed -n 's/^version = "\(.*\)"$/\1/p' Cargo.toml | head -n 1)
-APP_VERSION=$(sed -n 's/^version = "\(.*\)"$/\1/p' app/Cargo.toml | head -n 1)
 CAPTURE_VERSION=$(sed -n 's/^version = "\(.*\)"$/\1/p' capture/Cargo.toml | head -n 1)
 TAG="v$VERSION"
 DEB="openpacketmon_$VERSION-1_amd64.deb"
 DIST="target/dist"
 
 step "checking the repository for $TAG"
-[ "$APP_VERSION" = "$VERSION" ] || fail "app/Cargo.toml has version $APP_VERSION, Cargo.toml $VERSION"
 [ "$CAPTURE_VERSION" = "$VERSION" ] || fail "capture/Cargo.toml has version $CAPTURE_VERSION, Cargo.toml $VERSION"
 grep -qF "## [$VERSION]" CHANGELOG.md || fail "CHANGELOG.md has no section ## [$VERSION]"
 if [ "$PUBLISH" = yes ]; then
@@ -71,24 +69,22 @@ dev/check-notices.sh
 
 step "building the release binaries"
 cargo build --release --locked --workspace   # cargo deb only builds openpacketmon itself
-for program in openpacketmon openpacketmon-app; do
-  [ "$("target/release/$program" --version)" = "$program $VERSION" ] \
-    || fail "$program reports $("target/release/$program" --version), expected $VERSION"
-done
+[ "$(target/release/openpacketmon --version)" = "openpacketmon $VERSION" ] \
+  || fail "openpacketmon reports $(target/release/openpacketmon --version), expected $VERSION"
 
 step "packaging $DIST/$DEB"
 rm -rf "$DIST" && mkdir -p "$DIST"
 cargo deb --no-build --quiet >/dev/null
 cp "target/debian/$DEB" THIRD-PARTY-LICENSES.txt "$DIST/"
 CONTENTS=$(dpkg-deb --contents "$DIST/$DEB")
-for f in usr/bin/openpacketmon usr/bin/openpacketmon-app usr/share/applications/openpacketmon.desktop \
-         usr/lib/systemd/user/openpacketmon.service usr/share/doc/openpacketmon/copyright \
+for f in usr/bin/openpacketmon usr/bin/openpacketmon-capture usr/share/applications/openpacketmon.desktop \
+         usr/share/doc/openpacketmon/copyright \
          usr/share/doc/openpacketmon/NOTICE usr/share/doc/openpacketmon/THIRD-PARTY-LICENSES.txt; do
   grep -q " \./$f\$" <<<"$CONTENTS" || fail "$DEB does not contain /$f"
 done
 [ "$(dpkg-deb --field "$DIST/$DEB" Version)" = "$VERSION-1" ] || fail "$DEB has the wrong version"
 DEPENDS=$(dpkg-deb --field "$DIST/$DEB" Depends)
-for package in "libc6 (>=" libcap2-bin libwebkit2gtk-4.1-0; do
+for package in "libc6 (>=" libcap2-bin libpcap libasound2 libxkbcommon0; do
   grep -qF "$package" <<<"$DEPENDS" || fail "$DEB does not depend on $package"
 done
 (cd "$DIST" && sha256sum "$DEB" THIRD-PARTY-LICENSES.txt > SHA256SUMS)

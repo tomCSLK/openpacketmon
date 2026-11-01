@@ -27,7 +27,7 @@ mod tests {
     #[test]
     fn test_get_country_without_database() {
         assert!(MmdbReader::open(Path::new("unknown path")).is_none());
-        assert!(MmdbReader::open(Path::new("static/favicon.svg")).is_none());
+        assert!(MmdbReader::open(Path::new("Cargo.toml")).is_none());
         let res = get_country(&IpAddr::from([8, 8, 8, 8]), &MmdbReader::Empty);
         assert_eq!(res, Country::ZZ);
     }

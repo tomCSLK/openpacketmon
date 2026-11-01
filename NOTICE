@@ -8,7 +8,7 @@ licensed under the MIT License or the Apache License, Version 2.0, at your optio
 
 It starts from Sniffnet commit ab4bf739d464 (2026-10-20, after Sniffnet v1.5.1).
 Sniffnet's desktop interface, charts, sounds, fonts, icons, translations,
-built-in MaxMind GeoLite2 databases and project files were removed; the browser interface, the window program, the
+built-in MaxMind GeoLite2 databases and project files were removed; the user interface, the capture helper, the
 packet store, the dissectors, the display filter, the TCP analysis and the
 statistics are new. CHANGELOG.md describes the changes.
 

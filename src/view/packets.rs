@@ -6,7 +6,6 @@ use std::collections::{HashMap, HashSet, VecDeque};
 use std::fmt::Write;
 use std::net::IpAddr;
 
-use serde::Serialize;
 use sniffnet_packet_parser::{LinkType, Protocol};
 
 use crate::dissect::{self, Dissection, Field, Layer};
@@ -259,20 +258,15 @@ fn relative_time(ts: Timestamp, first: Option<Timestamp>) -> String {
     format!("{sign}{}.{:06}", diff / 1_000_000, diff % 1_000_000)
 }
 
-/// A packet in the list (the browser pages get it as JSON and build the row)
-#[derive(Serialize)]
+/// A packet in the list
 pub struct PacketRow {
-    #[serde(rename = "n")]
     pub number: u64,
     pub time: String,
     pub src: String,
     pub dst: String,
-    #[serde(rename = "proto")]
     pub protocol: &'static str,
-    #[serde(rename = "len")]
     pub length: u32,
     pub info: String,
-    #[serde(rename = "out")]
     pub outgoing: Option<bool>,
     /// Class of the coloring rule, empty for none
     pub color: &'static str,
@@ -501,7 +495,6 @@ pub fn filter_field_names() -> Vec<&'static str> {
 
 /// What surrounds the rows of the list
 pub struct PacketList {
-    pub running: bool,
     /// Why no packets are kept (store off, IPFIX); empty if they are
     pub unavailable: String,
     /// The connection the display filter selects: its two ends and its key
@@ -514,10 +507,9 @@ pub struct PacketList {
 
 /// The state of the list for a display and a connection filter
 pub fn packet_list(t: Lang, engine: &Engine, display: &str, connections: &str) -> PacketList {
-    let (running, unavailable, store, connection, error) = {
+    let (unavailable, store, connection, error) = {
         let engine = engine.lock();
         (
-            engine.is_running(),
             unavailable(t, &engine),
             engine.packets.clone(),
             filtered_connection(&engine, display),
@@ -525,7 +517,6 @@ pub fn packet_list(t: Lang, engine: &Engine, display: &str, connections: &str) -
         )
     };
     PacketList {
-        running,
         unavailable,
         connection,
         list: store.is_some() && error.is_none(),
@@ -535,7 +526,6 @@ pub fn packet_list(t: Lang, engine: &Engine, display: &str, connections: &str) -
 }
 
 /// A block of rows of the list
-#[derive(Serialize)]
 pub struct RowBlock {
     /// Matching packets
     pub total: usize,
@@ -547,7 +537,6 @@ pub struct RowBlock {
     /// Where the anchor packet is now
     pub anchor: Option<usize>,
     pub foot: String,
-    pub running: bool,
 }
 
 /// The rows of a window of the list; `None` without packets or with a wrong filter
@@ -559,11 +548,10 @@ pub fn row_block(
     connections: &str,
     window: Window,
 ) -> Option<RowBlock> {
-    let (store, running, selection) = {
+    let (store, selection) = {
         let engine = engine.lock();
         (
             engine.packets.clone(),
-            engine.is_running(),
             Selection::read(t, &engine, display, connections),
         )
     };
@@ -577,7 +565,6 @@ pub fn row_block(
         goto: picked.goto,
         anchor: picked.anchor,
         foot: foot_text(t, &store),
-        running,
     })
 }
 
@@ -826,6 +813,10 @@ fn pcap_name() -> String {
 
 #[cfg(test)]
 mod tests {
+    use serial_test::serial;
+
+    use crate::config::conf::Conf;
+    use crate::engine::Engine;
     use std::net::Ipv4Addr;
 
     use super::*;
@@ -1092,5 +1083,55 @@ mod tests {
         assert_eq!(lines[0].bytes[0], (0, "47".to_owned()));
         assert_eq!(lines[1].text[0], (16, 'H'));
         assert_eq!(lines[0].text[14], (14, '·'));
+    }
+
+    fn engine() -> (tokio::runtime::Runtime, Engine) {
+        let runtime = tokio::runtime::Runtime::new().unwrap();
+        let engine = Engine::new(Conf::default(), runtime.handle().clone());
+        (runtime, engine)
+    }
+
+    #[test]
+    #[serial]
+    fn a_wrong_filter_is_explained() {
+        let (_runtime, engine) = engine();
+        let list = packet_list(Lang::En, &engine, "tcp.port ==", "");
+        let fault = list.error.unwrap();
+        assert!(
+            fault.message.contains("Error at position 12"),
+            "{}",
+            fault.message
+        );
+        assert!(!fault.connections);
+        assert!(!list.list);
+
+        // the connection filter has its own fields
+        let list = packet_list(Lang::En, &engine, "", "country ==");
+        assert!(list.error.unwrap().connections);
+        assert!(
+            packet_list(Lang::En, &engine, "", "country == US")
+                .error
+                .is_none()
+        );
+
+        let problem = filter_problem(Lang::En, "foo", false).unwrap();
+        assert!(problem.contains("unknown field or protocol"), "{problem}");
+        assert_eq!(filter_problem(Lang::En, "dns", false), None);
+        assert_eq!(filter_problem(Lang::En, "country == US", true), None);
+    }
+
+    #[test]
+    #[serial]
+    fn without_a_capture_there_are_no_packets() {
+        let (_runtime, engine) = engine();
+        let index = FilterIndex::default();
+        let window = Window {
+            from: Some(0),
+            count: 50,
+            goto: None,
+            anchor: None,
+        };
+        assert!(row_block(Lang::En, &engine, &index, "", "", window).is_none());
+        assert!(pcap_file(Lang::En, &engine, &index, "", "").is_none());
     }
 }

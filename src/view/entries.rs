@@ -2,7 +2,7 @@
 
 use crate::config::favorite::{Favorite, FavoriteItem, FavoriteKey};
 use crate::engine::state::EngineState;
-use crate::networking::types::data_representation::{DataRepr, DataUnit};
+use crate::networking::types::data_representation::DataRepr;
 use crate::networking::types::host::Host;
 use crate::networking::types::program::Program;
 use crate::networking::types::service::Service;
@@ -218,10 +218,8 @@ pub struct EntryList {
     pub rows: Vec<EntryRow>,
     /// All entries found; the rows stop at [`MAX_ROWS`]
     pub total: usize,
-    pub running: bool,
     /// Programs are only known for network adapters
     pub unsupported: bool,
-    pub unit: DataUnit,
 }
 
 /// The entries of `kind` whose name contains `text`
@@ -255,11 +253,9 @@ pub fn entry_list(
         subtitle: t.get(&format!("{code}s-subtitle")),
         rows: entry_rows(t, state, &items[..total.min(MAX_ROWS)]),
         total,
-        running: state.is_running(),
         unsupported: kind == Favorite::Program
             && state.is_running()
             && !state.capture_source.supports_programs(),
-        unit: repr.data_unit,
     }
 }
 

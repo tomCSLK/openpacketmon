@@ -8,7 +8,8 @@ Netzwerkverkehrs-Monitor in Rust (iced-GUI, libpcap). Maßgeblich für Stand, Li
 
 ## Status (2026-11-01)
 
-- **egui-Oberfläche Stufen 1 bis 3** (2026-11-01, `src/gui/`, `PLAN.md` 5.5 „Stand egui“, nicht committet, kein Test-Paket): alle Seiten als natives Fenster, Aufruf `openpacketmon --gui`; ohne den Schalter weiter die Browser-Oberfläche. Paketspeicher wählbar bis 2 GiB und 2 Millionen Pakete. Stirbt der Mitschnitt-Helfer, meldet das jetzt auch die Oberfläche (`CaptureStopped`). Geprüft über Tests und gerenderte Bilder; Bedienung im echten Fenster, Live-Mitschnitt, Ton, Dateidialog, Skalierung und Geo-Download stehen aus. Stufe 4 (Abbau von Web, `app/`, systemd) nicht beauftragt.
+- **Oberfläche ist jetzt egui, Stufen 1 bis 4 erledigt** (2026-11-01, `src/gui/`, `PLAN.md` 5.5 „Stand egui“, kein Test-Paket): `openpacketmon` öffnet das Fenster (Wireshark-Muster: Fenster schließen beendet das Programm, Rückfrage bei laufender Aufzeichnung). **Entfernt:** `src/web/`, `app/` (`openpacketmon-app`), `templates/`, `static/`, systemd-Dienst, Optionen `--port`/`--no-browser`/`--gui`. Alles, was unten über Browser-Oberfläche, Fenster-Programm, Startlink, Dienst, `templates/` oder `static/` steht, ist **Verlauf**. Geprüft über Tests, gerenderte Bilder und kurze Starts; **die Bedienung im echten Fenster, Live-Mitschnitt, Ton, Dateidialog, Skalierung, Geo-Download und das neue `.deb` stehen aus.** Das nächste Test-Paket muss die Version erhöhen.
+- Aufbau heute: `openpacketmon-capture` (Helfer mit Rechten, `capture/`) → `src/engine/`, `src/dissect/`, `src/filter/` → `src/view/` (Seitendaten, ohne Oberfläche) → `src/gui/`. Paketspeicher wählbar bis 2 GiB und 2 Millionen Pakete. Stirbt der Mitschnitt-Helfer, meldet das die Oberfläche (`CaptureStopped`).
 
 - Phase: **1, 2 und 3 erledigt** (2026-10-28): privat auf https://github.com/tomCSLK/openpacketmon, dieser Ordner ist das Repo
   (seit 4.9 neues Repo mit einem Anfangs-Commit; Bezug zum Original ist Commit `ab4bf739d464`). Umbenannt, iced-Oberfläche entfernt, Kern als `src/engine/`;
@@ -105,7 +106,7 @@ Netzwerkverkehrs-Monitor in Rust (iced-GUI, libpcap). Maßgeblich für Stand, Li
 - **Seitendaten in `src/view/`** (2026-11-01, `PLAN.md` 5.5 „Stand Seitendaten“): Alles, was die Seiten zeigen, liegt ohne Webserver, HTML und
   Adressen in `src/view/` (Links als `Jump`, Zeiten als `Timestamp`), `src/web/` rendert nur noch und behält Handler, Formulare und Live-Protokoll. Keine sichtbare
   Änderung: 631 Seiten je Sprache vor und nach dem Umbau gleich. Neue Seitendaten gehören nach `src/view/`; der Test `the_view_knows_nothing_of_the_browser_pages` hält die Grenze.
-- **Umstellung auf egui** (Wunsch des Nutzers, 2026-10-31, `PLAN.md` 5.5, Helfer, Seitendaten und Stufen 1 bis 3 fertig, Abbau der Browser-Technik steht aus): native Oberfläche statt Browser-Technik.
+- **Umstellung auf egui** (Wunsch des Nutzers, 2026-10-31, `PLAN.md` 5.5, erledigt 2026-11-01): native Oberfläche statt Browser-Technik.
   Entschieden: **Wireshark-Muster** (Fenster schließen beendet das Programm, mit Rückfrage; kein Infobereich, kein Autostart) und
   **erstes Release 0.4.0 oder 0.5.0** statt 0.3.0; der Haltepunkt gilt unverändert. Ebenfalls entschieden: **Plan B** mit kleinem
   Mitschnitt-Helfer und egui-Programm ohne Rechte, ohne Webschicht; Paketspeicher bleibt im RAM mit wählbarer Grenze. Probebau im Scratchpad bestanden (flüssig mit 2 Millionen
@@ -117,12 +118,11 @@ Netzwerkverkehrs-Monitor in Rust (iced-GUI, libpcap). Maßgeblich für Stand, Li
 - **Windows-Version** (vorgesehen, Beginn nach dem ersten Release und MCP, enthält MCP also schon): Alles für die Fortsetzung auf einem Windows-Rechner
   steht in `docs/windows.md` (Software, Einrichten, Linux-Bindungen im Code, Tests, Installer, Code-Signatur, CI, Reihenfolge).
   Der Installer soll, wenn möglich, signiert werden: zuerst SignPath Foundation, sonst OV-Zertifikat.
-- **Hinweis zur Oberflächentechnik** (Stand 2026-10-31, Hintergrund zur Umstellung aus `PLAN.md` 5.5): Die Craft-Programme (WordCraft, DeckCraft,
+- **Hinweis zur Oberflächentechnik** (Stand 2026-10-31, Hintergrund der Umstellung aus `PLAN.md` 5.5): Die Craft-Programme (WordCraft, DeckCraft,
   GridCraft, PdfCraft, PhotoCraft u. a. sowie der ArtCraft Launcher, Organisation `github.com/storytold`, MIT OR Apache-2.0) sind Rust-Programme
   mit **egui + eframe 0.37** (Fenster über `winit`, Zeichnen über `egui-wgpu`/`egui_glow`; egui und winit aus eigenen Forks mit festen Commits;
   geprüft in der jeweiligen `Cargo.toml` auf `main`). Laut deren READMEs laufen sie nativ unter Linux, Windows, macOS, FreeBSD und im Browser
-  (WebAssembly); nicht selbst getestet, Stand „early alpha“. openpacketmon nutzt bis zur Umstellung die Browser-Oberfläche (axum/askama) und das
-  Fenster-Programm über wry/WebKitGTK.
+  (WebAssembly); nicht selbst getestet, Stand „early alpha“.
   Zum Entwickeln mit egui gibt es den MCP-Server `egui_mcp` (Rerun, `github.com/rerun-io/egui_crates`, MIT/Apache; steuert eine laufende
   egui-App über `eframe/inspection`); er ist **nicht** installiert und wird nur auf ausdrücklichen Wunsch eingerichtet.
 - **Bedienung nachgebessert** (2026-10-30, `PLAN.md` Phase 3 Punkt 16): Verbindungsseite ohne
@@ -144,8 +144,7 @@ Netzwerkverkehrs-Monitor in Rust (iced-GUI, libpcap). Maßgeblich für Stand, Li
   anderen Rechnern).
 - **Nichts auf GitHub anlegen oder hochladen, bevor Name und Logo feststehen.** Repo zuerst privat (kein GitHub-Fork, siehe `PLAN.md` Phase 1).
 - Vor dem Öffentlich-Schalten `PLAN.md` Phase 4 vollständig abarbeiten (u. a. GeoIP zur Laufzeit, Fremdlizenzen, Sicherheitstest).
-- Oberfläche: Technik und Designsystem von opennetmon (`../PRTG_Nachbau`, `static/app.css`, Templates) wiederverwenden; deren Dateien
-  stehen dort unter AGPL, der Nutzer ist alleiniger Autor und hat sie am 2026-10-28 für diesen Fork unter MIT/Apache freigegeben. Fremddateien darin (z. B. uPlot) behalten ihre Lizenz.
+- Oberfläche: Farben und Aufbau wie opennetmon, in `src/gui/theme.rs`. Neue Seitendaten gehören nach `src/view/`, Zeichnen nach `src/gui/`; Texte nur über `locales/`.
 - Upstream-Fixes nur gezielt übernehmen (`git format-patch`/`git am` aus einem temporären Upstream-Klon; Bezug ist
   Upstream-Commit `ab4bf739d464`, den Tag `upstream-base` gibt es nur noch im Bundle), nie die Upstream-Historie einspielen.
 - Heimnetz-Details und Lokales nur in `CLAUDE.local.md` (gitignored), wie bei opennetmon.
@@ -162,14 +161,14 @@ Netzwerkverkehrs-Monitor in Rust (iced-GUI, libpcap). Maßgeblich für Stand, Li
 ## Upstream-Eckdaten
 
 - Autor Giuliano Bellini, Release v1.5.1 (2026-07-22), geprüft `main` @ `ab4bf73` (2026-10-20).
-- Rust Edition 2024, Workspace mit `lib/sniffnet-packet-parser`; Build unter Linux braucht `libpcap-dev`, `libasound2-dev` (Ton der egui-Oberfläche) und `libwebkit2gtk-4.1-dev` (Fenster-Programm).
-- Prüfen: `cargo deny --workspace check` (cargo-deny 0.20.2; ohne `--workspace` fehlt `openpacketmon-app`), `cargo test --workspace`, `cargo clippy -- -D warnings` (ohne `--all-targets`, wie Upstream; der Testcode hat viele Pedantic-Meldungen), `cargo fmt --all -- --check`.
+- Rust Edition 2024, Workspace mit `lib/sniffnet-packet-parser`; Build unter Linux braucht `libpcap-dev` und `libasound2-dev` (Ton).
+- Prüfen: `cargo deny --workspace check` (cargo-deny 0.20.2; ohne `--workspace` fehlt `openpacketmon-capture`), `cargo test --workspace`, `cargo clippy -- -D warnings` (ohne `--all-targets`, wie Upstream; der Testcode hat viele Pedantic-Meldungen), `cargo fmt --all -- --check`.
 - Paket: **`dev/build-deb.sh`** (2026-10-29) baut alles mit der Version aus `Cargo.toml` und nennt den Installationsbefehl.
-  **Versionen wie bei opennetmon** (Wunsch des Nutzers): `0.x.y` ohne Datum, vor jedem neuen Test-Paket in `Cargo.toml`,
-  `app/Cargo.toml` und `capture/Cargo.toml` erhöhen, danach `cargo update --workspace --offline` (sonst scheitert die Lizenzprüfung im Skript an
+  **Versionen wie bei opennetmon** (Wunsch des Nutzers): `0.x.y` ohne Datum, vor jedem neuen Test-Paket in `Cargo.toml`
+  und `capture/Cargo.toml` erhöhen, danach `cargo update --workspace --offline` (sonst scheitert die Lizenzprüfung im Skript an
   `Cargo.lock`) – `y` bei Kleinigkeiten, `x` bei größeren Schritten (erstes Release wird `0.4.0` oder `0.5.0`, siehe `PLAN.md` 5.5;
   Ablauf mit `dev/release.sh` in `PLAN.md` 4.10). Das Skript hält an, wenn die
   Version nicht neuer als die installierte ist, weil `apt install ./….deb` ein Paket gleicher Version stillschweigend
   überspringt („… wird an Stelle von … gewählt“); `--force` baut trotzdem, dann `apt install --reinstall`. Von Hand:
-  `cargo build --release --workspace && cargo deb` (`cargo deb` allein baut `openpacketmon-app` nicht neu). Jeder `cargo build`
+  `cargo build --release --workspace && cargo deb` (`cargo deb` allein baut `openpacketmon-capture` nicht neu). Jeder `cargo build`
   entfernt die `setcap`-Rechte des Binarys (Live-Mitschnitt aus `target/` dann nur nach `sudo setcap cap_net_raw,cap_net_admin=eip target/…/openpacketmon-capture`; das Hauptprogramm braucht keine Rechte).

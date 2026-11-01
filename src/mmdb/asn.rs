@@ -27,7 +27,7 @@ mod tests {
     fn test_get_asn_without_database() {
         assert!(MmdbReader::open(Path::new("unknown path")).is_none());
         assert!(MmdbReader::open(Path::new("")).is_none());
-        assert!(MmdbReader::open(Path::new("static/favicon.svg")).is_none());
+        assert!(MmdbReader::open(Path::new("Cargo.toml")).is_none());
         let res = get_asn(&IpAddr::from([8, 8, 8, 8]), &MmdbReader::Empty);
         assert_eq!(res.code, "");
         assert_eq!(res.name, "");

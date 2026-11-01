@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Writes THIRD-PARTY-LICENSES.txt: the licenses of everything built into the release binaries.
 
-Covers the Rust crates that end up in openpacketmon and openpacketmon-app (normal dependencies only, no dev or build
-dependencies), the files bundled under static/ and resources/, and the data openpacketmon uses without shipping it.
+Covers the Rust crates that end up in openpacketmon and openpacketmon-capture (normal dependencies only, no dev or build
+dependencies), the files bundled under resources/, and the data openpacketmon uses without shipping it.
 License texts are taken from the crate sources in the cargo registry and printed once per distinct text.
 Adapted from dev/third-party-licenses.py of opennetmon (same author).
 
@@ -21,10 +21,9 @@ TARGET = "x86_64-unknown-linux-gnu"
 OUTPUT = pathlib.Path("THIRD-PARTY-LICENSES.txt")
 LICENSE_FILE = re.compile(r"^(licen[cs]e|copying|notice|unlicense)([-._].*)?$", re.IGNORECASE)
 # the programs whose dependencies are listed
-ROOTS = ("openpacketmon", "openpacketmon-app", "openpacketmon-capture")
+ROOTS = ("openpacketmon", "openpacketmon-capture")
 
 BUNDLED = [
-    ("uPlot 1.6.32", "static/vendor/uplot/", "MIT", "static/vendor/uplot/LICENSE"),
     ("Inter 4.1", "resources/fonts/", "OFL-1.1", "resources/fonts/OFL.txt"),
 ]
 NOTES = """\
@@ -45,8 +44,8 @@ Test data (only in the source repository, not in the packages): resources/test/i
 databases of IPinfo (https://ipinfo.io, https://github.com/ipinfo/sample-database), unchanged, licensed under
 CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/); see resources/test/README.md.
 
-System libraries (installed by the distribution, linked at run time, not shipped): libpcap (openpacketmon), GTK 3,
-WebKitGTK and libayatana-appindicator (openpacketmon-app). Their licenses are in /usr/share/doc/<package>/copyright."""
+System libraries (installed by the distribution, linked at run time, not shipped): libpcap, ALSA and the libraries of
+the display and the graphics card. Their licenses are in /usr/share/doc/<package>/copyright."""
 
 
 def metadata():
@@ -98,7 +97,7 @@ def render(meta):
         "openpacketmon itself (including lib/sniffnet-packet-parser) is licensed under the MIT License or the Apache",
         "License 2.0, at your option (LICENSE-MIT, LICENSE-APACHE); it is a fork of Sniffnet, see NOTICE.",
         "",
-        f"Rust crates compiled into openpacketmon and openpacketmon-app ({len(crates)})",
+        f"Rust crates compiled into openpacketmon and openpacketmon-capture ({len(crates)})",
         "-" * 40,
     ]
     for p in crates:

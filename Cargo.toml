@@ -4,7 +4,7 @@
 [package]
 name = "openpacketmon"
 version = "0.3.0"
-description = "Network traffic monitor with a browser UI, based on Sniffnet"
+description = "Network traffic monitor, based on Sniffnet"
 readme = "README.md"
 keywords = ["network", "packet", "traffic", "monitor", "pcap"]
 categories = ["network-programming", "visualization"]
@@ -38,19 +38,14 @@ sniffnet-packet-parser = { path = "lib/sniffnet-packet-parser", version = "0.2.1
 pcap.workspace = true
 
 async-channel = "2.5.0"
-askama = "0.16.1"
-axum = { version = "0.8.9", default-features = false, features = ["form", "http1", "json", "query", "tokio"] }
 clap = { version = "4.6.7", features = ["derive"] }
 confy = "2.0.0"
-ctrlc = { version = "3.5.2", features = ["termination"] }
 dns-lookup = "4.0.2"
 eframe = { version = "0.37.0", default-features = false, features = ["accesskit", "clipboard", "default_fonts", "links", "wayland", "wgpu", "x11"] }
 egui_extras = { version = "0.37.0", features = ["image", "svg"] }
 egui_plot = "0.38.0"
 flate2 = "1.1.10"
 fluent-bundle = "0.16.0"
-hyper = { version = "1.12.0", features = ["http1", "server"] }
-hyper-util = { version = "0.1.21", features = ["tokio", "service"] }
 image = { version = "0.25", default-features = false, features = ["png"] }
 ipnet = "2.12.2"
 jiff = "0.2.38"
@@ -61,19 +56,16 @@ nom = "8.0.0"
 phf = "0.14.0"
 phf_shared = "0.14.0"
 rand = "0.9.5"
-rust-embed = { version = "8.13.0", features = ["mime-guess"] }
+rust-embed = "8.13.0"
 reqwest = { version = "0.13.5", features = ["json"] }
 rfd = "0.17"
 rodio = { version = "0.23.0", default-features = false, features = ["playback"] }
 semver = "1.0.28"
 serde = { version = "1.0.229", features = ["derive"] }
 serde_json = { version = "1.0.154", features = ["preserve_order"] }
-subtle = "2.6.1"
 surge-ping = "0.9.1"
-tokio = { version = "1.53.3", features = ["macros", "fs", "rt-multi-thread", "signal", "sync", "time", "net"] }
+tokio = { version = "1.53.3", features = ["macros", "rt-multi-thread", "sync", "time"] }
 toml = "1.1.8"
-tower-http = { version = "0.6.11", features = ["set-header"] }
-unic-langid = "0.9.6"
 
 #───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
 
@@ -81,8 +73,6 @@ unic-langid = "0.9.6"
 rstest = "0.27.0"
 serde_test = "1.0.177"
 serial_test = { version = "4.0.1", default-features = false }
-tower = { version = "0.5.3", features = ["util"] }
-http-body-util = "0.1.5"
 egui_kittest = { version = "0.37.0", features = ["wgpu", "snapshot", "eframe"] }
 
 #───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
@@ -102,15 +92,15 @@ section = "Network"
 license-file = "resources/packaging/LICENSE"
 extended-description-file = "resources/packaging/linux/description.txt"
 maintainer-scripts = "resources/packaging/linux/scripts/"
-# $auto takes libc6 and the libraries with the versions the binaries were built against; postinst needs setcap
-depends = "$auto, libcap2-bin"
-recommends = "libayatana-appindicator3-1"
+# $auto takes libc6 and the libraries with the versions the binaries were built against; postinst needs setcap.
+# The window loads the libraries of the display and the graphics card at run time, which $auto cannot see.
+depends = "$auto, libcap2-bin, libxkbcommon0, libwayland-client0, libx11-6, libxcursor1, libxi6, libxkbcommon-x11-0, libvulkan1 | libegl1"
+# the file dialogs
+recommends = "xdg-desktop-portal"
 assets = [
     ["target/release/openpacketmon", "/usr/bin/", "755"],
-    ["target/release/openpacketmon-app", "/usr/bin/", "755"],
     ["target/release/openpacketmon-capture", "/usr/bin/", "755"],
     ["resources/packaging/linux/openpacketmon.desktop", "/usr/share/applications/", "644"],
-    ["resources/packaging/linux/openpacketmon.service", "/usr/lib/systemd/user/", "644"],
     ["NOTICE", "/usr/share/doc/openpacketmon/", "644"],
     ["THIRD-PARTY-LICENSES.txt", "/usr/share/doc/openpacketmon/", "644"],
     ["resources/packaging/linux/graphics/openpacketmon_8x8.png", "/usr/share/icons/hicolor/8x8/apps/openpacketmon.png", "644"],
@@ -136,8 +126,8 @@ assets = [
 #═══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
 
 [workspace]
-members = [".", "app", "capture", "lib/sniffnet-packet-parser"]
-default-members = [".", "app", "capture", "lib/sniffnet-packet-parser"]
+members = [".", "capture", "lib/sniffnet-packet-parser"]
+default-members = [".", "capture", "lib/sniffnet-packet-parser"]
 
 #───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
 

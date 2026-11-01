@@ -168,7 +168,7 @@ pub fn show(app: &mut App, ui: &mut Ui) {
                 let outgoing = points(&d.samples, unit, true);
                 let now = match (incoming.last(), outgoing.last()) {
                     (Some(i), Some(o)) => fill(
-                        &t.get("js-rate-now"),
+                        &t.get("rate-now"),
                         &[rate(t, unit, i[1]), rate(t, unit, o[1])],
                     ),
                     _ => String::new(),
@@ -186,12 +186,12 @@ pub fn show(app: &mut App, ui: &mut Ui) {
                         }
                         let series = [
                             Series {
-                                name: t.get("js-chart-in"),
+                                name: t.get("chart-in"),
                                 color: p.accent,
                                 points: incoming,
                             },
                             Series {
-                                name: t.get("js-chart-out"),
+                                name: t.get("chart-out"),
                                 color: p.ok,
                                 points: outgoing,
                             },

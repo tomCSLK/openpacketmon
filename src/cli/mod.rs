@@ -11,12 +11,8 @@ use clap::Parser;
     name = APP_NAME,
     bin_name = APP_NAME,
     version = APP_VERSION,
-    about = "Monitor your network traffic in the browser",
-    long_about = "Monitor your network traffic in the browser.\n\n\
-        Starts a local web server (127.0.0.1 only) and opens the browser with a start link that \
-        signs it in. If openpacketmon is already running, only the browser is opened."
+    about = "Monitor your network traffic"
 )]
-#[allow(clippy::struct_excessive_bools)] // switches of a page or a command line
 pub(crate) struct Args {
     /// Start capturing from this network adapter right away
     #[arg(short, long, value_name = "NAME", default_missing_value = CONF.device.device_name.as_str(), num_args = 0..=1)]
@@ -24,15 +20,6 @@ pub(crate) struct Args {
     /// Analyze the packets of this PCAP file right away
     #[arg(short, long, value_name = "FILE", conflicts_with = "adapter")]
     pub import: Option<String>,
-    /// Port of the web server on 127.0.0.1
-    #[arg(short, long, value_name = "PORT", default_value_t = crate::web::DEFAULT_PORT)]
-    pub port: u16,
-    /// Do not open the browser (e.g. when running as a service)
-    #[arg(long)]
-    pub no_browser: bool,
-    /// Open the native window instead of the browser pages
-    #[arg(long, conflicts_with_all = ["port", "no_browser"])]
-    pub gui: bool,
     /// List the network adapters and exit
     #[arg(short, long, exclusive = true)]
     pub list_adapters: bool,

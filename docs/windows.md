@@ -10,8 +10,8 @@ der Fehler liefert also erst der erste `cargo check` unter Windows.
 
 **Feste Vorgaben:** Npcap wird **nie mitgeliefert**, der Nutzer installiert es selbst (proprietäre Lizenz). Wireshark-Code
 bleibt tabu. Die Arbeitsregeln in `CLAUDE.md` gelten unverändert. Die Arbeit beginnt **erst nach dem ersten Release (0.4.0 oder
-0.5.0) und nach der MCP-Anbindung** (`PLAN.md` 5.4), die Windows-Version enthält MCP also schon. Die geplante Umstellung auf egui
-(`PLAN.md` 5.5) ersetzt Webview und WebView2; die Abschnitte zum Fenster-Programm stammen aus der Zeit davor. Der Installer soll, wenn möglich, signiert
+0.5.0) und nach der MCP-Anbindung** (`PLAN.md` 5.4), die Windows-Version enthält MCP also schon. Seit der Umstellung auf egui
+(`PLAN.md` 5.5) gibt es keinen Webserver und kein Webview mehr. Der Installer soll, wenn möglich, signiert
 werden (Nutzer, 2026-10-30/31).
 
 ## 1. Was auf dem Windows-Rechner installiert sein muss
@@ -25,7 +25,6 @@ Vorgesehen sind Windows 10/11 x64. Die `winget`-Befehle sind Vorschläge und noc
 | Rust (rustup, Toolchain `stable-x86_64-pc-windows-msvc`) | Bauen | `winget install Rustlang.Rustup` |
 | Npcap | Mitschnitt zur Laufzeit, die Tests und der Build von `pcap` brauchen `wpcap.dll` | https://npcap.com/#download |
 | Npcap SDK | Linken gegen `wpcap.lib` | https://npcap.com/#download, entpacken, `Lib\x64` in die Umgebungsvariable `LIB` |
-| WebView2 Runtime | Fenster-Programm (wry) | bei Windows 11 dabei, sonst von Microsoft |
 | Python 3 | `dev/third-party-licenses.py`, `dev/update-services.py` | `winget install Python.Python.3.12` |
 | GitHub CLI | Anmeldung, Repo, später Releases | `winget install GitHub.cli` |
 | cargo-deny 0.20.2 | Lizenz- und Sicherheitsprüfung | `cargo install cargo-deny --locked --version 0.20.2` |
@@ -74,17 +73,11 @@ dabei unverändert weiter bauen; Windows-Code kommt hinter `#[cfg(windows)]`, Li
 
 ## 4. Was im Code zu tun ist
 
-### Server `openpacketmon`
+### Programm `openpacketmon`
 
 | Stelle | Heute | Für Windows |
 |---|---|---|
-| `src/web/mod.rs` `shutdown_signal` | `tokio::signal::unix`, **baut nicht** | Teil hinter `#[cfg(unix)]`; unter Windows reicht `ctrl_c` |
-| `src/web/auth.rs` `write_start_link` | `std::os::unix`-Rechte `0700`/`0600`, **baut nicht** | Datei im Benutzerprofil anlegen; prüfen, dass nur der Benutzer lesen kann (ACL). Sie enthält den Zugangsschlüssel, das ist sicherheitsrelevant |
-| `src/web/auth.rs` `start_link_path` | `XDG_RUNTIME_DIR`, sonst Konfigurationsordner | Rückfall greift; `%LOCALAPPDATA%` wäre passender als das roamende `%APPDATA%` |
 | `src/utils/formatted_strings.rs` `redirect_stdout_stderr_to_file` | nutzt die Crate `gag`, die nicht mehr in `Cargo.toml` steht, **baut im Release nicht** | Funktion entfernen oder `gag` wieder aufnehmen; Log-Datei wird gebraucht, wenn es kein Konsolenfenster gibt |
-| `src/main.rs` `open_browser` | `xdg-open` | Browser unter Windows öffnen. Der Link enthält `?token=`, also keinen Weg über `cmd /c start` mit ungeschütztem `&`; besser `rundll32 url.dll,FileProtocolHandler` oder `ShellExecuteW`. Nur `http(s)` zulassen |
-| `src/web/app.rs` `app_binary` | Dateiname ohne Endung | `openpacketmon-app.exe` suchen |
-| `src/web/app.rs` Autostart | `.desktop` in `~/.config/autostart` | Eintrag unter `HKCU\Software\Microsoft\Windows\CurrentVersion\Run` oder Verknüpfung im Ordner „Autostart“, Tests anpassen |
 | `src/mmdb/geo.rs` `geo_dir` | `HOME`, `.local/share` (`HOME` fehlt unter Windows) | `%LOCALAPPDATA%\openpacketmon\geo` |
 | `src/mmdb/geo.rs` `geoipupdate_file` | `/var/lib/GeoIP/…` | unter Windows weglassen oder den Ordner von `geoipupdate` nehmen, Test anpassen |
 | `src/networking/traffic_preview.rs`, `capture_context.rs` | aus Sniffnet, schon für Windows vorbereitet | prüfen |
@@ -95,33 +88,20 @@ dabei unverändert weiter bauen; Windows-Code kommt hinter `#[cfg(windows)]`, Li
 | Doku-Texte | „Linux“, `setcap`, `systemctl`, `/usr/share/doc/…` | Oberfläche und README prüfen |
 
 Der Build von Windows braucht in `build.rs` zusätzlich das Programm-Icon: Sniffnet nutzte dafür `winresource`. Bei uns wurde das
-entfernt, es kommt für `openpacketmon.exe` und `openpacketmon-app.exe` mit einem eigenen `.ico` wieder dazu (aus
+entfernt, es kommt für `openpacketmon.exe` mit einem eigenen `.ico` wieder dazu (aus
 `openpacketmon_256x256.png` u. a. erzeugen, **nicht** das `sniffnet.ico` des Originals).
 
-### Fenster-Programm `openpacketmon-app` (`app/src/main.rs`)
+### Fenster (`src/gui/`)
 
-Hier liegt die meiste Arbeit, die Datei ist durchgehend auf Linux geschrieben:
-
-| Stelle | Heute | Für Windows |
-|---|---|---|
-| Einzelne Instanz (`single_instance`, `listen_for_show`) | Unix-Socket im Laufzeitordner | Named Pipe oder benannter Mutex; zweiter Start muss das Fenster der laufenden Instanz zeigen |
-| Serverstart | `CommandExt::process_group(0)` | `CREATE_NO_WINDOW`/`CREATE_NEW_PROCESS_GROUP` über `std::os::windows::process::CommandExt` |
-| Pfade `runtime_dir`, `config_dir`, `webview_dir` | `XDG_*`, `HOME` | dieselben Ordner wie der Server. Beide Programme müssen die Datei mit dem Startlink am **selben** Ort suchen |
-| Webview | `build_gtk(window.default_vbox())`, `WebViewBuilderExtUnix`, `WindowExtUnix` | `build(&window)` hinter `cfg`; GTK-Teile nur unter Unix |
-| Links | `xdg-open` | wie beim Server, nur `http(s)` |
-| Konsole | keine Angabe | `#![cfg_attr(windows, windows_subsystem = "windows")]` für das Fenster-Programm. Das gilt je nach Entscheidung auch für den Server, wenn er ohne Fenster laufen soll |
-| `Cargo.toml` | `tao` mit Funktion `x11` | Linux-Funktion nur für Linux aktivieren |
-
-Danach prüfen: Downloads (PCAP) in WebView2, neue Fenster und Links, Anmeldung per Startlink, Symbol im Infobereich, Beenden
-über den Infobereich, Verhalten beim Schließen des Fensters.
+egui, wgpu und `rfd` laufen unter Windows, der Code dort ist bisher aber nur unter Linux gelaufen. Zu prüfen: Dateidialoge, Ton (`rodio` nutzt dort WASAPI statt ALSA),
+`LANG`-Abfrage in `language_of`, Konsole (`#![cfg_attr(windows, windows_subsystem = "windows")]`, sonst geht mit dem Fenster ein Konsolenfenster auf) und Verhalten beim Schließen.
 
 Die Trennung der Rechte bleibt: Unter Linux hat nur der Helfer `openpacketmon-capture` die Mitschnittrechte und gibt sie nach dem
-Öffnen des Adapters ab, Server und Fenster laufen ohne. Unter Windows entscheidet die Installation von Npcap, ob normale Benutzer
-mitschneiden dürfen oder nur Administratoren. Das Fenster-Programm soll nie als Administrator laufen müssen.
+Öffnen des Adapters ab, das Programm läuft ohne. Unter Windows entscheidet die Installation von Npcap, ob normale Benutzer
+mitschneiden dürfen oder nur Administratoren. Das Programm soll nie als Administrator laufen müssen.
 
 ### Was es unter Windows nicht gibt
 
-- **systemd-User-Dienst:** Dafür reicht der Autostart des Fenster-Programms. Ein Windows-Dienst ist vorerst nicht nötig.
 - **`setcap` und `postinst`:** Das übernimmt Npcap.
 - **`.deb`:** ersetzt durch einen Installer (Abschnitt 6).
 
@@ -137,9 +117,9 @@ mitschneiden dürfen oder nur Administratoren. Das Fenster-Programm soll nie als
 5. Programme je Verbindung, Latenzmessung, Geodaten-Download, Benachrichtigungen mit Ton, PCAP-Download und -Import.
 6. IPFIX-Collector: Die Windows-Firewall fragt nach, weil er auf `0.0.0.0:4739` lauscht. Die Oberfläche auf `127.0.0.1` löst
    keine Nachfrage aus.
-7. Sicherheit: Der Sicherheitstest aus `PLAN.md` 4.8 für die geänderten Stellen, vor allem die Rechte der Startlink-Datei.
+7. Sicherheit: Der Sicherheitstest aus `PLAN.md` 4.8 für die geänderten Stellen, vor allem die Rechte des Helfers.
 8. Sauberes System: Installer, Deinstallation, Update über eine ältere Version.
-9. MCP-Anbindung (`PLAN.md` 5.4): `openpacketmon.exe mcp` mit Claude Code unter Windows, Anmeldung über den Startlink.
+9. MCP-Anbindung (`PLAN.md` 5.4): `openpacketmon.exe mcp` mit Claude Code unter Windows.
 
 ## 6. Installer und Release
 
@@ -182,7 +162,7 @@ Was SignPath verlangt und was das für uns heißt:
 ## 7. Prüfwerkzeuge und CI
 
 - `deny.toml`: `targets` um `x86_64-pc-windows-msvc` ergänzen.
-- `dev/third-party-licenses.py`: `TARGET` gilt nur für Linux. Es kommen z. B. `webview2-com` und die `windows-*`-Crates dazu,
+- `dev/third-party-licenses.py`: `TARGET` gilt nur für Linux. Es kommen z. B. die `windows-*`-Crates dazu,
   die Windows-Lizenzliste kann also größer werden. Am besten erzeugt das Skript eine gemeinsame Liste für beide Plattformen.
 - `dev/*.sh` laufen in Git Bash. `dev/build-deb.sh` und `dev/release.sh` sind nur für Linux gedacht.
 - `.github/workflows/ci.yml`: einen Job auf `windows-latest` ergänzen, mit Npcap SDK (Sniffnet lädt `npcap-sdk-1.16.zip` von
@@ -193,13 +173,12 @@ Was SignPath verlangt und was das für uns heißt:
 ## 8. Reihenfolge
 
 1. Einrichten (Abschnitt 1 bis 3), `cargo check --workspace` und die echte Fehlerliste mit Abschnitt 4 abgleichen.
-2. Server bauen und starten, Oberfläche im Browser, ein Mitschnitt mit Npcap.
-3. `cargo test`, Pfade und Rechte, vor allem die Startlink-Datei.
-4. Fenster-Programm mit Symbol im Infobereich.
-5. Windows-Eigenheiten aus Abschnitt 5.
-6. CI, Lizenzliste, `deny.toml`.
-7. Installer, Test auf sauberem System, README, erstes Windows-Release, zunächst unsigniert.
-8. Signatur beantragen (Abschnitt 6.1), danach signierte Installer.
+2. Programm bauen und starten, ein Mitschnitt mit Npcap.
+3. `cargo test`, Pfade und Rechte.
+4. Windows-Eigenheiten aus Abschnitt 5.
+5. CI, Lizenzliste, `deny.toml`.
+6. Installer, Test auf sauberem System, README, erstes Windows-Release, zunächst unsigniert.
+7. Signatur beantragen (Abschnitt 6.1), danach signierte Installer.
 
 **Beginn (Nutzer, 2026-10-30/31):** Reihenfolge erstes Release → MCP-Anbindung → Windows. Bis zum Release gilt auch auf dem Windows-Rechner
 der Haltepunkt aus `PLAN.md` 4.10. Die Abschnitte 4 und 5 stammen aus der Zeit vor MCP: Beim Beginn die Liste um das ergänzen, was

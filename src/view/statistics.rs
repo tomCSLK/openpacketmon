@@ -3,8 +3,6 @@
 
 use std::collections::HashMap;
 
-use serde::Serialize;
-
 use crate::engine::Engine;
 use crate::engine::analysis::{self, PacketAnalysis, flag};
 use crate::networking::types::address_port_pair::AddressPortPair;
@@ -147,7 +145,7 @@ pub struct TimeRow {
 }
 
 /// The chart: packets and bytes per second, in steps of `step` seconds from `start`
-#[derive(Serialize, Default)]
+#[derive(Default)]
 pub struct Chart {
     pub start: i64,
     pub step: i64,
@@ -471,7 +469,11 @@ pub fn statistics(
 
 #[cfg(test)]
 mod tests {
+    use serial_test::serial;
+
     use super::*;
+    use crate::config::conf::Conf;
+    use crate::engine::Engine;
 
     #[test]
     fn the_chart_puts_seconds_together_in_steps() {
@@ -505,5 +507,17 @@ mod tests {
     fn filters_are_combined_with_the_one_of_the_page() {
         assert_eq!(and_filter("", "tcp"), "tcp");
         assert_eq!(and_filter(" dns or tcp ", "tcp"), "(dns or tcp) and tcp");
+    }
+
+    #[test]
+    #[serial]
+    fn the_connection_filter_is_no_display_filter() {
+        let runtime = tokio::runtime::Runtime::new().unwrap();
+        let engine = Engine::new(Conf::default(), runtime.handle().clone());
+        let index = FilterIndex::default();
+        let page = statistics(Lang::En, &engine, &index, "", "country == US");
+        assert!(page.error.is_none());
+        let page = statistics(Lang::En, &engine, &index, "", "country ==");
+        assert!(page.error.unwrap().connections);
     }
 }

@@ -106,7 +106,6 @@ impl From<Jump> for Page {
                 filter,
                 connections,
             },
-            Jump::Stream(number) => Self::Stream(number),
         }
     }
 }

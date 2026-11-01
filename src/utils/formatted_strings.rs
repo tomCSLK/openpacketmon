@@ -22,22 +22,6 @@ pub const APP_VERSION: &str = env!("CARGO_PKG_VERSION");
 //     }
 // }
 
-#[allow(clippy::print_stdout)]
-pub fn print_cli_welcome_message() {
-    let ver = APP_VERSION;
-    print!(
-        "\n\
-╭────────────────────────────────────────────────────────────────────╮\n\
-│                                                                    │\n\
-│                      openpacketmon {ver:<10}                      │\n\
-│                                                                    │\n\
-│        → GitHub: https://github.com/tomCSLK/openpacketmon          │\n\
-│        → Based on Sniffnet by Giuliano Bellini                     │\n\
-│                                                                    │\n\
-╰────────────────────────────────────────────────────────────────────╯\n\n"
-    );
-}
-
 pub fn get_domain_from_r_dns(r_dns: String) -> String {
     if r_dns.parse::<IpAddr>().is_ok() || r_dns.is_empty() {
         // rDNS is equal to the corresponding IP address (can't be empty but checking it to be safe)

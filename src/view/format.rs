@@ -1,5 +1,4 @@
 //! Numbers, data volumes and times as the program shows them, in the language of the interface.
-//! `static/format.js` formats the live values of the browser pages the same way.
 
 use std::net::IpAddr;
 

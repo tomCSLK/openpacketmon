@@ -144,7 +144,7 @@ pub fn settings(t: Lang, engine: &EngineState) -> Settings {
     let notifications = &conf.settings.notifications;
     let mut languages = vec![Choice {
         value: "",
-        label: t.get("language-browser"),
+        label: t.get("gui-language-system"),
         selected: Lang::parse(&conf.language).is_none(),
     }];
     languages.extend(Lang::ALL.into_iter().map(|l| Choice {
@@ -267,7 +267,11 @@ pub fn apply_settings(engine: &mut EngineState, change: &SettingsChange) {
 
 #[cfg(test)]
 mod tests {
+    use serial_test::serial;
+
     use super::*;
+    use crate::config::conf::Conf;
+    use crate::engine::Engine;
 
     #[test]
     fn sounds_and_addresses_are_parsed() {
@@ -280,5 +284,91 @@ mod tests {
             ["192.168.1.20", "fe80::1", "10.0.0.1"].map(|a| a.parse::<IpAddr>().unwrap())
         );
         assert_eq!(invalid, ["example.com"]);
+    }
+
+    fn engine() -> (tokio::runtime::Runtime, Engine) {
+        let runtime = tokio::runtime::Runtime::new().unwrap();
+        let engine = Engine::new(Conf::default(), runtime.handle().clone());
+        (runtime, engine)
+    }
+
+    fn change() -> SettingsChange {
+        SettingsChange {
+            language: "de".to_owned(),
+            page_size: 100,
+            favorite_active: true,
+            favorite_sound: Sound::Gulp,
+            addresses: vec![[10, 0, 0, 2].into(), [192, 168, 1, 20].into()],
+            volume: 150,
+            mmdb_country: String::new(),
+            mmdb_asn: String::new(),
+            update_checks: false,
+            packets_enabled: false,
+            packets_max: 250_000,
+            packets_memory: Some(2048),
+            packets_headers: true,
+        }
+    }
+
+    #[test]
+    #[serial]
+    fn the_settings_are_put_into_the_configuration() {
+        let (_runtime, engine) = engine();
+        apply_settings(&mut engine.lock(), &change());
+        let state = engine.lock();
+        let conf = &state.conf;
+        assert_eq!(conf.language, "de");
+        assert_eq!(conf.page_size, 100);
+        let notifications = &conf.settings.notifications;
+        assert!(notifications.favorite_notification.is_active);
+        assert_eq!(notifications.favorite_notification.sound, Sound::Gulp);
+        assert_eq!(notifications.volume, 100);
+        assert_eq!(conf.favorites.addresses().len(), 2);
+        assert!(conf.favorites.contains_address(&[192, 168, 1, 20].into()));
+        assert!(conf.updates.disable_checks());
+        assert!(!conf.packet_store.enabled);
+        assert_eq!(conf.packet_store.max_packets, 250_000);
+        assert_eq!(conf.packet_store.megabytes, 2048);
+        assert!(conf.packet_store.headers_only);
+    }
+
+    #[test]
+    #[serial]
+    fn values_that_are_not_offered_change_nothing() {
+        let (_runtime, engine) = engine();
+        let (size, max, memory) = {
+            let state = engine.lock();
+            let store = state.conf.packet_store;
+            (state.conf.page_size, store.max_packets, store.megabytes)
+        };
+        let mut wrong = change();
+        wrong.language = "xx".to_owned();
+        wrong.page_size = 7;
+        wrong.packets_max = 7;
+        wrong.packets_memory = Some(7);
+        apply_settings(&mut engine.lock(), &wrong);
+        let state = engine.lock();
+        assert_eq!(state.conf.language, "");
+        assert_eq!(state.conf.page_size, size);
+        assert_eq!(state.conf.packet_store.max_packets, max);
+        assert_eq!(state.conf.packet_store.megabytes, memory);
+    }
+
+    #[test]
+    #[serial]
+    fn addresses_that_are_gone_are_no_favorites_any_more() {
+        let (_runtime, engine) = engine();
+        apply_settings(&mut engine.lock(), &change());
+        let mut fewer = change();
+        fewer.addresses = vec![[10, 0, 0, 2].into()];
+        apply_settings(&mut engine.lock(), &fewer);
+        let state = engine.lock();
+        assert_eq!(state.conf.favorites.addresses().len(), 1);
+        assert!(
+            !state
+                .conf
+                .favorites
+                .contains_address(&[192, 168, 1, 20].into())
+        );
     }
 }

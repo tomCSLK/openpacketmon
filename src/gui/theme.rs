@@ -1,5 +1,4 @@
-//! Colors, fonts and the look of the widgets: the same tokens as the stylesheet of the browser
-//! pages (`static/app.css`), so both look alike.
+//! Colors, fonts and the look of the widgets.
 
 // the colors read as in the stylesheet
 #![allow(clippy::unreadable_literal)]

@@ -2,7 +2,7 @@
 
 use crate::config::favorite::Favorite;
 use crate::engine::state::EngineState;
-use crate::networking::types::data_representation::{DataRepr, DataUnit};
+use crate::networking::types::data_representation::DataRepr;
 use crate::report::types::sort_type::SortType;
 use crate::view::capture::{capture_state, source_kind};
 use crate::view::entries::{EntryRow, entry_rows};
@@ -21,11 +21,10 @@ pub struct CaptureHead {
     pub finished: bool,
 }
 
-/// A value tile; `id` names the value for updates while the page is open
+/// A value tile
 pub struct Tile {
     pub label: String,
     pub value: String,
-    pub id: &'static str,
 }
 
 fn capture_head(t: Lang, state: &EngineState) -> Option<CaptureHead> {
@@ -49,34 +48,28 @@ fn tiles(t: Lang, state: &EngineState) -> Vec<Tile> {
         Tile {
             label: t.get("tile-total"),
             value: format::amount(t, unit, data.tot_data(repr)),
-            id: "total",
         },
         Tile {
             label: t.get("tile-in"),
             value: format::amount(t, unit, data.incoming_data(repr)),
-            id: "in",
         },
         Tile {
             label: t.get("tile-out"),
             value: format::amount(t, unit, data.outgoing_data(repr)),
-            id: "out",
         },
         Tile {
             label: t.get("tile-connections"),
             value: format::count(t, state.info_traffic.map.len() as u128),
-            id: "connections",
         },
         Tile {
             label: t.get("tile-hosts"),
             value: format::count(t, state.info_traffic.hosts.len() as u128),
-            id: "hosts",
         },
     ];
     if let Some(dropped) = state.info_traffic.dropped_packets {
         tiles.push(Tile {
             label: t.get("tile-dropped"),
             value: format::count(t, dropped.total(DataRepr::packets(false), *data)),
-            id: "dropped",
         });
     }
     tiles
@@ -100,7 +93,6 @@ pub struct Overview {
     pub services: Vec<EntryRow>,
     /// Not for capture sources without programs
     pub programs: Option<Vec<EntryRow>>,
-    pub unit: DataUnit,
 }
 
 pub fn overview(t: Lang, state: &EngineState) -> Overview {
@@ -111,6 +103,5 @@ pub fn overview(t: Lang, state: &EngineState) -> Overview {
         services: top(t, state, Favorite::Service),
         programs: (!state.is_running() || state.capture_source.supports_programs())
             .then(|| top(t, state, Favorite::Program)),
-        unit: state.conf.data_repr.data_unit,
     }
 }

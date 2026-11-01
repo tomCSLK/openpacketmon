@@ -283,6 +283,43 @@ fn the_filter_field_suggests_and_applies() {
 
 #[test]
 #[serial]
+fn the_keys_move_the_packet_list() {
+    let fixture = engine_with(2_000);
+    let mut harness = window(&fixture, Theme::Light, Lang::De);
+    harness.state_mut().go(Page::Packets {
+        filter: String::new(),
+        connections: String::new(),
+        goto: None,
+    });
+    settle(&mut harness);
+
+    harness.key_press(egui::Key::ArrowDown);
+    settle(&mut harness);
+    assert_eq!(row_at_top(&harness), 1);
+    harness.key_press(egui::Key::PageDown);
+    settle(&mut harness);
+    let page = harness.state().pages.packets.visible() - 1;
+    assert_eq!(row_at_top(&harness), 1 + page);
+
+    harness.key_press_modifiers(egui::Modifiers::COMMAND, egui::Key::End);
+    settle(&mut harness);
+    let top = row_at_top(&harness);
+    assert!(top + page >= 1_999, "row {top} at the top");
+
+    // back from the details, the list is where it was
+    harness.state_mut().go(Page::Packet(1_990));
+    settle(&mut harness);
+    harness.state_mut().back();
+    settle(&mut harness);
+    assert_eq!(row_at_top(&harness), top);
+
+    harness.key_press_modifiers(egui::Modifiers::COMMAND, egui::Key::Home);
+    settle(&mut harness);
+    assert_eq!(row_at_top(&harness), 0);
+}
+
+#[test]
+#[serial]
 fn going_to_a_packet_from_a_shorter_list_stays_there() {
     let fixture = engine_with(2_000);
     let mut harness = window(&fixture, Theme::Light, Lang::De);
@@ -423,8 +460,14 @@ fn closing_asks_only_while_a_capture_runs() {
     request_close(&mut harness);
     assert!(harness.query_by_label("Aufzeichnung läuft").is_none());
 
-    harness.state_mut().live.capturing = true;
-    request_close(&mut harness);
+    // the next reading of the state of the capture takes this back
+    for _ in 0..50 {
+        harness.state_mut().live.capturing = true;
+        request_close(&mut harness);
+        if harness.query_by_label("Aufzeichnung läuft").is_some() {
+            break;
+        }
+    }
     assert!(harness.query_by_label("Aufzeichnung läuft").is_some());
     harness.get_by_label("Abbrechen").click();
     harness.run_steps(2);

@@ -1,3 +1,0 @@
-{# the connection filter next to the display filter of packets and statistics; needs `connections`, `error`, `t` #}
-{% if !connections.is_empty() %}<input type="search" name="c" value="{{ connections }}" placeholder="{{ t.get("connections-filter-placeholder") }}" aria-label="{{ t.get("connections-filter") }}"
-    autocomplete="off" spellcheck="false" data-filter-input data-filter-kind="connections"{% if let Some(e) = error %}{% if e.connections %} class="invalid"{% endif %}{% else %} class="valid"{% endif %}>{% endif %}

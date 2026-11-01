@@ -13,7 +13,7 @@ use crate::networking::manage_packets::get_address_to_lookup;
 use crate::networking::types::address_port_pair::AddressPortPair;
 use crate::networking::types::data_info::DataInfo;
 use crate::networking::types::data_info_host::DataInfoHost;
-use crate::networking::types::data_representation::{DataRepr, DataUnit};
+use crate::networking::types::data_representation::DataRepr;
 use crate::networking::types::info_address_port_pair::InfoAddressPortPair;
 use crate::networking::types::latency::LatencyStatus;
 use crate::networking::types::program::Program;
@@ -126,7 +126,6 @@ pub struct ListRequest<'a> {
 
 /// A page of the list of connections
 pub struct ConnectionList {
-    pub running: bool,
     /// What is wrong with the filter; a wrong filter shows no connections rather than all of them
     pub error: Option<String>,
     pub rows: Vec<ConnectionRow>,
@@ -143,7 +142,6 @@ pub struct ConnectionList {
     pub sizes: Vec<(usize, bool)>,
     /// The capture source knows the programs
     pub programs: bool,
-    pub unit: DataUnit,
 }
 
 pub fn connection_list(t: Lang, engine: &EngineState, request: &ListRequest) -> ConnectionList {
@@ -181,7 +179,6 @@ pub fn connection_list(t: Lang, engine: &EngineState, request: &ListRequest) -> 
     let first_row = if total == 0 { 0 } else { (page - 1) * size + 1 };
     let last_row = first_row + rows.len().saturating_sub(1);
     ConnectionList {
-        running: engine.is_running(),
         error,
         rows,
         total,
@@ -192,7 +189,6 @@ pub fn connection_list(t: Lang, engine: &EngineState, request: &ListRequest) -> 
         last_row,
         sizes: PAGE_SIZES.iter().map(|s| (*s, *s == size)).collect(),
         programs: engine.capture_source.supports_programs(),
-        unit,
     }
 }
 

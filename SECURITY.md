@@ -15,7 +15,7 @@ Please report vulnerabilities **privately** and not as a public issue:
 2. Choose **Report a vulnerability** and describe the problem.
 
 Helpful details: the affected version, how to reproduce it, what an attacker can achieve and under which conditions (for example:
-another local user, a web page open in the same browser, crafted packets on the captured network). Do not include captures with
+another local user, crafted packets on the captured network, a crafted capture file). Do not include captures with
 private traffic; reduce them to the packets that trigger the problem.
 
 openpacketmon is maintained in spare time. You will get an answer as soon as possible; once a fix is released, the advisory is
@@ -26,14 +26,12 @@ affect Sniffnet as well; we pass them on to its maintainer.
 
 ## Scope and known limitations
 
-In scope: the web interface on `127.0.0.1` and its sign-in (start link, session cookie, CSRF tokens, `Host`/`Origin` checks), the
-parsing of captured packets (dissectors, display filter, TCP analysis), the import of capture and MMDB files, the download of the
-geolocation databases, the window program `openpacketmon-app`, the Debian package and the systemd user service.
+In scope: the parsing of captured packets (dissectors, display filter, TCP analysis) and how the window shows them, the import of
+capture and MMDB files, the download of the geolocation databases, the capture helper `openpacketmon-capture` and the Debian package.
 
 Known and documented, not vulnerabilities in themselves:
 
-- The web interface listens on `127.0.0.1` only and uses plain HTTP; it is meant for the user who runs it, not for remote access.
 - The package gives the helper `/usr/bin/openpacketmon-capture` the capabilities `cap_net_raw` and `cap_net_admin`, so every local
   user can capture traffic with it, as with Wireshark's `dumpcap` in the group `wireshark`. Remove them with `setcap -r` if that is not
   wanted. The helper drops them once the adapter is open and does not look into the packets; openpacketmon itself has no special rights.
-- The packet store keeps the captured packets in memory, including their contents, until the capture is stopped.
+- The packet store keeps the captured packets in memory, including their contents, until the capture is stopped or the program ends.

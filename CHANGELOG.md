@@ -12,22 +12,18 @@ First public version. This list describes what differs from Sniffnet.
 
 ### Interface
 
-- New browser UI in the style of opennetmon on 127.0.0.1 (default port 7380) instead of Sniffnet's desktop UI: capture
-  page (adapter with activity curves, capture file, IPFIX collector, BPF filter, PCAP export), overview with tiles, live
-  chart and top lists, connections, hosts, services, programs, notifications with badge and sounds, and settings; light
-  and dark design with a violet sidebar; English and German; desktop layout only
-- New program `openpacketmon-app`: the UI in its own window (system web view) with a tray icon (open, browser, quit). It
-  starts the server when needed and runs without capture rights; closing the window keeps the capture running, downloads
-  go to the download folder, and links to other sites open in the browser. A setting starts it in the tray at sign-in
-- A back button on every page, also for the window without a browser bar. Statistics, packet list and PCAP download can
-  take the connection filter, so the Connections page opens the statistics of everything its search selects
+- New native interface (egui, wgpu) in the style of opennetmon instead of Sniffnet's desktop UI: capture page (adapter with
+  activity curves, capture file, IPFIX collector, BPF filter, PCAP export), overview with tiles, live chart and top lists,
+  connections, hosts, services, programs, notifications with badge and sounds, and settings; light and dark design with a
+  violet sidebar; English and German; the font Inter is built in
+- The program works like Wireshark: closing the window ends it, with a question while a capture is running; there is no
+  background service, tray icon or autostart. Several windows can run side by side
+- A back arrow on every page, also with Alt+Left and the back button of the mouse. Statistics, packet list and saving as
+  PCAP can take the connection filter, so the Connections page opens the statistics of everything its search selects
 - The filter fields suggest fields, operators and connectors while typing, with short explanations, and in the
   connection filter the values of the capture
-- Sign-in with a start link (random access key, readable only by the user), session cookie, CSRF tokens, `Host`/`Origin`
-  checks and security headers
-- A second start only opens the browser for the running instance, with one start link file per port; options `--port`,
-  `--no-browser`, `--adapter`, `--import` and `--list-adapters`
-- Debian package with a start menu entry and a systemd user service (`systemctl --user enable --now openpacketmon`)
+- Options `--adapter`, `--import` and `--list-adapters`
+- Debian package with a start menu entry
 - Connections are filtered with one field in the grammar of the display filter, with fields of their own (`ip.addr`,
   `port`, `proto`, `direction`, `service`, `domain`, `as.name`, `country`, `program`, `bytes`, `favorite` …), checked
   while typing and explained in a help section; pages with page numbers and a field to type the page
@@ -41,11 +37,11 @@ First public version. This list describes what differs from Sniffnet.
 
 ### Packet analysis
 
-- Packet store: the packets of a capture are kept in memory (10,000 to 500,000 packets, at most 512 MiB), whole or as
+- Packet store: the packets of a capture are kept in memory (10,000 to 2 million packets, 256 MiB to 2 GiB), whole or as
   headers only, chosen on the capture page or in the settings; live captures then take whole packets
 - New page *Packets*: one continuous list, as in Wireshark, that scrolls through all packets matching the display filter,
   loads only the rows in view and follows new packets at the end during a capture; "Go to packet" (Ctrl+G), Ctrl+Home/End,
-  Page Up/Down and the arrow keys; back from the packet details it returns to the same packet
+  Page Up/Down and the arrow keys; back from the packet details the list is where it was
 - Packet details: layer tree and hex dump, a field marks its bytes and a byte selects its field. Layers: Ethernet, VLAN,
   Linux cooked capture, ARP, IPv4, IPv6, TCP, UDP, ICMP, ICMPv6, IGMP, DNS, mDNS, LLMNR, DHCP, DHCPv6, TLS (with server
   name, ALPN and versions, also over several TCP segments), HTTP/1, SSDP, NTP and the QUIC header
@@ -53,7 +49,7 @@ First public version. This list describes what differs from Sniffnet.
   `dns.time > 100ms`; checked while typing and explained when wrong
 - Coloring rules in the packet list (errors and resets, TCP setup and teardown, DNS, local services, TLS/QUIC, HTTP …)
 - Follow stream: the payload of a TCP or UDP connection in both directions as text or hex
-- Download of the stored packets (all or the filtered ones) as a PCAP file
+- Saving the stored packets (all or the filtered ones) as a PCAP file
 - TCP analysis of the stored packets: retransmissions, gaps, segments out of order, duplicate ACKs, zero windows,
   keep-alives and window updates are marked and can be filtered (`tcp.analysis.flags`, `tcp.analysis.retransmission` …);
   round trip times of ACKs, handshake times and DNS response times, with links between a packet and the one it
@@ -80,9 +76,8 @@ First public version. This list describes what differs from Sniffnet.
 
 ### Removed from Sniffnet
 
-- Sniffnet's desktop UI (iced), charts (plotters), sound playback (rodio), file dialogs, fonts, icons, flags, themes,
-  sound files and the 14 UI translations; the sounds are now generated in the browser, and dependencies went from 701 to
-  about 300 crates
+- Sniffnet's desktop UI (iced), charts (plotters), fonts, icons, flags, themes, sound files and the 14 UI translations; the
+  sounds are now generated by the program
 - The IP blacklist, and the data threshold and blacklist notifications and their forwarding to a URL
 - Windows and macOS packaging: Linux only for now
 - Files that only apply to the Sniffnet project (funding, website, audits, upstream CI)
@@ -92,7 +87,7 @@ First public version. This list describes what differs from Sniffnet.
 
 - `NOTICE` lists the files of Sniffnet changed for openpacketmon, and each of them says so at its top (Apache License
   section 4(b)); `dev/check-notices.sh` finds changed files of Sniffnet without such a notice
-- `THIRD-PARTY-LICENSES.txt` lists the licenses of all compiled-in crates, uPlot, the service names and the geolocation and
+- `THIRD-PARTY-LICENSES.txt` lists the licenses of all compiled-in crates, the font Inter, the service names and the geolocation and
   test data (generated by `dev/third-party-licenses.py`); the package installs it with NOTICE to
   `/usr/share/doc/openpacketmon/`, and the sidebar links to both (*Licenses*)
 - `cargo deny` checks licenses, sources and RustSec advisories of all dependencies (`deny.toml`), also in the CI

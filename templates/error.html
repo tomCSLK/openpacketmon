@@ -1,9 +1,0 @@
-{% extends "public.html" %}
-{% block title %}{{ t.get("error-title") }} · openpacketmon{% endblock %}
-{% block card %}
-<div class="error-page">
-  <h1>{{ t.get("error-title") }} <span class="error-code">{{ status }}</span></h1>
-  <p>{{ message }}</p>
-  <p class="actions"><a class="button secondary" href="/" data-back>{{ t.get("back") }}</a></p>
-</div>
-{% endblock %}

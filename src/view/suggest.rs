@@ -3,8 +3,6 @@
 
 use std::collections::HashMap;
 
-use serde::Serialize;
-
 use crate::engine::state::EngineState;
 use crate::filter::{self, Kind};
 use crate::view::i18n::Lang;
@@ -30,7 +28,6 @@ fn kind_code(kind: Kind) -> &'static str {
 }
 
 /// A name of the filter
-#[derive(Serialize)]
 pub struct Name {
     pub n: &'static str,
     /// Kind of value, none for a protocol
@@ -40,7 +37,6 @@ pub struct Name {
 }
 
 /// What a kind of value allows
-#[derive(Serialize)]
 pub struct KindInfo {
     pub ops: &'static [&'static str],
     /// What such a value looks like
@@ -48,7 +44,6 @@ pub struct KindInfo {
 }
 
 /// All a filter field needs to know
-#[derive(Serialize)]
 pub struct Catalog {
     pub names: Vec<Name>,
     pub kinds: HashMap<&'static str, KindInfo>,
@@ -102,7 +97,6 @@ pub fn catalog(t: Lang, connections: bool) -> Catalog {
 }
 
 /// A value of the capture
-#[derive(Serialize)]
 pub struct ValueRow {
     pub text: String,
     /// As it is written in a filter

@@ -98,9 +98,13 @@ fn top_card(
                 widgets::empty(ui, &t.get("entries-empty"));
             } else {
                 let height = 26.0 + rows.len() as f32 * entries::ROW_H + 6.0;
-                *action = widgets::table_area(ui, Some(height), |ui| {
+                let clicked = widgets::table_area(ui, Some(height), |ui| {
                     entries::table(ui, id, t, rows, true, false)
                 });
+                // the cards share `action`: no click here must not undo one in another card
+                if clicked.is_some() {
+                    *action = clicked;
+                }
             }
         },
     );

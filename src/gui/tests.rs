@@ -304,6 +304,31 @@ fn the_rows_of_the_filters_end_at_the_edge_of_the_page() {
     }
 }
 
+/// Each card of the overview has its own clicks: a later card must not undo those of an earlier one
+#[test]
+#[serial]
+fn every_top_list_of_the_overview_opens_its_entries() {
+    let fixture = engine_with(200);
+    wait_for("the capture has no hosts", || {
+        !crate::view::overview::overview(Lang::En, &fixture.engine.lock())
+            .hosts
+            .is_empty()
+    });
+    let entries = {
+        let state = fixture.engine.lock();
+        let view = crate::view::overview::overview(Lang::En, &state);
+        [&view.hosts, &view.services].map(|rows| (rows[0].label.clone(), rows[0].jump.clone()))
+    };
+    let mut harness = window_of_size(&fixture, Theme::Light, Lang::En, 1_400.0);
+    for (label, jump) in entries {
+        harness.state_mut().go(Page::Overview);
+        settle(&mut harness);
+        harness.get_by_label(&label).click();
+        harness.run_steps(3);
+        assert_eq!(harness.state().page, Page::from(jump), "{label}");
+    }
+}
+
 /// What the last frame put on the clipboard
 fn copied(harness: &Harness<'static, App>) -> Option<String> {
     harness

@@ -305,12 +305,15 @@ fn notifications_card(
             });
             ui.horizontal(|ui| {
                 ui.label(t.get("settings-volume"));
+                // the handle takes its size from the height of the slider
+                ui.spacing_mut().interact_size.y = ui.text_style_height(&egui::TextStyle::Body);
                 let slider = ui.add(
                     Slider::new(&mut form.volume, 0..=100)
                         .step_by(5.0)
-                        .suffix(" %"),
+                        .show_value(false),
                 );
                 *preview |= slider.drag_stopped();
+                ui.label(format!("{} %", form.volume));
             });
             widgets::hint(ui, &t.get("gui-sound-hint"));
         },

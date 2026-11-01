@@ -29,6 +29,8 @@ pub enum CaptureError {
     Fatal(String),
     /// The IPFIX collector is running but what reaches it isn't decodable at the moment (warning)
     IpfixUndecodable,
+    /// The running capture has ended by itself: no packets come any more
+    Stopped(String),
 }
 
 impl CaptureContext {

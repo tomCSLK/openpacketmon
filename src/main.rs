@@ -28,6 +28,7 @@ mod engine;
 mod filter;
 #[cfg(test)]
 mod fuzz;
+mod gui;
 mod mmdb;
 mod networking;
 mod notifications;
@@ -66,6 +67,22 @@ fn main() {
     if args.list_adapters {
         let engine = Engine::new(conf, runtime.handle().clone());
         print_adapters(&engine.lock());
+        return;
+    }
+
+    if args.gui {
+        let engine = Engine::new(conf, runtime.handle().clone());
+        engine.check_newer_release();
+        if !start_requested_capture(&engine, args.adapter, args.import) {
+            std::process::exit(1);
+        }
+        if let Err(e) = gui::run(engine.clone()) {
+            eprintln!("Could not open the window: {e}");
+            std::process::exit(1);
+        }
+        engine.stop();
+        engine.store_conf();
+        drop(runtime);
         return;
     }
 

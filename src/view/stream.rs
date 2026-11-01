@@ -250,7 +250,7 @@ pub fn stream(
     let client = format::socket(&client_key.src_ip, client_key.src_port);
     let server = format::socket(&client_key.dst_ip, client_key.dst_port);
     Some(Stream {
-        title: format!("{client} ⇄ {server} ({})", client_key.protocol),
+        title: format!("{client} ↔ {server} ({})", client_key.protocol),
         client,
         server,
         client_counts: counts_text(counts[0], counts[1]),

@@ -173,6 +173,7 @@ pub async fn save(
             update_checks: form.update_checks.is_some(),
             packets_enabled: form.packets_enabled.is_some(),
             packets_max: form.packets_max,
+            packets_memory: None,
             packets_headers: form.packets_headers.is_some(),
         },
     );

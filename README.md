@@ -31,7 +31,7 @@ from here on; it is not affiliated with or endorsed by the Sniffnet project.
 ## Building
 
 ```sh
-sudo apt install libpcap-dev libwebkit2gtk-4.1-dev
+sudo apt install libpcap-dev libwebkit2gtk-4.1-dev libasound2-dev
 cargo build --release
 ```
 

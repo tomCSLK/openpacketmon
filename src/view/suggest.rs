@@ -127,6 +127,291 @@ pub fn value_rows(engine: &EngineState, field: &str, part: &str) -> Vec<ValueRow
         .collect()
 }
 
+// ---- the text before the cursor -----------------------------------------------------------------
+
+/// Most lines of names shown
+const LINES: usize = 60;
+const CONNECTORS: [&str; 2] = ["and", "or"];
+const OPERATORS: [&str; 15] = [
+    "==", "=", "eq", "!=", "ne", "<", "lt", "<=", "le", ">", "gt", ">=", "ge", "contains", "in",
+];
+
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+enum TokenKind {
+    /// A string without its closing quote
+    Open,
+    Text,
+    Symbol,
+    Word,
+}
+
+struct Token<'a> {
+    kind: TokenKind,
+    text: &'a str,
+    start: usize,
+    end: usize,
+}
+
+/// The same words as the tokenizer of the filter (`src/filter/mod.rs`)
+fn tokens(text: &str) -> Vec<Token<'_>> {
+    const TWO: [&str; 6] = ["==", "!=", "<=", ">=", "&&", "||"];
+    let stops_word = |c: char| c.is_whitespace() || "\"(){}=!<>&|,".contains(c);
+    let mut list = Vec::new();
+    let mut i = 0;
+    while let Some(c) = text[i..].chars().next() {
+        let rest = &text[i..];
+        if c.is_whitespace() || c == ',' {
+            i += c.len_utf8();
+        } else if c == '"' {
+            let mut end = None;
+            let mut chars = rest.char_indices().skip(1);
+            while let Some((at, d)) = chars.next() {
+                if d == '"' {
+                    end = Some(i + at + 1);
+                    break;
+                }
+                if d == '\\' {
+                    chars.next();
+                }
+            }
+            let Some(end) = end else {
+                list.push(Token {
+                    kind: TokenKind::Open,
+                    text: rest,
+                    start: i,
+                    end: text.len(),
+                });
+                return list;
+            };
+            list.push(Token {
+                kind: TokenKind::Text,
+                text: &text[i..end],
+                start: i,
+                end,
+            });
+            i = end;
+        } else if let Some(two) = TWO.iter().find(|s| rest.starts_with(**s)) {
+            list.push(Token {
+                kind: TokenKind::Symbol,
+                text: two,
+                start: i,
+                end: i + 2,
+            });
+            i += 2;
+        } else if "=<>!(){}".contains(c) {
+            list.push(Token {
+                kind: TokenKind::Symbol,
+                text: &rest[..1],
+                start: i,
+                end: i + 1,
+            });
+            i += 1;
+        } else if stops_word(c) {
+            i += c.len_utf8();
+        } else {
+            let len = rest.find(stops_word).unwrap_or(rest.len());
+            list.push(Token {
+                kind: TokenKind::Word,
+                text: &rest[..len],
+                start: i,
+                end: i + len,
+            });
+            i += len;
+        }
+    }
+    list
+}
+
+/// What can come next in a filter
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum Expect {
+    /// A name
+    Term,
+    Operator,
+    /// The `{` after `in`
+    Brace,
+    Value,
+    /// The values of `in`
+    Set,
+    /// `and`, `or`
+    Next,
+}
+
+/// Where the cursor is in a filter
+pub struct Position<'a> {
+    pub expect: Expect,
+    /// The field a value or operator belongs to
+    pub field: Option<&'a Name>,
+    /// The word being typed
+    pub partial: String,
+    /// Where that word starts, in bytes
+    pub start: usize,
+    depth: i32,
+}
+
+/// Follows the grammar over the finished words before the cursor
+pub fn position<'a>(before: &str, catalog: &'a Catalog) -> Position<'a> {
+    let mut list = tokens(before);
+    let (mut partial, mut start) = (String::new(), before.len());
+    if let Some(last) = list.last()
+        && last.end == before.len()
+        && matches!(last.kind, TokenKind::Word | TokenKind::Open)
+    {
+        last.text.clone_into(&mut partial);
+        start = last.start;
+        list.pop();
+    }
+    let mut expect = Expect::Term;
+    let mut field = None;
+    let mut depth = 0;
+    for token in &list {
+        let word = if token.kind == TokenKind::Word {
+            token.text.to_lowercase()
+        } else {
+            token.text.to_owned()
+        };
+        let word = word.as_str();
+        let connector = matches!(word, "and" | "or" | "&&" | "||");
+        match expect {
+            Expect::Term => {
+                if word == "(" {
+                    depth += 1;
+                } else if word != "not" && word != "!" {
+                    field = catalog.names.iter().find(|n| n.n == word && n.k.is_some());
+                    expect = if field.is_some() {
+                        Expect::Operator
+                    } else {
+                        Expect::Next
+                    };
+                }
+            }
+            Expect::Operator if OPERATORS.contains(&word) => {
+                expect = if word == "in" {
+                    Expect::Brace
+                } else {
+                    Expect::Value
+                };
+            }
+            Expect::Brace => {
+                expect = if word == "{" {
+                    Expect::Set
+                } else {
+                    Expect::Next
+                };
+            }
+            Expect::Value => expect = Expect::Next,
+            Expect::Set => {
+                if word == "}" {
+                    expect = Expect::Next;
+                }
+            }
+            _ if connector => expect = Expect::Term,
+            _ => {
+                if word == ")" {
+                    depth -= 1;
+                }
+                expect = Expect::Next;
+            }
+        }
+    }
+    Position {
+        expect,
+        field,
+        partial,
+        start,
+        depth,
+    }
+}
+
+/// A line of the list of suggestions
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub struct Line {
+    pub name: String,
+    /// What the line puts into the field
+    pub insert: String,
+    pub hint: Option<String>,
+}
+
+impl Line {
+    fn plain(word: &str) -> Self {
+        Self {
+            name: word.to_owned(),
+            insert: word.to_owned(),
+            hint: None,
+        }
+    }
+}
+
+/// Lines that start with the text come first, then those with a part that does, then the rest
+fn rank(name: &str, text: &str) -> Option<usize> {
+    let at = name.find(text)?;
+    if at == 0 {
+        return Some(0);
+    }
+    Some(if matches!(name.as_bytes()[at - 1], b'.' | b'_') {
+        1
+    } else {
+        2
+    })
+}
+
+/// What can come at this position
+pub fn lines(position: &Position, catalog: &Catalog) -> Vec<Line> {
+    let text = position.partial.to_lowercase();
+    let starting = |words: &[&str]| -> Vec<Line> {
+        words
+            .iter()
+            .filter(|w| w.starts_with(&text))
+            .map(|w| Line::plain(w))
+            .collect()
+    };
+    match position.expect {
+        Expect::Term => {
+            let mut found: [Vec<Line>; 3] = Default::default();
+            let names = catalog
+                .names
+                .iter()
+                .map(|n| (n.n, n.h.clone()))
+                .chain([("not", Some(catalog.not.clone()))]);
+            for (name, hint) in names {
+                if let Some(r) = rank(name, &text) {
+                    found[r].push(Line {
+                        name: name.to_owned(),
+                        insert: name.to_owned(),
+                        hint,
+                    });
+                }
+            }
+            found.into_iter().flatten().take(LINES).collect()
+        }
+        Expect::Operator => {
+            let ops = position
+                .field
+                .and_then(|f| f.k)
+                .and_then(|k| catalog.kinds.get(k))
+                .map_or(&[][..], |k| k.ops);
+            let mut lines = starting(ops);
+            for line in &mut lines {
+                if line.name == "in" {
+                    "in {".clone_into(&mut line.insert);
+                }
+            }
+            lines.extend(starting(&CONNECTORS));
+            lines
+        }
+        Expect::Brace => vec![Line::plain("{")],
+        Expect::Set => starting(&["}"]),
+        Expect::Next => {
+            let mut lines = starting(&CONNECTORS);
+            if position.depth > 0 {
+                lines.extend(starting(&[")"]));
+            }
+            lines
+        }
+        Expect::Value => Vec::new(),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -189,5 +474,58 @@ mod tests {
                 }
             }
         }
+    }
+
+    #[test]
+    fn the_cursor_says_what_can_come_next() {
+        let cat = catalog(Lang::En, false);
+        let at = |text: &str| position(text, &cat).expect;
+        assert_eq!(at(""), Expect::Term);
+        assert_eq!(at("tc"), Expect::Term);
+        assert_eq!(at("tcp.port "), Expect::Operator);
+        assert_eq!(at("tcp.port == "), Expect::Value);
+        assert_eq!(at("tcp.port == 80 "), Expect::Next);
+        assert_eq!(at("tcp.port == 80 and "), Expect::Term);
+        assert_eq!(at("tcp.port in "), Expect::Brace);
+        assert_eq!(at("tcp.port in { 80 "), Expect::Set);
+        assert_eq!(at("not tcp.port "), Expect::Operator);
+        assert_eq!(at("dns "), Expect::Next);
+        assert_eq!(at("domain contains \"open"), Expect::Value);
+    }
+
+    #[test]
+    fn the_word_being_typed_is_replaced() {
+        let cat = catalog(Lang::En, false);
+        let p = position("tcp.port == 80 and tls.s", &cat);
+        assert_eq!(p.partial, "tls.s");
+        assert_eq!(p.start, 19);
+        let names = lines(&p, &cat);
+        assert_eq!(names[0].name, "tls.sni");
+        assert_eq!(names[0].insert, "tls.sni");
+    }
+
+    #[test]
+    fn operators_and_connectors_follow_a_field() {
+        let cat = catalog(Lang::En, false);
+        let names: Vec<String> = lines(&position("tcp.port ", &cat), &cat)
+            .into_iter()
+            .map(|l| l.insert)
+            .collect();
+        assert!(names.contains(&"==".to_owned()), "{names:?}");
+        assert!(names.contains(&"in {".to_owned()), "{names:?}");
+        assert!(names.contains(&"and".to_owned()), "{names:?}");
+        let inside = lines(&position("(dns ", &cat), &cat);
+        assert!(inside.iter().any(|l| l.name == ")"));
+        let outside = lines(&position("dns ", &cat), &cat);
+        assert!(!outside.iter().any(|l| l.name == ")"));
+    }
+
+    #[test]
+    fn text_outside_of_ascii_does_not_break_the_tokens() {
+        let cat = catalog(Lang::En, false);
+        let p = position("domain contains \"müller\" and tö", &cat);
+        assert_eq!(p.partial, "tö");
+        assert_eq!(p.expect, Expect::Term);
+        assert_eq!(position("&| é ", &cat).expect, Expect::Next);
     }
 }

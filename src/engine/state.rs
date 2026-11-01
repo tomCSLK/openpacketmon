@@ -410,6 +410,11 @@ impl EngineState {
                     self.capture_error = Some(CaptureError::IpfixUndecodable);
                 }
             }
+            BackendTrafficMessage::CaptureStopped(cap_id, reason) => {
+                if cap_id == self.capture_id {
+                    self.capture_error = Some(CaptureError::Stopped(reason));
+                }
+            }
         }
     }
 

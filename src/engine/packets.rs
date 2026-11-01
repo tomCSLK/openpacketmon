@@ -85,7 +85,7 @@ impl PacketStore {
             packets: VecDeque::new(),
             bytes: 0,
             max_packets: conf.max_packets(),
-            max_bytes: PacketStoreConf::MAX_BYTES,
+            max_bytes: conf.max_bytes(),
             snap: conf.headers_only.then_some(PacketStoreConf::HEADERS_SNAP),
             next_number: 1,
             first_timestamp: None,
@@ -249,6 +249,7 @@ mod tests {
     fn store(max_packets: usize, headers_only: bool) -> PacketStore {
         let mut store = PacketStore::new(
             PacketStoreConf {
+                megabytes: 512,
                 enabled: true,
                 max_packets,
                 headers_only,

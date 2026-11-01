@@ -61,6 +61,7 @@ pub fn parse_packets(
         .spawn(move || packet_stream(cap, &pcap_tx, &mut freeze_rx_2))
         .log_err(location!());
 
+    let mut stop_reported = false;
     loop {
         // check if we need to freeze the parsing
         if freeze_rx.try_recv().is_ok() {
@@ -92,6 +93,9 @@ pub fn parse_packets(
         }
 
         match packet_res {
+            Err(pcap::Error::PcapError(reason)) => {
+                report_stop(cap_id, reason, &mut stop_reported, tx);
+            }
             Err(e) => {
                 if e == pcap::Error::NoMorePackets {
                     // send a message including data from the last interval (only happens in offline captures)
@@ -200,6 +204,19 @@ pub fn parse_packets(
     }
 }
 
+/// A capture that has ended by itself says so once; the reader keeps failing until it is stopped
+fn report_stop(
+    cap_id: usize,
+    reason: String,
+    reported: &mut bool,
+    tx: &Sender<BackendTrafficMessage>,
+) {
+    if !*reported {
+        *reported = true;
+        let _ = tx.send_blocking(BackendTrafficMessage::CaptureStopped(cap_id, reason));
+    }
+}
+
 /// Used only by PCAP import
 fn maybe_send_tick_import_pcap(
     cap_id: usize,
@@ -260,4 +277,22 @@ fn packet_stream(
 struct PacketOwned {
     header: PacketHeader,
     data: Box<[u8]>,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_stopped_capture_is_reported_once() {
+        let (tx, rx) = async_channel::unbounded();
+        let mut reported = false;
+        report_stop(3, "gone".to_owned(), &mut reported, &tx);
+        report_stop(3, "gone".to_owned(), &mut reported, &tx);
+        assert!(matches!(
+            rx.try_recv(),
+            Ok(BackendTrafficMessage::CaptureStopped(3, reason)) if reason == "gone"
+        ));
+        assert!(rx.try_recv().is_err());
+    }
 }

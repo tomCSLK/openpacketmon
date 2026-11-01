@@ -16,6 +16,23 @@ pub struct Settings {
     // ---------------------------------------------------------------------------------------------
     #[serde(deserialize_with = "deserialize_or_default")]
     pub notifications: Notifications,
+    // ---------------------------------------------------------------------------------------------
+    /// Light or dark design of the window
+    #[serde(deserialize_with = "deserialize_or_default")]
+    pub theme: ThemeChoice,
+    /// The packet list of the window without the colors of the packet kinds
+    #[serde(deserialize_with = "deserialize_or_default")]
+    pub plain_packets: bool,
+}
+
+/// The design of the window
+#[derive(Serialize, Deserialize, Clone, Copy, PartialEq, Eq, Debug, Default)]
+pub enum ThemeChoice {
+    /// Follows the desktop
+    #[default]
+    System,
+    Light,
+    Dark,
 }
 
 #[cfg(test)]

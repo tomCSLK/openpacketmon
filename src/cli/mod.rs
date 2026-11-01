@@ -30,6 +30,9 @@ pub(crate) struct Args {
     /// Do not open the browser (e.g. when running as a service)
     #[arg(long)]
     pub no_browser: bool,
+    /// Open the native window instead of the browser pages
+    #[arg(long, conflicts_with_all = ["port", "no_browser"])]
+    pub gui: bool,
     /// List the network adapters and exit
     #[arg(short, long, exclusive = true)]
     pub list_adapters: bool,
@@ -98,6 +101,7 @@ mod tests {
                     volume: 100,
                     favorite_notification: Default::default(),
                 },
+                ..Settings::default()
             },
             favorites: Favorites::from([FavoriteKey::Address([10, 0, 0, 1].into())]),
             device: ConfigDevice {
@@ -123,6 +127,7 @@ mod tests {
             language: "de".to_string(),
             page_size: 100,
             packet_store: crate::config::packet_store::PacketStoreConf {
+                megabytes: 1024,
                 enabled: false,
                 max_packets: 10_000,
                 headers_only: true,

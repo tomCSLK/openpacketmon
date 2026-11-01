@@ -1211,10 +1211,10 @@ weitergibt. Erster Entwurf, noch nicht geprüft:
   über einen eigenen Pfad, damit die Anpassung aus `docs/windows.md` 4 auch für MCP gilt. Keine Pfade in Beispielen der
   Einrichtung fest verdrahten (Aufruf `openpacketmon mcp` bzw. `openpacketmon.exe mcp`).
 
-#### 5.5 Umstellung der Oberfläche auf egui (Wunsch des Nutzers, 2026-10-31, Mitschnitt-Helfer umgesetzt, Oberfläche noch nicht begonnen)
+#### 5.5 Umstellung der Oberfläche auf egui (Wunsch des Nutzers, 2026-10-31, Stufen 1 bis 3 umgesetzt, Abbau von Web und `app/` steht aus)
 
 Der Nutzer möchte für Client-Software eine native Oberfläche statt Browser-Technik (egui, bekannt aus den ArtCraft-Programmen).
-Der Probebau lief im Scratchpad (Ergebnis unten). Im Repo ist bisher nur der Mitschnitt-Helfer umgesetzt (Abschnitt „Stand Helfer“ unten).
+Der Probebau lief im Scratchpad (Ergebnis unten). Im Repo sind Mitschnitt-Helfer, Seitendaten und die egui-Seiten umgesetzt (Abschnitte „Stand Helfer“, „Stand Seitendaten“, „Stand egui“ unten); die Browser-Oberfläche bleibt bis Stufe 4 Standard.
 
 Entschieden (Nutzer, 2026-10-31):
 
@@ -1285,7 +1285,7 @@ Stand Helfer (2026-11-01, freigegeben vom Nutzer, Test-Paket 0.3.0, kein Release
   unbekannter Adapter. Von Hand im Namensraum mit dem ganzen Programm auf `lo`: Stopp ohne Zombie, nach `kill -9` des Programms kein Helfer
   mehr. Last im Release-Bau: 200 000 Datagramme in 1,2 s auf `lo` (400 000 Pakete), keines verloren, wie beim Paket 0.2.9 ohne Helfer
   (je 3 Läufe); CPU-Zeit des Programms 1,5 s statt 2 s.
-- Nicht getestet: echte Adapter mit `setcap` und die Installation des `.deb` (Test-Paket 0.3.0, der Nutzer installiert), Betrieb über Tage.
+- Vom Nutzer getestet (2026-11-01): `.deb` 0.3.0 installiert, Aufzeichnung auf echten Adaptern mit `setcap` ohne Fehler „auf Anhieb“. Noch nicht getestet: Betrieb über Tage.
 - Bekannte Grenze: Stirbt der Helfer mitten im Mitschnitt, steht die Meldung nur auf stderr, die Aufzeichnung steht still. Die Meldung in der
   Oberfläche kommt mit der egui-Fassung. `cap_net_raw,cap_net_admin` auf dem Helfer erlauben weiter jedem lokalen Benutzer den Mitschnitt,
   wie zuvor auf `openpacketmon` (siehe `SECURITY.md`).
@@ -1309,6 +1309,18 @@ Die Oberfläche ist unverändert, `src/web/` rendert diese Daten nur noch.
 - Vor dem Release zu beheben: Der Test `test_increments_ping_sequence` (`src/networking/types/latency.rs`) schlägt selten fehl, weil parallele Tests denselben Zähler `PING_SEQUENCE` erhöhen; beim Umbau einmal aufgetreten, beim nächsten Lauf nicht mehr.
 - Eine gewollte Abweichung: Eine Benachrichtigung ohne Filter (Host ohne Name, AS und Land) führt nach `/connections` statt `/connections?f=`, die Seite ist dieselbe.
 - Auf dem Weg ohne Änderung der Ausgabe zusammengelegt: doppeltes `sound_code` (`api.rs`, `settings.rs`), `endpoint` in `stream.rs` (jetzt `format::socket`), Seitengrößen als Konstante.
+
+Stand egui (2026-11-01, Stufen 1 bis 3 freigegeben vom Nutzer, nicht committet, kein Test-Paket): Alle Seiten gibt es in **`src/gui/`**, Aufruf `openpacketmon --gui`. Ohne den Schalter startet weiter die Browser-Oberfläche.
+
+- Aufbau: `src/gui/mod.rs` (Fenster, Seitenleiste, Verlauf, Rückfrage beim Schließen), `theme.rs` (Farben wie `static/app.css`, Inter), `widgets.rs`, `load.rs` (liest im Hintergrund, die Oberfläche wartet nie auf die Engine), `chart.rs`, `filter_field.rs`, `sound.rs`, `icons.rs`, `pages/` je Seite. Die Seiten rufen nur `src/view/`.
+- Paketliste: eine lange Liste, gelesen wird blockweise nur der sichtbare Teil; Mitlaufen endet beim Hochscrollen und kommt am Ende wieder; Strg+G springt zu einem Paket; Farblegende in der Filterhilfe.
+- Speichergrenze (Stufe 3): `PacketStoreConf` hat das neue Feld `megabytes` (256 MiB bis 2 GiB), die Paketzahl geht bis 2 Millionen. Die Browser-Oberfläche behält den gespeicherten Wert (`packets_memory: None`), bekommt aber die neuen Paketzahlen in ihrer Auswahl; der feste Wert 512 MiB steht nicht mehr im Hinweistext.
+- Fund beim Bau, auch für die Browser-Oberfläche behoben: Starb der Mitschnitt-Helfer mitten in der Aufzeichnung, stand das nur auf stderr und die Oberfläche zeigte weiter „läuft“. Jetzt meldet `parse_packets` das einmal als `BackendTrafficMessage::CaptureStopped`, `capture_problem` zeigt den Text `capture-stopped`.
+- Sichtbare Kleinigkeit auch im Browser: `↔` statt `⇄` (Inter hat das Zeichen nicht).
+- Neue Abhängigkeiten: `eframe`, `egui_extras`, `egui_plot`, `image`, `rfd` (Dateidialog), `rodio` (Ton); zum Bauen zusätzlich `libasound2-dev` (CI, README, `CONTRIBUTING.md` ergänzt). Inter liegt in `resources/fonts/`, die Lizenz steht in `THIRD-PARTY-LICENSES.txt`. `deny.toml`: drei Ausnahmen für Sicherheitsmeldungen (RUSTSEC-2026-0370/0371/0372) und für die Schriftlizenzen von `epaint_default_fonts`; **vor dem Release neu bewerten**.
+- Geprüft: `cargo test --workspace` (331 + Helfer und Unterpakete), `cargo clippy -- -D warnings`, `cargo fmt`, `cargo deny --workspace check`, `dev/check-notices.sh`. 19 Tests der Oberfläche über `egui_kittest` (Sprung zu Paketen, Filtervorschläge, Rückweg, Rückfrage beim Schließen, Meldung bei stehender Aufzeichnung, Schriften decken alle Texte ab, Mitlaufen). Bilder aller Seiten hell und dunkel: `GUI_SHOTS=<ordner> cargo test --bin openpacketmon gui::tests::shots -- --include-ignored --test-threads=1`. Das echte Fenster startete einmal 8 Sekunden ohne Fehler.
+- **Nicht von Hand geprüft:** Bedienung im echten Fenster, Live-Mitschnitt in der Oberfläche, Ton, Dateidialoge, Skalierung des Bildschirms, Geo-Download. Der Bild-für-Bild-Vergleich der Browser-Seiten wurde für diese Etappe nicht wiederholt; die Browser-Oberfläche ist nur über ihre Tests abgesichert.
+- Offen, Stufe 4 (nicht beauftragt): `--gui` wird Standard, `src/web/`, `app/`, `templates/`, `static/`, `locales`-Reste der Browser-Seiten und der systemd-Dienst fallen weg, `.deb` anpassen; `Lang::js_texts` entfällt.
 
 Entschieden (Nutzer, 2026-10-31): Der Paketspeicher bleibt im RAM, die Grenze wird wählbar (bis etwa 2 GiB mit passender Paketzahl).
 Eine temporäre Datei wie bei Wireshark kommt nur, falls das später nicht reicht, weil sonst unverschlüsselter Verkehr auf der SSD läge.

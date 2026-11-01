@@ -199,15 +199,9 @@ async fn healthz() -> &'static str {
 async fn licenses(_session: crate::web::auth::Session) -> impl IntoResponse {
     (
         [(header::CONTENT_TYPE, "text/plain; charset=utf-8")],
-        LICENSES,
+        crate::view::LICENSES,
     )
 }
-
-const LICENSES: &str = concat!(
-    include_str!("../../NOTICE"),
-    "\n\n",
-    include_str!("../../THIRD-PARTY-LICENSES.txt")
-);
 
 async fn not_found() -> WebError {
     WebError::NotFound

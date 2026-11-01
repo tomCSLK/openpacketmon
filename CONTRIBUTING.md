@@ -16,7 +16,7 @@ to review than large ones.
 
 ## Development
 
-Requirements: a current stable Rust toolchain (edition 2024), `libpcap-dev` and, for the window program, `libwebkit2gtk-4.1-dev`.
+Requirements: a current stable Rust toolchain (edition 2024), `libpcap-dev`, `libasound2-dev` (sound of the native window) and, for the window program, `libwebkit2gtk-4.1-dev`.
 Building is described in the README under [Building](README.md#building). Before you open a pull request, all of these must pass:
 
 ```bash

@@ -138,6 +138,11 @@ impl Engine {
     }
 
     /// Writes the settings to disk
+    /// Downloads the geolocation databases and waits for them; not on a thread of the runtime
+    pub fn download_geo(&self) -> Result<(), crate::mmdb::geo::DownloadError> {
+        self.runtime.block_on(crate::mmdb::geo::download_dbip())
+    }
+
     pub fn store_conf(&self) {
         // tests share one settings file (`Conf::test_path`), and only the tests of `Conf` may write it
         #[cfg(not(test))]
@@ -149,7 +154,7 @@ impl Engine {
 }
 
 #[cfg(test)]
-mod tests {
+pub(crate) mod tests {
     use std::time::{Duration, Instant};
 
     use serial_test::serial;
@@ -160,7 +165,7 @@ mod tests {
     use crate::networking::types::service::Service;
 
     /// Ethernet frame with an IPv4 header and a TCP (`tcp = true`) or UDP header
-    fn frame(
+    pub(crate) fn frame(
         src: [u8; 4],
         dst: [u8; 4],
         src_port: u16,
@@ -204,7 +209,7 @@ mod tests {
     }
 
     /// Writes a classic PCAP file (Ethernet link type) with the given (seconds, frame) records
-    fn write_pcap(path: &std::path::Path, packets: &[(u32, Vec<u8>)]) {
+    pub(crate) fn write_pcap(path: &std::path::Path, packets: &[(u32, Vec<u8>)]) {
         let mut out = Vec::new();
         out.extend_from_slice(&0xa1b2_c3d4_u32.to_le_bytes());
         out.extend_from_slice(&2_u16.to_le_bytes());

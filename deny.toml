@@ -16,6 +16,9 @@ ignore = [
     { id = "RUSTSEC-2026-0374", reason = "basic-toml (unmaintained) only through askama_derive, at compile time" },
     { id = "RUSTSEC-2024-0370", reason = "proc-macro-error (unmaintained) only through glib-macros 0.18 (GTK 3 of the tray icon), at compile time" },
     { id = "RUSTSEC-2024-0429", reason = "glib 0.18 (GTK 3 of the tray icon): openpacketmon does not use VariantStrIter" },
+    { id = "RUSTSEC-2026-0370", reason = "zvariant (merged into zbus 6) only through accesskit_unix, the screen reader support of egui" },
+    { id = "RUSTSEC-2026-0371", reason = "zbus_names (merged into zbus 6) only through accesskit_unix, the screen reader support of egui" },
+    { id = "RUSTSEC-2026-0372", reason = "zvariant_derive (merged into zbus 6) only through accesskit_unix, the screen reader support of egui" },
 ]
 
 [licenses]
@@ -39,6 +42,10 @@ allow = [
     "Zlib",
 ]
 confidence-threshold = 0.9
+# The fonts built into egui: Hack (MIT), Noto Emoji and Emoji Icon Font (OFL-1.1), Ubuntu Light (Ubuntu-font-1.0).
+exceptions = [
+    { crate = "epaint_default_fonts", allow = ["OFL-1.1", "Ubuntu-font-1.0"] },
+]
 # the workspace crates are not published
 private = { ignore = true }
 

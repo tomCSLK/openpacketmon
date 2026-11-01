@@ -230,4 +230,6 @@ pub enum BackendTrafficMessage {
     PendingHosts(usize, Vec<HostMessage>),
     OfflineGap(usize, u32),
     IpfixUndecodable(usize),
+    /// The capture ended by itself, for example because the capture helper is gone
+    CaptureStopped(usize, String),
 }

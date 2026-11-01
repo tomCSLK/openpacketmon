@@ -167,7 +167,7 @@ pub fn filtered_connection(
     let key = filtered_conversation(engine.info_traffic.map.keys(), filter)?;
     Some((
         format!(
-            "{} ⇄ {}",
+            "{} ↔ {}",
             format::socket(&key.src_ip, key.src_port),
             format::socket(&key.dst_ip, key.dst_port)
         ),

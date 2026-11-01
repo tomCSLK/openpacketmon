@@ -23,6 +23,13 @@ pub mod statistics;
 pub mod stream;
 pub mod suggest;
 
+/// The licenses of openpacketmon and of the software and data it uses
+pub const LICENSES: &str = concat!(
+    include_str!("../../NOTICE"),
+    "\n\n",
+    include_str!("../../THIRD-PARTY-LICENSES.txt")
+);
+
 /// Where a link on a page leads; the interface decides how to get there
 #[derive(Debug, Clone, PartialEq)]
 pub enum Jump {

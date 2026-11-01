@@ -269,6 +269,9 @@ pub fn capture_problem(t: Lang, engine: &EngineState) -> Option<String> {
     match &engine.capture_error {
         Some(CaptureError::Fatal(e)) => Some(e.clone()),
         Some(CaptureError::IpfixUndecodable) => Some(t.get("capture-ipfix-undecodable")),
+        Some(CaptureError::Stopped(reason)) => {
+            Some(t.get1("capture-stopped", "reason", reason.as_str()))
+        }
         None => None,
     }
 }

@@ -213,6 +213,8 @@ pub struct SettingsChange {
     pub packets_enabled: bool,
     /// Left as it is if it is not one of the choices
     pub packets_max: usize,
+    /// The memory of the packet store in MiB; `None` leaves it as it is
+    pub packets_memory: Option<usize>,
     pub packets_headers: bool,
 }
 
@@ -241,6 +243,11 @@ pub fn apply_settings(engine: &mut EngineState, change: &SettingsChange) {
     conf.packet_store.enabled = change.packets_enabled;
     if PacketStoreConf::MAX_PACKETS_CHOICES.contains(&change.packets_max) {
         conf.packet_store.max_packets = change.packets_max;
+    }
+    if let Some(megabytes) = change.packets_memory
+        && PacketStoreConf::MEGABYTES_CHOICES.contains(&megabytes)
+    {
+        conf.packet_store.megabytes = megabytes;
     }
     conf.packet_store.headers_only = change.packets_headers;
 

@@ -21,17 +21,37 @@ pub enum Kind {
     Danger,
 }
 
+/// Every kind has a border, in its own color if need be: it counts towards the size of a button
 fn colors(p: &Palette, kind: Kind) -> (Color32, Color32, Stroke) {
     match kind {
-        Kind::Primary => (p.accent, Color32::WHITE, Stroke::NONE),
+        Kind::Primary => (p.accent, Color32::WHITE, Stroke::new(1.0, p.accent)),
         Kind::Secondary => (p.surface, p.text, Stroke::new(1.0, p.border_strong)),
-        Kind::Danger => (p.down, Color32::WHITE, Stroke::NONE),
+        Kind::Danger => (p.down, Color32::WHITE, Stroke::new(1.0, p.down)),
     }
 }
 
 /// A button of the given kind
 pub fn button(ui: &mut Ui, text: impl Into<String>, kind: Kind) -> Response {
     sized_button(ui, text, kind, CONTROL_H)
+}
+
+/// The width of a button with this text
+pub fn button_width(ui: &Ui, text: &str) -> f32 {
+    let text = WidgetText::from(text).into_galley(
+        ui,
+        Some(TextWrapMode::Extend),
+        f32::INFINITY,
+        egui::TextStyle::Button,
+    );
+    text.size().x + 2.0 * ui.spacing().button_padding.x
+}
+
+/// The width of each of `fields` fields in a row, next to items of the given widths: together
+/// with the gaps between them all they fill the row exactly
+pub fn field_width(ui: &Ui, fields: usize, beside: &[f32]) -> f32 {
+    let gaps = (fields + beside.len()).saturating_sub(1) as f32 * ui.spacing().item_spacing.x;
+    let room = ui.available_width() - beside.iter().sum::<f32>() - gaps;
+    (room / fields.max(1) as f32).max(80.0)
 }
 
 /// A small button

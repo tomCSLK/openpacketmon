@@ -6,7 +6,7 @@ use eframe::egui::{self, Align, Layout, RichText, ScrollArea, Ui};
 use egui_extras::{Column, TableBuilder};
 
 use crate::gui::chart::{Series, chart};
-use crate::gui::filter_field::FilterField;
+use crate::gui::filter_field::{FilterField, button_widths};
 use crate::gui::load::Loader;
 use crate::gui::pages::head;
 use crate::gui::theme::palette;
@@ -120,8 +120,8 @@ pub fn show(app: &mut App, ui: &mut Ui, display: &str, connections: &str) {
     let with_connections = !connections.is_empty();
     ui.horizontal(|ui| {
         let reset = !display.is_empty() || with_connections;
-        let room = ui.available_width() - 100.0 - if reset { 110.0 } else { 0.0 };
-        let width = if with_connections { room / 2.0 } else { room };
+        let fields = if with_connections { 2 } else { 1 };
+        let width = widgets::field_width(ui, fields, &button_widths(ui, t, reset));
         if with_connections {
             let out = state.connections.show(
                 ui,

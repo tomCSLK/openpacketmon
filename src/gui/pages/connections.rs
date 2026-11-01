@@ -7,7 +7,7 @@ use egui_extras::{Column, TableBuilder};
 
 use crate::config::favorite::FavoriteKey;
 use crate::engine::Engine;
-use crate::gui::filter_field::{FilterField, filter_help};
+use crate::gui::filter_field::{FilterField, button_widths, filter_help};
 use crate::gui::load::Loader;
 use crate::gui::pages::head;
 use crate::gui::theme::palette;
@@ -23,6 +23,8 @@ use crate::view::connections::{
 use crate::view::i18n::Lang;
 
 const SORTS: [SortType; 3] = [SortType::Neutral, SortType::Descending, SortType::Ascending];
+/// The width of the choice of the order: its longest text fits, or it would grow with the text
+const SORT_WIDTH: f32 = 190.0;
 
 #[derive(Clone, PartialEq)]
 struct Key {
@@ -44,6 +46,13 @@ pub struct State {
     list: Loader<Key, ConnectionList>,
     detail: Loader<(AddressPortPair, usize), Option<ConnectionDetail>>,
     page_text: String,
+}
+
+#[cfg(test)]
+impl State {
+    pub fn set_sort(&mut self, sort: usize) {
+        self.sort = sort;
+    }
 }
 
 #[derive(Default)]
@@ -114,7 +123,9 @@ pub fn show(app: &mut App, ui: &mut Ui, filter: &str) {
     let filtered = !filter.is_empty();
     ui.horizontal(|ui| {
         let reset = filtered || state.sort != 0;
-        let room = ui.available_width() - 260.0 - if reset { 110.0 } else { 0.0 };
+        let mut beside = button_widths(ui, t, reset);
+        beside.push(SORT_WIDTH);
+        let room = widgets::field_width(ui, 1, &beside);
         let valid = (!state.field.text.trim().is_empty()).then_some(problem.is_none());
         let out = state.field.show(
             ui,
@@ -128,7 +139,7 @@ pub fn show(app: &mut App, ui: &mut Ui, filter: &str) {
         actions.apply |= out.apply;
         let labels = [t.get("sort-recent"), t.get("sort-desc"), t.get("sort-asc")];
         ComboBox::from_id_salt("connections-sort")
-            .width(140.0)
+            .width(SORT_WIDTH)
             .selected_text(labels[state.sort].clone())
             .show_index(ui, &mut state.sort, labels.len(), |i| labels[i].clone());
         actions.apply |= widgets::button(ui, t.get("apply"), Kind::Primary).clicked();

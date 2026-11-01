@@ -152,6 +152,13 @@ fn shots() {
         shot(&mut harness, &folder, &format!("filtered-{suffix}"));
 
         harness.state_mut().go(Page::Packets {
+            filter: "tcp".to_owned(),
+            connections: "port == 443".to_owned(),
+            goto: None,
+        });
+        shot(&mut harness, &folder, &format!("two-filters-{suffix}"));
+
+        harness.state_mut().go(Page::Packets {
             filter: String::new(),
             connections: String::new(),
             goto: Some(1_000),
@@ -237,6 +244,63 @@ fn shots() {
         harness.state_mut().go(page);
         settle(&mut harness);
         shot(&mut harness, &folder, &format!("{name}-en"));
+    }
+}
+
+/// The right edge of the content of a window of 1280 points
+const CONTENT_RIGHT: f32 = 1_262.0;
+
+/// However long the texts of the buttons are, the row of a filter ends where the page ends
+#[test]
+#[serial]
+fn the_rows_of_the_filters_end_at_the_edge_of_the_page() {
+    let packets = |filter: &str, connections: &str| Page::Packets {
+        filter: filter.to_owned(),
+        connections: connections.to_owned(),
+        goto: None,
+    };
+    let statistics = |filter: &str, connections: &str| Page::Statistics {
+        filter: filter.to_owned(),
+        connections: connections.to_owned(),
+    };
+    let connections = |filter: &str| Page::Connections {
+        filter: filter.to_owned(),
+    };
+    let fixture = engine_with(200);
+    for (lang, apply, reset) in [
+        (Lang::De, "Anwenden", "Zurücksetzen"),
+        (Lang::En, "Apply", "Reset"),
+    ] {
+        let mut harness = window(&fixture, Theme::Light, lang);
+        for (page, last) in [
+            (packets("", ""), apply),
+            (packets("tcp", ""), reset),
+            (packets("tcp", "port == 443"), reset),
+            (statistics("", ""), apply),
+            (statistics("tcp", ""), reset),
+            (statistics("tcp", "port == 443"), reset),
+            (connections(""), apply),
+            (connections("port == 443"), reset),
+        ] {
+            let name = format!("{page:?}");
+            harness.state_mut().go(page);
+            settle(&mut harness);
+            let right = harness.get_by_label(last).rect().right();
+            assert!(
+                (right - CONTENT_RIGHT).abs() <= 1.0,
+                "{last} on {name} ends at {right}",
+            );
+        }
+        // the row does not move with the order chosen
+        for sort in 0..3 {
+            harness.state_mut().pages.connections.set_sort(sort);
+            settle(&mut harness);
+            let right = harness.get_by_label(reset).rect().right();
+            assert!(
+                (right - CONTENT_RIGHT).abs() <= 1.0,
+                "{reset} with order {sort} ends at {right}",
+            );
+        }
     }
 }
 

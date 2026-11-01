@@ -8,7 +8,7 @@ use eframe::egui::{self, Align, Key, Layout, RichText, Sense, TextEdit, TextWrap
 use egui_extras::{Column, TableBuilder};
 
 use crate::engine::Engine;
-use crate::gui::filter_field::{FilterField, filter_help};
+use crate::gui::filter_field::{FilterField, button_widths, filter_help};
 use crate::gui::load::{Loader, Task};
 use crate::gui::pages::head;
 use crate::gui::theme::palette;
@@ -182,8 +182,11 @@ impl State {
         block.foot.clone_into(&mut self.foot);
         if let Some(asked) = goto {
             self.goto_found(asked, block.goto);
+        } else if self.follow {
+            // at once: the scroll area reaches the end only after drawing the frame, at a place
+            // whose rows may have just gone
+            self.scroll_to = Some(self.max_offset());
         } else if let Some(now) = block.anchor
-            && !self.follow
             && now != reply.first
         {
             // older packets were dropped from the store: the same packets stay in view
@@ -561,8 +564,8 @@ fn filter_bar(app: &mut App, ui: &mut Ui, actions: &mut Actions, display: &str, 
     let connections_problem = state.connections.problem(t, true).map(str::to_owned);
     ui.horizontal(|ui| {
         let reset = !display.is_empty() || with_connections;
-        let room = ui.available_width() - 100.0 - if reset { 110.0 } else { 0.0 };
-        let width = if with_connections { room / 2.0 } else { room };
+        let fields = if with_connections { 2 } else { 1 };
+        let width = widgets::field_width(ui, fields, &button_widths(ui, t, reset));
         if with_connections {
             let valid = Some(connections_problem.is_none());
             let out = state.connections.show(
@@ -867,6 +870,9 @@ pub fn fill(text: &str, values: &[String]) -> String {
 
 #[cfg(test)]
 mod tests {
+    use egui_kittest::Harness;
+    use egui_kittest::kittest::Queryable;
+
     use super::*;
 
     fn state() -> State {
@@ -892,6 +898,96 @@ mod tests {
         s.toggle_follow();
         assert!(!s.follow);
         assert!(s.paused);
+    }
+
+    /// The rows `from..total` of a list of `total` rows, as a block that has arrived
+    fn block(from: usize, total: usize) -> Reply {
+        let row = |i: usize| PacketRow {
+            number: i as u64 + 1,
+            time: String::new(),
+            src: String::new(),
+            dst: String::new(),
+            protocol: "TCP",
+            length: 60,
+            info: String::new(),
+            outgoing: None,
+            color: "",
+        };
+        Reply {
+            block: Some(RowBlock {
+                total,
+                from,
+                rows: (from..total).map(row).collect(),
+                goto: None,
+                anchor: None,
+                foot: String::new(),
+            }),
+            first: 0,
+        }
+    }
+
+    fn list_of(state: State) -> Harness<'static, State> {
+        Harness::builder()
+            .with_size(egui::vec2(1000.0, 400.0))
+            .with_context_setup(crate::gui::theme::install)
+            .build_ui_state(
+                |ui, state: &mut State| {
+                    let mut actions = Actions::default();
+                    table(ui, state, Lang::En, true, true, false, &mut actions);
+                },
+                state,
+            )
+    }
+
+    /// More packets came than rows are in view: the frame that takes the block must show its
+    /// rows. Waiting for the scroll area to reach the end draws the old place, whose rows have
+    /// just gone, and the list flashes empty.
+    #[test]
+    fn following_shows_a_new_block_in_the_same_frame() {
+        let mut list = list_of(State {
+            follow: true,
+            was_at_end: true,
+            ..State::default()
+        });
+        list.state_mut().receive(block(960, 1_000));
+        list.step();
+        list.step();
+        assert!(list.query_by_label("1000").is_some());
+
+        list.state_mut().receive(block(1_400, 1_500));
+        list.step();
+        assert!(list.query_by_label("1500").is_some());
+        assert!(list.state().follow);
+        // and it stays there, with the frames between two blocks
+        list.step();
+        assert!(list.query_by_label("1500").is_some());
+        assert!(list.state().follow);
+    }
+
+    /// Not following, the list stays where it is while it grows, and its rows stay
+    #[test]
+    fn a_new_block_leaves_a_list_that_does_not_follow_in_place() {
+        let mut list = list_of(State {
+            scroll_to: Some(100.0 * ROW_H),
+            ..State::default()
+        });
+        list.state_mut().receive(block(0, 1_000));
+        list.step();
+        list.step();
+        assert_eq!(list.state().first_row(), 100);
+        assert!(list.query_by_label("105").is_some());
+
+        let grown = Reply {
+            block: block(0, 1_500).block.map(|mut block| {
+                block.rows.truncate(1_000);
+                block
+            }),
+            first: 100,
+        };
+        list.state_mut().receive(grown);
+        list.step();
+        assert_eq!(list.state().first_row(), 100);
+        assert!(list.query_by_label("105").is_some());
     }
 
     #[test]

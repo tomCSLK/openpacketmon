@@ -12,6 +12,7 @@ use eframe::egui::{
 use crate::engine::Engine;
 use crate::gui::load::Loader;
 use crate::gui::theme::palette;
+use crate::gui::widgets;
 use crate::view::i18n::Lang;
 use crate::view::packets::filter_problem;
 use crate::view::suggest::{Catalog, Expect, Line, catalog, lines, position, value_rows};
@@ -38,6 +39,15 @@ pub struct FilterField {
     dismissed: bool,
     /// What is wrong with the text
     problem: Option<(String, Option<String>)>,
+}
+
+/// The widths of the buttons behind a filter field
+pub fn button_widths(ui: &Ui, t: Lang, reset: bool) -> Vec<f32> {
+    let mut widths = vec![widgets::button_width(ui, &t.get("apply"))];
+    if reset {
+        widths.push(widgets::button_width(ui, &t.get("filter-reset")));
+    }
+    widths
 }
 
 /// What happened to the field in this frame

@@ -31,6 +31,7 @@ impl LoggedNotifications {
 
     pub fn clear_notifications(&mut self) {
         self.notifications = VecDeque::new();
+        self.total_notifications = 0;
     }
 
     #[cfg(test)]

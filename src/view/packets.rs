@@ -5,6 +5,7 @@
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::fmt::Write;
 use std::net::IpAddr;
+use std::ops::Range;
 
 use sniffnet_packet_parser::{LinkType, Protocol};
 
@@ -668,6 +669,97 @@ fn related_packets(
     (Some(record), related)
 }
 
+/// Text for the clipboard. It comes from the network, and where it is pasted a control character
+/// or a line break must not act: pasted into a terminal, a line break runs what stands before it
+fn clean(text: &str) -> String {
+    text.chars()
+        .map(|c| if c.is_control() { '.' } else { c })
+        .collect()
+}
+
+/// The value of a field, for the clipboard
+pub fn field_value(field: &Field) -> String {
+    clean(&field.value)
+}
+
+/// A field as one line, for the clipboard
+pub fn field_line(field: &Field) -> String {
+    if field.value.is_empty() {
+        field.name.to_owned()
+    } else {
+        format!("{}: {}", field.name, field_value(field))
+    }
+}
+
+fn push_field(text: &mut String, field: &Field, depth: usize) {
+    text.push('\n');
+    text.push_str(&"  ".repeat(depth));
+    text.push_str(&field_line(field));
+    for child in &field.children {
+        push_field(text, child, depth + 1);
+    }
+}
+
+/// A layer with its fields, indented as in the tree, for the clipboard
+pub fn layer_text(layer: &Layer) -> String {
+    let mut text = clean(&layer.title);
+    for field in &layer.fields {
+        push_field(&mut text, field, 1);
+    }
+    text
+}
+
+/// All layers, for the clipboard
+pub fn layers_text(layers: &[Layer]) -> String {
+    layers.iter().map(layer_text).collect::<Vec<_>>().join("\n")
+}
+
+/// The bytes of a range as hex, for the clipboard
+pub fn selection_hex(lines: &[HexLine], range: &Range<usize>) -> String {
+    lines
+        .iter()
+        .flat_map(|line| &line.bytes)
+        .filter(|(byte, _)| range.contains(byte))
+        .map(|(_, hex)| hex.as_str())
+        .collect::<Vec<_>>()
+        .join(" ")
+}
+
+/// The dot of the clipboard for what has no character; the screen shows a middle dot
+fn plain_char(c: char) -> char {
+    if c == '·' { '.' } else { c }
+}
+
+/// The bytes of a range as text, for the clipboard
+pub fn selection_text(lines: &[HexLine], range: &Range<usize>) -> String {
+    lines
+        .iter()
+        .flat_map(|line| &line.text)
+        .filter(|(byte, _)| range.contains(byte))
+        .map(|(_, c)| plain_char(*c))
+        .collect()
+}
+
+/// The bytes as the hex dump shows them, for the clipboard
+pub fn dump_text(lines: &[HexLine]) -> String {
+    lines
+        .iter()
+        .map(|line| {
+            let mut text = format!("{}  ", line.offset);
+            for (i, (_, hex)) in line.bytes.iter().enumerate() {
+                text.push_str(hex);
+                text.push_str(if i == 7 { "  " } else { " " });
+            }
+            let missing = 16 - line.bytes.len();
+            let padding = missing * 3 + usize::from(line.bytes.len() <= 7) + 1;
+            text.push_str(&" ".repeat(padding));
+            text.extend(line.text.iter().map(|(_, c)| plain_char(*c)));
+            text
+        })
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
 /// One packet: its layers and bytes and what belongs to it
 pub struct PacketDetail {
     pub number: u64,
@@ -820,6 +912,68 @@ mod tests {
     use std::net::Ipv4Addr;
 
     use super::*;
+
+    fn sample_layer() -> Layer {
+        Layer {
+            title: "Transmission Control Protocol".to_owned(),
+            range: 0..20,
+            fields: vec![
+                Field::new("Source port", "443", 0..2),
+                Field::new("Flags", "0x12", 13..14).with_children(vec![Field::new(
+                    "Syn",
+                    "set",
+                    13..14,
+                )]),
+                Field::new("Payload", "", 20..20),
+            ],
+        }
+    }
+
+    #[test]
+    fn a_layer_is_copied_as_its_tree() {
+        assert_eq!(
+            layer_text(&sample_layer()),
+            "Transmission Control Protocol\n  Source port: 443\n  Flags: 0x12\n    Syn: set\n  Payload",
+        );
+        let two = [sample_layer(), sample_layer()];
+        assert_eq!(layers_text(&two).lines().count(), 10);
+    }
+
+    /// Pasted into a terminal, a line break out of a packet would run what stands before it
+    #[test]
+    fn what_comes_from_the_network_cannot_act_where_it_is_pasted() {
+        let field = Field::new("Host", "a\nrm -rf x\u{1b}[0m", 0..1);
+        assert_eq!(field_value(&field), "a.rm -rf x.[0m");
+        assert_eq!(field_line(&field), "Host: a.rm -rf x.[0m");
+        let layer = Layer {
+            title: "One\ntwo".to_owned(),
+            range: 0..1,
+            fields: Vec::new(),
+        };
+        assert_eq!(layer_text(&layer), "One.two");
+    }
+
+    #[test]
+    fn bytes_are_copied_as_hex_as_text_and_as_a_dump() {
+        let mut data = b"GET /\r\n".to_vec();
+        data.extend_from_slice(&[0xff; 12]);
+        let lines = hex_dump(&data);
+        assert_eq!(selection_hex(&lines, &(0..3)), "47 45 54");
+        // across the end of a line
+        assert_eq!(selection_hex(&lines, &(15..17)), "ff ff");
+        assert_eq!(selection_text(&lines, &(0..7)), "GET /..");
+        assert_eq!(selection_hex(&lines, &(100..110)), "");
+        let dump = dump_text(&lines);
+        let mut rows = dump.lines();
+        assert_eq!(
+            rows.next(),
+            Some("0000  47 45 54 20 2f 0d 0a ff  ff ff ff ff ff ff ff ff  GET /...........")
+        );
+        assert_eq!(
+            rows.next(),
+            Some("0010  ff ff ff                                          ...")
+        );
+    }
 
     fn packet(src: [u8; 4], sport: u16, dst: [u8; 4], dport: u16) -> StoredPacket {
         StoredPacket {

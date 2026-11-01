@@ -50,6 +50,14 @@ impl<K: Clone + PartialEq + Send + 'static, T: Send + 'static> Loader<K, T> {
         self.value.take()
     }
 
+    /// How long the job has been running, zero without one
+    pub fn running_for(&self) -> Duration {
+        match self.started {
+            Some(started) if self.busy.load(Ordering::Acquire) => started.elapsed(),
+            _ => Duration::ZERO,
+        }
+    }
+
     /// Takes a finished result; `true` if there is a new value
     pub fn poll(&mut self) -> bool {
         let done = self

@@ -63,7 +63,7 @@ pub fn show(app: &mut App, ui: &mut Ui) {
             &t.get1("notifications-count", "count", list.total),
             |ui| {
                 if list.total > shown {
-                    widgets::hint(ui, &t.get1("notifications-kept", "count", shown));
+                    widgets::card_note(ui, &t.get1("notifications-kept", "count", shown));
                 }
             },
             |ui| {

@@ -572,14 +572,10 @@ fn nav_item(
         egui::vec2(18.0, 18.0),
     );
     egui::Image::new(icon).tint(color).paint_at(ui, icon_rect);
-    ui.painter().text(
-        rect.left_center() + egui::vec2(38.0, 0.0),
-        egui::Align2::LEFT_CENTER,
-        text,
-        FontId::proportional(14.0),
-        color,
-    );
-    if let Some(count) = badge.filter(|n| *n > 0) {
+    let count = badge.filter(|n| *n > 0);
+    let text_left = rect.left() + 38.0;
+    let mut text_right = rect.right() - 6.0;
+    if let Some(count) = count {
         let label = if count > 99 {
             "99+".to_owned()
         } else {
@@ -587,17 +583,29 @@ fn nav_item(
         };
         let galley = ui
             .painter()
-            .layout_no_wrap(label, FontId::proportional(11.0), Color32::WHITE);
-        let pill = egui::Rect::from_center_size(
-            rect.right_center() - egui::vec2(12.0 + galley.size().x / 2.0, 0.0),
-            egui::vec2(galley.size().x + 12.0, 18.0),
-        );
+            .layout_no_wrap(label, semibold_font(11.5), Color32::WHITE);
+        // a rectangle, not a circle, and never narrower than this
+        let size = egui::vec2((galley.size().x + 11.0).max(22.0), 20.0);
+        let right = rect.right_center() - egui::vec2(6.0, 0.0);
+        let badge = egui::Rect::from_center_size(right - egui::vec2(size.x / 2.0, 0.0), size);
         ui.painter()
-            .rect_filled(pill, CornerRadius::same(9), p.down);
+            .rect_filled(badge, CornerRadius::same(5), p.down);
         ui.painter()
-            .galley(pill.center() - galley.size() / 2.0, galley, Color32::WHITE);
+            .galley(badge.center() - galley.size() / 2.0, galley, Color32::WHITE);
+        text_right = badge.left() - 6.0;
     }
-    response
+    // the text gives way to the number
+    let font = FontId::proportional(14.0);
+    let mut job = egui::text::LayoutJob::simple_singleline(text.to_owned(), font, color);
+    job.wrap = egui::text::TextWrapping::truncate_at_width(text_right - text_left);
+    let galley = ui.painter().layout_job(job);
+    let top = rect.center().y - galley.size().y / 2.0;
+    ui.painter()
+        .galley(egui::pos2(text_left, top), galley, color);
+    match count {
+        Some(count) if count > 99 => response.on_hover_text(count.to_string()),
+        _ => response,
+    }
 }
 
 pub fn theme_preference(choice: ThemeChoice) -> ThemePreference {

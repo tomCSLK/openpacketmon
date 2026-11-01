@@ -304,6 +304,92 @@ fn the_rows_of_the_filters_end_at_the_edge_of_the_page() {
     }
 }
 
+/// What the last frame put on the clipboard
+fn copied(harness: &Harness<'static, App>) -> Option<String> {
+    harness
+        .output()
+        .platform_output
+        .commands
+        .iter()
+        .find_map(|c| match c {
+            egui::OutputCommand::CopyText(text) => Some(text.clone()),
+            _ => None,
+        })
+}
+
+#[test]
+#[serial]
+fn the_details_of_a_packet_can_be_copied() {
+    let fixture = engine_with(200);
+    // tall enough to have the fields of the transport layer in view
+    let mut harness = window_of_size(&fixture, Theme::Light, Lang::En, 1_400.0);
+    harness.state_mut().go(Page::Packet(3));
+    settle(&mut harness);
+
+    // nothing chosen, nothing copied
+    harness.event(egui::Event::Copy);
+    harness.step();
+    assert_eq!(copied(&harness), None);
+
+    let line = "Destination port: 443";
+    harness.get_by_label(line).click();
+    harness.run_steps(2);
+    harness.event(egui::Event::Copy);
+    harness.step();
+    assert_eq!(copied(&harness).as_deref(), Some(line));
+
+    harness.get_by_label(line).click_secondary();
+    harness.run_steps(2);
+    harness.get_by_label("Copy value").click();
+    harness.step();
+    assert_eq!(copied(&harness).as_deref(), Some("443"));
+
+    harness.get_by_label(line).click_secondary();
+    harness.run_steps(2);
+    harness.get_by_label("Copy bytes as hex").click();
+    harness.step();
+    assert_eq!(copied(&harness).as_deref(), Some("01 bb"));
+
+    harness.get_by_label(line).click_secondary();
+    harness.run_steps(2);
+    harness.get_by_label("Copy everything").click();
+    harness.step();
+    let all = copied(&harness).unwrap();
+    assert!(all.contains("  Destination port: 443"), "{all}");
+
+    // the first line of the hex dump: its bytes have no label to find them by
+    let at = harness.get_by_label("Bytes").rect().left_bottom() + egui::vec2(90.0, 24.0);
+    let right_click = |harness: &mut Harness<'static, App>| {
+        harness.event(egui::Event::PointerMoved(at));
+        for pressed in [true, false] {
+            harness.event(egui::Event::PointerButton {
+                pos: at,
+                button: egui::PointerButton::Secondary,
+                pressed,
+                modifiers: egui::Modifiers::NONE,
+            });
+        }
+        harness.run_steps(3);
+    };
+    right_click(&mut harness);
+    harness
+        .get_by_label("Copy whole packet as hex dump")
+        .click();
+    harness.step();
+    let dump = copied(&harness).unwrap();
+    assert!(dump.starts_with("0000  "), "{dump}");
+    assert!(dump.lines().count() > 3, "{dump}");
+
+    right_click(&mut harness);
+    harness.get_by_label("Copy selection as hex").click();
+    harness.step();
+    let hex = copied(&harness).unwrap();
+    assert!(
+        !hex.is_empty() && hex.split(' ').all(|byte| byte.len() == 2),
+        "{hex}"
+    );
+}
+
 #[test]
 #[serial]
 fn the_filter_field_suggests_and_applies() {

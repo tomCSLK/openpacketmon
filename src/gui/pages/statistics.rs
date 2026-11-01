@@ -163,6 +163,8 @@ pub fn show(app: &mut App, ui: &mut Ui, display: &str, connections: &str) {
                 page(ui, t, s, packets_unit, &mut actions);
             });
         }
+    } else {
+        widgets::loading(ui, state.data.running_for(), &t.get("gui-loading"));
     }
 
     if show_packets {

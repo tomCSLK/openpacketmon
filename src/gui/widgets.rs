@@ -1,5 +1,7 @@
 //! The parts every page is made of: page heads, cards, buttons, notes and fact lists.
 
+use std::time::Duration;
+
 use eframe::egui::{
     self, Align, Button, Color32, CornerRadius, Frame, ImageSource, Layout, Margin, Response,
     RichText, Sense, Stroke, TextWrapMode, Ui, WidgetInfo, WidgetText,
@@ -12,6 +14,10 @@ use crate::view::i18n::Lang;
 pub const CONTROL_H: f32 = 32.0;
 /// Height of the small buttons in the heads of the cards
 pub const CONTROL_SM_H: f32 = 26.0;
+
+/// Most data comes at once: only after this time a spinner tells that it is on its way, or it
+/// would only flicker
+const LOADING_DELAY: Duration = Duration::from_millis(150);
 
 /// The look of a button
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -360,6 +366,30 @@ pub fn hint(ui: &mut Ui, text: &str) {
     ui.with_layout(Layout::top_down(Align::Min), |ui| {
         ui.label(RichText::new(text).small().color(p.muted));
     });
+}
+
+/// A short note at the right of the head of a card
+pub fn card_note(ui: &mut Ui, text: &str) {
+    let p = palette(ui.ctx());
+    ui.label(RichText::new(text).size(13.0).color(p.muted));
+}
+
+/// Stands for data on its way, which has been awaited for `waited`
+pub fn loading(ui: &mut Ui, waited: Duration, text: &str) {
+    if let Some(left) = LOADING_DELAY.checked_sub(waited)
+        && !left.is_zero()
+    {
+        ui.ctx().request_repaint_after(left);
+        return;
+    }
+    let p = palette(ui.ctx());
+    ui.add_space(32.0);
+    ui.vertical_centered(|ui| {
+        ui.add(egui::Spinner::new().size(24.0).color(p.accent));
+        ui.add_space(4.0);
+        ui.label(RichText::new(text).color(p.muted));
+    });
+    ui.add_space(32.0);
 }
 
 /// A cell of a grid with its text at the right edge

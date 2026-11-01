@@ -64,7 +64,7 @@ capture-export-name = Dateiname
 capture-packets-full = Vollständige Pakete
 capture-packets-headers = Nur Kopfdaten
 capture-packets-off = Aus
-capture-packets-hint = Gespeicherte Pakete zeigen die Seiten Pakete, Paketdetails und Stream folgen und lassen sich als PCAP speichern. Vollständige Pakete brauchen mehr Arbeitsspeicher (höchstens 512 MiB), nur damit sind Inhalte wie der TLS-Servername (SNI) und Stream folgen vollständig. „Nur Kopfdaten“ behält die ersten 128 Bytes jedes Pakets.
+capture-packets-hint = Gespeicherte Pakete zeigen die Seiten Pakete, Paketdetails und Stream folgen und lassen sich als PCAP speichern. Vollständige Pakete brauchen mehr Arbeitsspeicher (Grenze in den Einstellungen, bis 2 GiB), nur damit sind Inhalte wie der TLS-Servername (SNI) und Stream folgen vollständig. „Nur Kopfdaten“ behält die ersten 128 Bytes jedes Pakets.
 capture-packets-full-max = vollständige Pakete, höchstens { $max } Pakete
 capture-packets-headers-max = nur Kopfdaten (128 Bytes je Paket), höchstens { $max } Pakete
 capture-file-path = Pfad der Datei (PCAP oder PCAPNG)
@@ -445,6 +445,16 @@ filter-hint-favorite = Verbindung zu einem Favoriten
 filter-hint-exporter = Absender der IPFIX-Daten
 
 # Fenster
+packets-loading = Pakete werden geladen …
+gui-loading = Wird geladen …
+copy-line = Zeile kopieren
+copy-value = Wert kopieren
+copy-bytes-hex = Bytes als Hex kopieren
+copy-layer = Schicht kopieren
+copy-selection-hex = Auswahl als Hex kopieren
+copy-selection-text = Auswahl als Text kopieren
+copy-dump = Ganzes Paket als Hex-Dump kopieren
+copy-all = Alles kopieren
 gui-close-title = Aufzeichnung läuft
 gui-close-text = Beim Schließen endet die Aufzeichnung, und ihre Pakete gehen verloren, sofern sie nicht gespeichert sind.
 gui-close-confirm = Beenden

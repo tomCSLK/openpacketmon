@@ -814,6 +814,7 @@ mod tests {
         assert_eq!(state.logged_notifications.notifications().len(), 1);
         state.clear_notifications();
         assert_eq!(state.logged_notifications.notifications().len(), 0);
+        assert_eq!(state.logged_notifications.tot(), 0);
         assert_eq!(state.unread_notifications, 0);
     }
 

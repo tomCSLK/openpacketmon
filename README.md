@@ -66,8 +66,8 @@ The *Connections* page filters with one field in the same grammar as the display
 `program contains firefox`, `favorite`). Hosts, programs and IP addresses can be favorites; a notification reports new traffic
 of a favorite. The *Packets* page lists the single packets in one continuous list that follows the capture live (with "Go to
 packet"), with a display filter (`dns`, `tls.sni contains amazon`, `ip.addr == 192.168.1.0/24`) and coloring rules; it shows
-their layers (including DNS, DHCP, TLS server names, HTTP, SSDP, NTP and QUIC) and bytes, follows TCP and UDP streams and saves
-the packets as a PCAP file for Wireshark. A TCP analysis marks retransmissions, gaps, duplicate ACKs and zero windows and
+their layers (including DNS, DHCP, TLS server names, HTTP, SSDP, NTP and QUIC) and bytes, copies them with Ctrl+C or the
+context menu, follows TCP and UDP streams and saves the packets as a PCAP file for Wireshark. A TCP analysis marks retransmissions, gaps, duplicate ACKs and zero windows and
 measures round trip, handshake and DNS response times; the *Statistics* page shows the protocol hierarchy, these findings and
 a traffic chart for any display filter. The capture page also chooses whether the packets are kept whole, as headers only
 (less memory) or not at all. The packets stay in memory, up to the limits chosen in the settings (2 million packets, 2 GiB);

@@ -52,6 +52,8 @@ pub fn show(app: &mut App, ui: &mut Ui, number: u64) {
         packets = widgets::button(ui, t.get("stream-packets"), Kind::Secondary).clicked();
     });
     if !known {
+        let waited = app.pages.stream.content.running_for();
+        widgets::loading(ui, waited, &t.get("gui-loading"));
         return;
     }
     let Some(Some(s)) = app.pages.stream.content.value_of(&key) else {

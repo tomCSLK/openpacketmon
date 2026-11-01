@@ -42,6 +42,8 @@ First public version. This list describes what differs from Sniffnet.
 - New page *Packets*: one continuous list, as in Wireshark, that scrolls through all packets matching the display filter,
   loads only the rows in view and follows new packets at the end during a capture; "Go to packet" (Ctrl+G), Ctrl+Home/End,
   Page Up/Down and the arrow keys; back from the packet details the list is where it was
+- Fields, layers and bytes of the packet details can be copied with Ctrl+C or the context menu; control characters from the
+  packets are replaced in what is copied
 - Packet details: layer tree and hex dump, a field marks its bytes and a byte selects its field. Layers: Ethernet, VLAN,
   Linux cooked capture, ARP, IPv4, IPv6, TCP, UDP, ICMP, ICMPv6, IGMP, DNS, mDNS, LLMNR, DHCP, DHCPv6, TLS (with server
   name, ALPN and versions, also over several TCP segments), HTTP/1, SSDP, NTP and the QUIC header

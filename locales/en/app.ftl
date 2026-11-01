@@ -64,7 +64,7 @@ capture-export-name = File name
 capture-packets-full = Whole packets
 capture-packets-headers = Headers only
 capture-packets-off = Off
-capture-packets-hint = Stored packets are shown on the pages Packets, Packet details and Follow stream and can be saved as PCAP. Whole packets take more memory (512 MiB at most); only with them are contents like the TLS server name (SNI) and Follow stream complete. "Headers only" keeps the first 128 bytes of each packet.
+capture-packets-hint = Stored packets are shown on the pages Packets, Packet details and Follow stream and can be saved as PCAP. Whole packets take more memory (limit in the settings, up to 2 GiB); only with them are contents like the TLS server name (SNI) and Follow stream complete. "Headers only" keeps the first 128 bytes of each packet.
 capture-packets-full-max = whole packets, { $max } packets at most
 capture-packets-headers-max = headers only (128 bytes per packet), { $max } packets at most
 capture-file-path = Path of the file (PCAP or PCAPNG)
@@ -445,6 +445,16 @@ filter-hint-favorite = Connection to a favorite
 filter-hint-exporter = Sender of the IPFIX data
 
 # Window
+packets-loading = Loading packets …
+gui-loading = Loading …
+copy-line = Copy line
+copy-value = Copy value
+copy-bytes-hex = Copy bytes as hex
+copy-layer = Copy layer
+copy-selection-hex = Copy selection as hex
+copy-selection-text = Copy selection as text
+copy-dump = Copy whole packet as hex dump
+copy-all = Copy everything
 gui-close-title = Capture running
 gui-close-text = Closing the window ends the capture, and its packets are lost unless they have been saved.
 gui-close-confirm = Quit

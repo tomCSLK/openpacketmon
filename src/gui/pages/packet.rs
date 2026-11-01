@@ -13,7 +13,11 @@ use crate::gui::theme::palette;
 use crate::gui::widgets::{self, Kind};
 use crate::gui::{App, Page, local_time};
 use crate::view::Jump;
-use crate::view::packets::{HexLine, PacketDetail, conversation_filter, packet_detail};
+use crate::view::i18n::Lang;
+use crate::view::packets::{
+    HexLine, PacketDetail, conversation_filter, dump_text, field_line, field_value, layer_text,
+    layers_text, packet_detail, selection_hex, selection_text,
+};
 
 /// Room for the offset, 16 bytes and their characters
 const HEX_WIDTH: f32 = 610.0;
@@ -23,7 +27,48 @@ pub struct State {
     detail: Loader<(u64, usize), Option<PacketDetail>>,
     /// The bytes of the field chosen
     selected: Option<Range<usize>>,
+    /// What copying takes of the field or layer chosen
+    selected_text: String,
     number: u64,
+}
+
+/// What the lists of a page ask for in a frame
+#[derive(Default)]
+struct Asked {
+    /// The bytes and the text of a field or layer chosen
+    pick: Option<(Range<usize>, String)>,
+    copy: Option<String>,
+}
+
+/// What belongs to all the rows of the lists
+struct Lists<'a> {
+    t: Lang,
+    detail: &'a PacketDetail,
+    selected: Option<&'a Range<usize>>,
+}
+
+impl Lists<'_> {
+    /// An entry of a menu that copies a text
+    fn item(&self, ui: &mut Ui, key: &str, asked: &mut Asked, text: impl FnOnce() -> String) {
+        if ui.button(self.t.get(key)).clicked() {
+            asked.copy = Some(text());
+            ui.close();
+        }
+    }
+
+    /// The entry for the bytes of a range, if there are any in the dump
+    fn bytes_item(&self, ui: &mut Ui, range: &Range<usize>, asked: &mut Asked) {
+        let hex = selection_hex(&self.detail.hex, range);
+        if !hex.is_empty() {
+            self.item(ui, "copy-bytes-hex", asked, || hex);
+        }
+    }
+
+    /// The entry the menus have in common
+    fn all_item(&self, ui: &mut Ui, asked: &mut Asked) {
+        ui.separator();
+        self.item(ui, "copy-all", asked, || layers_text(&self.detail.layers));
+    }
 }
 
 pub fn show(app: &mut App, ui: &mut Ui, number: u64) {
@@ -34,6 +79,7 @@ pub fn show(app: &mut App, ui: &mut Ui, number: u64) {
     if state.number != number {
         state.number = number;
         state.selected = None;
+        state.selected_text.clear();
     }
     state.detail.poll();
     let engine = app.engine.clone();
@@ -159,9 +205,20 @@ pub fn show(app: &mut App, ui: &mut Ui, number: u64) {
     }
 
     let selected = app.pages.packet.selected.clone();
-    let mut pick = None;
+    let mut asked = Asked::default();
+    // the text of a selected label goes to the clipboard after this one
+    if ctx.input(|i| i.events.iter().any(|e| matches!(e, egui::Event::Copy)))
+        && !app.pages.packet.selected_text.is_empty()
+    {
+        asked.copy = Some(app.pages.packet.selected_text.clone());
+    }
     let Some(Some(d)) = app.pages.packet.detail.value_of(&key) else {
         return;
+    };
+    let lists = Lists {
+        t,
+        detail: d,
+        selected: selected.as_ref(),
     };
     let height = ui.available_height();
     // the bytes need their width, the layers take what is left
@@ -189,7 +246,7 @@ pub fn show(app: &mut App, ui: &mut Ui, number: u64) {
                                 ui.horizontal(|ui| {
                                     ui.add_space(10.0);
                                     ui.vertical(|ui| {
-                                        layer_tree(ui, i, layer, selected.as_ref(), &mut pick);
+                                        layer_tree(ui, i, layer, &lists, &mut asked);
                                     });
                                 });
                             }
@@ -214,8 +271,10 @@ pub fn show(app: &mut App, ui: &mut Ui, number: u64) {
                             for line in &d.hex {
                                 ui.horizontal(|ui| {
                                     ui.add_space(14.0);
-                                    if let Some(byte) = hex_line(ui, line, selected.as_ref()) {
-                                        pick = smallest_field(&d.layers, byte);
+                                    if let Some(byte) = hex_line(ui, line, &lists, &mut asked)
+                                        && let Some(field) = smallest_field(&d.layers, byte)
+                                    {
+                                        asked.pick = Some((field.range.clone(), field_line(field)));
                                     }
                                 });
                             }
@@ -229,8 +288,12 @@ pub fn show(app: &mut App, ui: &mut Ui, number: u64) {
         });
     });
 
-    if pick.is_some() {
-        app.pages.packet.selected = pick;
+    if let Some(text) = asked.copy {
+        ctx.copy_text(text);
+    }
+    if let Some((range, text)) = asked.pick {
+        app.pages.packet.selected = Some(range);
+        app.pages.packet.selected_text = text;
     }
     if back {
         app.back();
@@ -242,32 +305,27 @@ pub fn show(app: &mut App, ui: &mut Ui, number: u64) {
     }
 }
 
-fn layer_tree(
-    ui: &mut Ui,
-    index: usize,
-    layer: &Layer,
-    selected: Option<&Range<usize>>,
-    pick: &mut Option<Range<usize>>,
-) {
+fn layer_tree(ui: &mut Ui, index: usize, layer: &Layer, lists: &Lists, asked: &mut Asked) {
     let header = egui::CollapsingHeader::new(&layer.title)
         .id_salt(index)
         .default_open(true)
         .show(ui, |ui| {
             for field in &layer.fields {
-                field_row(ui, field, selected, pick);
+                field_row(ui, field, lists, asked);
             }
         });
-    if header.header_response.clicked() {
-        *pick = Some(layer.range.clone());
+    let response = header.header_response;
+    if response.clicked() || response.secondary_clicked() {
+        asked.pick = Some((layer.range.clone(), layer_text(layer)));
     }
+    response.context_menu(|ui| {
+        lists.item(ui, "copy-layer", asked, || layer_text(layer));
+        lists.bytes_item(ui, &layer.range, asked);
+        lists.all_item(ui, asked);
+    });
 }
 
-fn field_row(
-    ui: &mut Ui,
-    field: &Field,
-    selected: Option<&Range<usize>>,
-    pick: &mut Option<Range<usize>>,
-) {
+fn field_row(ui: &mut Ui, field: &Field, lists: &Lists, asked: &mut Asked) {
     let p = palette(ui.ctx());
     let mut job = LayoutJob::default();
     let body = egui::TextStyle::Body.resolve(ui.style());
@@ -281,27 +339,35 @@ fn field_row(
         job.append(": ", 0.0, format(p.muted));
         job.append(&field.value, 0.0, format(p.text));
     }
-    let on = selected == Some(&field.range);
+    let on = lists.selected == Some(&field.range);
     let response = ui.add(egui::Button::selectable(on, job));
-    if response.clicked() {
-        *pick = Some(field.range.clone());
+    if response.clicked() || response.secondary_clicked() {
+        asked.pick = Some((field.range.clone(), field_line(field)));
     }
+    response.context_menu(|ui| {
+        lists.item(ui, "copy-line", asked, || field_line(field));
+        if !field.value.is_empty() {
+            lists.item(ui, "copy-value", asked, || field_value(field));
+        }
+        lists.bytes_item(ui, &field.range, asked);
+        lists.all_item(ui, asked);
+    });
     if !field.children.is_empty() {
         ui.indent((field.name, field.range.start), |ui| {
             for child in &field.children {
-                field_row(ui, child, selected, pick);
+                field_row(ui, child, lists, asked);
             }
         });
     }
 }
 
 /// The smallest field around a byte
-fn smallest_field(layers: &[Layer], byte: usize) -> Option<Range<usize>> {
-    fn search(fields: &[Field], byte: usize, best: &mut Option<Range<usize>>) {
+fn smallest_field(layers: &[Layer], byte: usize) -> Option<&Field> {
+    fn search<'a>(fields: &'a [Field], byte: usize, best: &mut Option<&'a Field>) {
         for field in fields {
             if field.range.contains(&byte) {
-                if best.as_ref().is_none_or(|b| field.range.len() <= b.len()) {
-                    *best = Some(field.range.clone());
+                if best.is_none_or(|b| field.range.len() <= b.range.len()) {
+                    *best = Some(field);
                 }
                 search(&field.children, byte, best);
             }
@@ -317,7 +383,8 @@ fn smallest_field(layers: &[Layer], byte: usize) -> Option<Range<usize>> {
 }
 
 /// A line of the hex dump; returns the byte clicked
-fn hex_line(ui: &mut Ui, line: &HexLine, selected: Option<&Range<usize>>) -> Option<usize> {
+fn hex_line(ui: &mut Ui, line: &HexLine, lists: &Lists, asked: &mut Asked) -> Option<usize> {
+    let selected = lists.selected;
     let p = palette(ui.ctx());
     let font = egui::TextStyle::Monospace.resolve(ui.style());
     let plain = TextFormat {
@@ -360,9 +427,22 @@ fn hex_line(ui: &mut Ui, line: &HexLine, selected: Option<&Range<usize>>) -> Opt
     let galley = ui.painter().layout_job(job);
     let (rect, response) = ui.allocate_exact_size(galley.size(), Sense::click());
     ui.painter().galley(rect.min, galley.clone(), p.text);
+    let hex = &lists.detail.hex;
+    response.context_menu(|ui| {
+        if let Some(range) = selected.filter(|range| !range.is_empty()) {
+            lists.item(ui, "copy-selection-hex", asked, || {
+                selection_hex(hex, range)
+            });
+            lists.item(ui, "copy-selection-text", asked, || {
+                selection_text(hex, range)
+            });
+        }
+        lists.item(ui, "copy-dump", asked, || dump_text(hex));
+        lists.all_item(ui, asked);
+    });
     let at = response
         .interact_pointer_pos()
-        .filter(|_| response.clicked())?;
+        .filter(|_| response.clicked() || response.secondary_clicked())?;
     let index: usize = galley.cursor_from_pos(at - rect.min).index.into();
     bytes.get(index).copied().flatten()
 }
@@ -384,9 +464,10 @@ mod tests {
                 Field::new("tail", "", 18..20),
             ],
         }];
-        assert_eq!(smallest_field(&layers, 5), Some(4..6));
-        assert_eq!(smallest_field(&layers, 8), Some(0..20));
-        assert_eq!(smallest_field(&layers, 19), Some(18..20));
-        assert_eq!(smallest_field(&layers, 25), None);
+        let found = |byte| smallest_field(&layers, byte).map(|field| field.range.clone());
+        assert_eq!(found(5), Some(4..6));
+        assert_eq!(found(8), Some(0..20));
+        assert_eq!(found(19), Some(18..20));
+        assert_eq!(found(25), None);
     }
 }

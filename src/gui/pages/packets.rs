@@ -2,7 +2,7 @@
 //! blocks in the background; at the end it follows the new packets of a running capture.
 
 use std::collections::HashMap;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use eframe::egui::{self, Align, Key, Layout, RichText, Sense, TextEdit, TextWrapMode, Ui};
 use egui_extras::{Column, TableBuilder};
@@ -60,6 +60,10 @@ pub struct State {
     head: Loader<Filters, PacketList>,
     block: Loader<BlockKey, Reply>,
     key: Option<BlockKey>,
+    /// A block has come for the filters in use, so an empty list means there are no packets
+    received: bool,
+    /// When the filters were put in use
+    opened: Option<Instant>,
     rows: HashMap<usize, PacketRow>,
     total: usize,
     foot: String,
@@ -115,6 +119,8 @@ impl State {
         self.rows.clear();
         self.total = 0;
         self.key = None;
+        self.received = false;
+        self.opened = Some(Instant::now());
         self.goto = goto;
         self.target = None;
         self.goto_note = None;
@@ -123,6 +129,11 @@ impl State {
         self.follow = goto.is_none() && running;
         self.paused = false;
         self.was_at_end = false;
+    }
+
+    /// How long the first block has been awaited
+    fn waited(&self) -> Duration {
+        self.opened.map_or(Duration::ZERO, |at| at.elapsed())
     }
 
     /// The switch "follow": on, it jumps to the end at once, not only with the next block
@@ -166,6 +177,7 @@ impl State {
 
     /// Takes a block of rows that has arrived
     fn receive(&mut self, reply: Reply) {
+        self.received = true;
         let goto = self.goto.take();
         let Some(block) = reply.block else {
             self.rows.clear();
@@ -339,6 +351,7 @@ pub fn show(app: &mut App, ui: &mut Ui, display: &str, connections: &str, goto: 
     }
 
     // what the page says about the capture and the filters
+    let head_known = state.head.value_of(&filters).is_some();
     let (has_list, has_foot, unavailable, error, connection) =
         state.head.value_of(&filters).map_or_else(
             || (false, false, String::new(), None, None),
@@ -431,7 +444,8 @@ pub fn show(app: &mut App, ui: &mut Ui, display: &str, connections: &str, goto: 
         |ui| color_legend(ui, t),
     );
 
-    if has_list {
+    // the list stands while it is not yet known whether there is one, with a note that it loads
+    if has_list || (running && !head_known) {
         list(app, ui, filtered, live, &mut actions);
     }
 
@@ -610,7 +624,9 @@ fn list(app: &mut App, ui: &mut Ui, filtered: bool, live: bool, actions: &mut Ac
     let mut wanted_colors = colored;
     let state = &mut app.pages.packets;
     let shown_to = (state.first + state.visible).min(state.total);
-    let title = if state.total == 0 {
+    let title = if !state.received {
+        t.get("nav-packets")
+    } else if state.total == 0 {
         t.get("packets-none")
     } else {
         fill(
@@ -700,6 +716,10 @@ fn table(
     actions: &mut Actions,
 ) {
     let p = palette(ui.ctx());
+    if !state.received {
+        widgets::loading(ui, state.waited(), &t.get("packets-loading"));
+        return;
+    }
     if state.total == 0 {
         let text = if filtered {
             "packets-none-filtered"
@@ -877,6 +897,7 @@ mod tests {
 
     fn state() -> State {
         State {
+            received: true,
             total: 1_000,
             height: 240.0,
             follow: true,
@@ -939,6 +960,23 @@ mod tests {
             )
     }
 
+    /// Before the first block nobody knows that the list is empty, so it does not say so
+    #[test]
+    fn an_empty_list_is_only_told_once_it_is_known() {
+        let mut list = list_of(State {
+            opened: Instant::now().checked_sub(Duration::from_secs(1)),
+            ..State::default()
+        });
+        list.run_steps(2);
+        assert!(list.query_by_label("Loading packets …").is_some());
+        assert!(list.query_by_label("No packets yet.").is_none());
+
+        list.state_mut().receive(block(0, 0));
+        list.run_steps(2);
+        assert!(list.query_by_label("Loading packets …").is_none());
+        assert!(list.query_by_label("No packets yet.").is_some());
+    }
+
     /// More packets came than rows are in view: the frame that takes the block must show its
     /// rows. Waiting for the scroll area to reach the end draws the old place, whose rows have
     /// just gone, and the list flashes empty.
@@ -969,6 +1007,7 @@ mod tests {
     fn a_new_block_leaves_a_list_that_does_not_follow_in_place() {
         let mut list = list_of(State {
             scroll_to: Some(100.0 * ROW_H),
+            received: true,
             ..State::default()
         });
         list.state_mut().receive(block(0, 1_000));

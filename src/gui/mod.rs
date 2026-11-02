@@ -663,9 +663,24 @@ pub fn language_of(code: &str) -> Lang {
         ["LC_ALL", "LC_MESSAGES", "LANG"]
             .iter()
             .find_map(|name| std::env::var(name).ok().filter(|v| !v.is_empty()))
-            .map(|v| Lang::from_accept_language(&v.replace('_', "-")))
+            .map(|v| v.replace('_', "-"))
+            .or_else(windows_languages)
+            .map(|v| Lang::from_accept_language(&v))
             .unwrap_or_default()
     })
+}
+
+/// The display languages of Windows in the order of the user, like `de-DE,en-US`; the variables
+/// above are only set there by shells such as Git Bash
+#[cfg(windows)]
+fn windows_languages() -> Option<String> {
+    let languages = sys_locale::get_locales().collect::<Vec<_>>().join(",");
+    (!languages.is_empty()).then_some(languages)
+}
+
+#[cfg(not(windows))]
+fn windows_languages() -> Option<String> {
+    None
 }
 
 /// A time in the time zone of the computer

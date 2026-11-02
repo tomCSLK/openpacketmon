@@ -799,3 +799,14 @@ fn a_capture_that_ends_with_an_error_says_so_on_every_page() {
     settle(&mut harness);
     assert!(harness.query_by_label_contains("helper gone").is_some());
 }
+
+#[cfg(windows)]
+#[test]
+fn windows_names_the_languages_of_the_user() {
+    // the list Windows keeps under Settings > Time & language, never empty
+    let languages = super::windows_languages().expect("no display language");
+    assert!(
+        languages.split(',').all(|tag| tag.len() >= 2),
+        "{languages}"
+    );
+}

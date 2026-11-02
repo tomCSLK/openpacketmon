@@ -1,6 +1,6 @@
 [package]
 name = "openpacketmon-capture"
-version = "0.3.10"
+version = "0.3.11"
 description = "Capture helper of openpacketmon: the only part with the rights to capture packets"
 authors.workspace = true
 edition.workspace = true

@@ -1267,6 +1267,12 @@ Mausbewegungen (Intel Arc); mit DirectX 12 und OpenGL nicht. `src/gui/mod.rs` gi
 `follow_stream` und `packet_bytes` die Inhalte, eine eigene HTTP-Anfrage mit erfundenen Geheimnissen (Cookie, Bearer, URL-Query) kommt
 nur mit `x` an, auch in Hex. `mcp-access.json` ist nur
 für SYSTEM, Administratoren und den Benutzer lesbar, keine Änderung nötig (`docs/windows.md` 5 Punkt 9).
+Nutzer (2026-11-02): Mitschnitt im Fenster getestet, bisher ohne Probleme. **Systemsprache (vom Nutzer gewünscht, 2026-11-02):** Ohne
+Sprache in den Einstellungen und ohne `LANG` nimmt das Programm unter Windows die Anzeigesprachen des Systems (`sys-locale`, nur Windows);
+Npcap-Dialog jetzt auf Deutsch. Gefunden: Die MCP-Integrationstests sind unter Windows nicht von den echten Einstellungen getrennt
+(`confy` beachtet `XDG_CONFIG_HOME` dort nicht), Lösung offen (`docs/windows.md` 4).
+**Erste Tester-Fassung 0.3.11 (2026-11-02, Version vom Nutzer):** Installer `openpacketmon-0.3.11-setup.exe` mit `dev\build-installer.ps1`
+gebaut, SHA-256 in `docs/windows.md` 6; unsigniert, Weitergabe nur als Datei.
 Früher entschieden (2026-10-30/31): Beginn erst nach dem ersten Release und nach MCP; der Installer soll, **wenn möglich, eine Code-Signatur**
 bekommen. Weg (`docs/windows.md` 6.1): zuerst kostenlos über die SignPath Foundation, das setzt ein unsigniertes Windows-Release und
 einen Build in GitHub Actions voraus, und die Zusage ist nicht sicher, weil deren Regel „No hacking tools“ ein

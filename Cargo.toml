@@ -3,7 +3,7 @@
 
 [package]
 name = "openpacketmon"
-version = "0.3.10"
+version = "0.3.11"
 description = "Network traffic monitor, based on Sniffnet"
 readme = "README.md"
 keywords = ["network", "packet", "traffic", "monitor", "pcap"]
@@ -71,6 +71,8 @@ toml = "1.1.8"
 
 # opens the download page of Npcap when it is missing (src/npcap.rs); egui uses it for links anyway
 [target.'cfg(windows)'.dependencies]
+# the display language of Windows for the first start (src/gui/mod.rs, language_of)
+sys-locale = "0.3.2"
 webbrowser = "1.2.6"
 
 #───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────

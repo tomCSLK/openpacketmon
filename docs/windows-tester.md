@@ -41,8 +41,8 @@ openpacketmon selbst braucht nie Administratorrechte.
 - **Seiten**: Übersicht, Verbindungen, Pakete, Paketdetails, Statistik, Hosts, Dienste, Programme.
 - **Aufzeichnungsdatei**: eine `.pcap`-Datei öffnen (Quelle „Aufzeichnungsdatei“), stoppen und danach prüfen, ob sich die
   Datei im Explorer löschen oder umbenennen lässt.
-- **Einstellungen**: Sprache (anfangs Englisch, unter „Settings“ auf Deutsch umstellbar), Geodaten laden, Benachrichtigungen
-  mit Ton.
+- **Einstellungen**: Sprache (anfangs die Anzeigesprache von Windows, Deutsch oder sonst Englisch; in den Einstellungen
+  umstellbar), Geodaten laden, Benachrichtigungen mit Ton.
 - **Schließen** des Fensters während einer Aufzeichnung: Es kommt eine Rückfrage.
 
 ## Rückmeldung

@@ -1216,7 +1216,7 @@ Hinweis: Die Feldnamen (`ip.addr`, `tcp.port`) als Bedienkonvention sind kein Co
 
 Langzeitspeicherung (SQLite) und Berichte; Gerätenamen aus AdGuard/Omada; Warnung bei auffälligem Upload. (Fenster-Variante B ist umgesetzt, siehe „Fenster-Programm“.)
 
-#### 5.3 Windows-Version (begonnen 2026-11-02, Zweig `windows`)
+#### 5.3 Windows-Version (begonnen 2026-11-02 auf dem Zweig `windows`, am selben Tag nach `main` übernommen)
 
 Alles, was für die Fortsetzung auf einem Windows-Rechner nötig ist, steht in **`docs/windows.md`** (2026-10-30): Software,
 Zugänge, Einrichten, die Linux-Bindungen im Code mit ihrer Lösung, Tests, Installer, CI und Reihenfolge. Npcap wird nie mitgeliefert.
@@ -1247,7 +1247,7 @@ Bedienung und Mitschnitt noch nicht ausprobiert. **Release-Fassung (2026-11-02, 
 mit `CREATE_NO_WINDOW`; Icon `resources/packaging/windows/openpacketmon.ico` aus `dev/make-ico.py`, eingebettet von `build.rs` mit
 `winresource` (nur Build-Abhängigkeit unter Windows). Folge: Kommandozeilen-Ausgaben der Release-Fassung nur mit umgeleiteter
 Ausgabe sichtbar (`| Out-Host`). `dev/third-party-licenses.py` schreibt unter Windows jetzt dieselbe Datei wie unter Linux.
-**Stufe A und Installer (2026-11-02, vom Nutzer freigegeben; nicht committet):** Entschieden: Inno Setup, Installation standardmäßig
+**Stufe A und Installer (2026-11-02, vom Nutzer freigegeben; auf dem Zweig `windows` committet):** Entschieden: Inno Setup, Installation standardmäßig
 nur für den Benutzer (wahlweise für alle), gesperrte Datei per „Stop wartet“ ohne `unsafe`, eine gemeinsame Lizenzliste für beide
 Plattformen. Umgesetzt (Einzelheiten `docs/windows.md` 4, 6, 7): Adapter mit ihrer Beschreibung statt `\Device\NPF_{…}`
 (`MyDevice::display_name`/`is_called`, `--adapter` nimmt auch die Beschreibung); `Engine::stop` wartet, bis der Mitschnitt seine Dateien
@@ -1257,9 +1257,8 @@ Abhängigkeit `webbrowser` nur unter Windows); C-Laufzeit statisch (`.cargo/conf
 (Timeout kommt auch ohne Pakete); `resources/packaging/windows/openpacketmon.iss` und `dev/build-installer.ps1` (lokal installiert und
 deinstalliert, mit 0.3.10 nur zum Testen); `deny.toml` mit Windows-Ziel und `BSL-1.0`; `THIRD-PARTY-LICENSES.txt` für beide Plattformen
 (482 Crates); Tester-Anleitung `docs/windows-tester.md`. Geprüft: `cargo test --workspace` (388 bestanden), Clippy, fmt, `cargo deny`,
-`dev/check-notices.sh`. **Offen:** Bedienung und Mitschnitt im Fenster (Nutzer), Test auf sauberem System (Windows-Sandbox), Version
-der Tester-Fassung (nennt der Nutzer), Systemsprache unter Windows (startet englisch), Rechte von `mcp-access.json`, CI-Job, Linux-Build
-nur über die CI geprüft.
+`dev/check-notices.sh`. **Offen** (Stand dieses Absatzes; erledigt seither: Mitschnitt im Fenster, Version 0.3.11, Systemsprache,
+Rechte von `mcp-access.json`, Linux-Prüfung, siehe unten): Test auf sauberem System (Windows-Sandbox), CI-Job.
 **Blinkendes Fenster (2026-11-02, vom Nutzer freigegeben):** Unter Windows nahm wgpu Vulkan, und das Fenster blinkte bei
 Mausbewegungen (Intel Arc); mit DirectX 12 und OpenGL nicht. `src/gui/mod.rs` gibt unter Windows jetzt DirectX 12 vor, sonst OpenGL;
 `WGPU_BACKEND` gilt weiter (`docs/windows.md` 4 „Fenster“).
@@ -1274,6 +1273,13 @@ Npcap-Dialog jetzt auf Deutsch. Gefunden: Die MCP-Integrationstests sind unter W
 (`confy` beachtet `XDG_CONFIG_HOME` dort nicht), Lösung offen (`docs/windows.md` 4).
 **Erste Tester-Fassung 0.3.11 (2026-11-02, Version vom Nutzer):** Installer `openpacketmon-0.3.11-setup.exe` mit `dev\build-installer.ps1`
 gebaut, SHA-256 in `docs/windows.md` 6; unsigniert, Weitergabe nur als Datei.
+**Nach `main` übernommen (2026-11-02, Nutzer):** Der Zweig `windows` (`d5e38ce` bis `3061214`) wurde ohne Merge-Commit nach `main`
+übernommen. Vorher unter Linux auf dem Zweig geprüft (die CI läuft nur auf `main` und bei PRs, für den Zweig also nie): fmt, Clippy,
+`cargo test --locked --workspace` (370 Tests im Hauptprogramm, Live-Test des Helfers im Netz-Namensraum), `cargo deny --workspace check`
+mit beiden Zielen, `dev/third-party-licenses.py --check`, `dev/check-notices.sh`, alles ohne Befund. Ungeprüft übernommen sind die
+Angaben zu Windows-Updates und Preisen in `docs/windows.md` 6.1 und `docs/windows-tester.md` (KB5127648, April-Update, Certum).
+Weiter offen: sauberes System (Windows-Sandbox), CI-Job für Windows, MCP-Tests unter Windows von den echten Einstellungen trennen
+(`confy` ohne `XDG_CONFIG_HOME`), Signatur am Haltepunkt (die Tester haben Smart App Control an und können 0.3.11 nicht installieren).
 Früher entschieden (2026-10-30/31): Beginn erst nach dem ersten Release und nach MCP; der Installer soll, **wenn möglich, eine Code-Signatur**
 bekommen. Weg (`docs/windows.md` 6.1): zuerst kostenlos über die SignPath Foundation, das setzt ein unsigniertes Windows-Release und
 einen Build in GitHub Actions voraus, und die Zusage ist nicht sicher, weil deren Regel „No hacking tools“ ein

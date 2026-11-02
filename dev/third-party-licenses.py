@@ -89,7 +89,8 @@ def license_texts(package):
     files = sorted(f for f in folder.iterdir() if f.is_file() and LICENSE_FILE.match(f.name))
     # a missing extra file stops the script: the crate has changed and the list must be checked
     files += [folder / name for name in EXTRA_LICENSE_FILES.get(package["name"], [])]
-    return [(str(f.relative_to(folder)), f.read_text(encoding="utf-8", errors="strict").strip()) for f in files]
+    # with / also on Windows, so the file is the same on every system
+    return [(f.relative_to(folder).as_posix(), f.read_text(encoding="utf-8", errors="strict").strip()) for f in files]
 
 
 def add(texts, text, user):
@@ -148,7 +149,7 @@ def main():
             print(f"{OUTPUT} is out of date; run dev/third-party-licenses.py", file=sys.stderr)
             sys.exit(1)
         return
-    OUTPUT.write_text(content, encoding="utf-8")
+    OUTPUT.write_text(content, encoding="utf-8", newline="\n")
     print(f"wrote {OUTPUT} ({content.count(chr(10))} lines)")
 
 

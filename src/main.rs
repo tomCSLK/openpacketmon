@@ -5,6 +5,9 @@
 //!
 //! openpacketmon is a program with a window: closing the window ends the program and the capture.
 
+// no console window next to the window on Windows; debug builds keep it for their output
+#![cfg_attr(all(windows, not(debug_assertions)), windows_subsystem = "windows")]
+
 // used throughout the crate as `crate::…`
 use networking::types::info_traffic::InfoTraffic;
 use networking::types::service::Service;

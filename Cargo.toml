@@ -87,6 +87,10 @@ phf_codegen = "0.14.0"
 phf_shared = "0.14.0"
 rustrict = { version = "0.7.39", default-features = false, features = ["censor"] }
 
+# the icon and the version information of openpacketmon.exe
+[target.'cfg(windows)'.build-dependencies]
+winresource = { version = "0.1.34", default-features = false }
+
 #═══════════════════════════════════════════════════════════════════════════════════════════════════════════════════════
 
 [package.metadata.deb]

@@ -67,22 +67,6 @@ pub fn get_logs_file_path() -> Option<String> {
     Some(conf.to_str()?.to_string())
 }
 
-#[cfg(all(windows, not(debug_assertions)))]
-pub fn redirect_stdout_stderr_to_file()
--> Option<(gag::Redirect<std::fs::File>, gag::Redirect<std::fs::File>)> {
-    if let Ok(logs_file) = std::fs::OpenOptions::new()
-        .create(true)
-        .append(true)
-        .open(get_logs_file_path()?)
-    {
-        return Some((
-            gag::Redirect::stdout(logs_file.try_clone().ok()?).ok()?,
-            gag::Redirect::stderr(logs_file).ok()?,
-        ));
-    }
-    None
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;

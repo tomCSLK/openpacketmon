@@ -49,6 +49,13 @@ impl CaptureHelper {
         if let Some(bpf) = bpf {
             command.arg("--bpf").arg(bpf);
         }
+        // the window has no console, so each helper would get a console window of its own
+        #[cfg(windows)]
+        {
+            use std::os::windows::process::CommandExt;
+            const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+            command.creation_flags(CREATE_NO_WINDOW);
+        }
         let mut child = command
             .spawn()
             .map_err(|e| format!("{}: {e}", path.display()))?;

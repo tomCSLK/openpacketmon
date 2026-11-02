@@ -22,6 +22,28 @@ fn main() {
 
     let service_names = build_services_phf();
     build_service_categories_phf(service_names);
+
+    #[cfg(windows)]
+    windows_resources();
+}
+
+/// Embeds the icon and the version information into openpacketmon.exe
+#[cfg(windows)]
+fn windows_resources() {
+    const ICON_PATH: &str = "./resources/packaging/windows/openpacketmon.ico";
+    println!("cargo:rerun-if-changed={ICON_PATH}");
+    // only when building for Windows, not when checking for another target on Windows
+    if env::var("CARGO_CFG_TARGET_OS").as_deref() != Ok("windows") {
+        return;
+    }
+    let mut res = winresource::WindowsResource::new();
+    res.set_icon(ICON_PATH)
+        .set("ProductName", "openpacketmon")
+        .set("FileDescription", "openpacketmon")
+        .set("LegalCopyright", "MIT OR Apache-2.0, see NOTICE")
+        .set("OriginalFilename", "openpacketmon.exe")
+        .set("InternalName", "openpacketmon");
+    res.compile().unwrap();
 }
 
 fn build_services_phf() -> HashSet<String> {

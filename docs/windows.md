@@ -3,10 +3,10 @@
 Stand: 2026-10-30, ergänzt 2026-11-02 (MCP, Mitschnitt-Helfer, vorgezogener Beginn, Installer für Tester, Erfahrungen beim Einrichten des Windows-Rechners). Diese Datei beschreibt, was nötig ist, um das Projekt auf einem Windows-Rechner fortzusetzen und dort eine
 Windows-Version zu bauen und zu testen.
 
-**Heutiger Stand (2026-11-02):** Im Zweig `windows` baut die **Debug-Fassung** unter Windows, die Tests sind grün, und das Fenster
-startet (kurzer Start: Titel „openpacketmon“, je Adapter ein Helfer für die Vorschau, nach dem Beenden keine Helfer übrig). Bedient,
-mitgeschnitten und importiert wurde darin noch nichts. **Die Release-Fassung baut noch nicht** (`gag`, Abschnitt 4), es gibt kein
-Icon, keinen Installer, und es geht ein Konsolenfenster mit auf. Eine Fassung für Tester gibt es also noch nicht.
+**Heutiger Stand (2026-11-02):** Im Zweig `windows` bauen **Debug- und Release-Fassung** unter Windows, die Tests sind grün, und
+das Fenster startet. Die Release-Fassung öffnet kein Konsolenfenster, auch nicht für die Helfer, und `openpacketmon.exe` trägt Icon
+und Versionsangaben (Abschnitt 4). Bedient, mitgeschnitten und importiert wurde darin noch nichts, und es gibt keinen Installer.
+Eine Fassung für Tester gibt es also noch nicht.
 Die Punkte in Abschnitt 4 stammen aus einer Durchsicht des Codes auf dem Linux-Rechner, ergänzt um das, was unter Windows
 aufgefallen ist.
 
@@ -19,8 +19,15 @@ der nur unter Linux genutzt wird: `PIPE_BYTES`, `let mut cap` und (Clippy) ein u
 Adapter unter Windows mit ihrer Beschreibung erscheinen (Tabelle in Abschnitt 4). `cargo clippy -- -D warnings` ist unter Windows grün,
 der Helfer auch gegen `--target x86_64-unknown-linux-gnu` (mit `LIBPCAP_VER` gesetzt, nur Prüfung ohne Linken). `cargo build --workspace` linkt danach ohne weitere Fehler gegen `wpcap.lib`; `openpacketmon.exe --version`
 läuft, `openpacketmon-capture.exe` startet (findet also `wpcap.dll`). Dass sich etwas bauen lässt, heißt nicht, dass es unter
-Windows richtig läuft (Abschnitt 4). Gebaut ist bisher nur die Debug-Fassung; `cargo build --release` scheitert erwartungsgemäß an
-`redirect_stdout_stderr_to_file` (nur `cfg(all(windows, not(debug_assertions)))`, Crate `gag` fehlt in `Cargo.toml`).
+Windows richtig läuft (Abschnitt 4). `cargo build --release` scheiterte zuerst an `redirect_stdout_stderr_to_file` (nur
+`cfg(all(windows, not(debug_assertions)))`, Crate `gag` fehlt in `Cargo.toml`); behoben, siehe unten.
+
+**Release-Fassung (2026-11-02):** Nach dem Entfernen von `redirect_stdout_stderr_to_file` baut `cargo build --release --workspace`
+(`openpacketmon.exe` rund 26 MiB, Helfer 183 KiB). Geprüft: Beim Start ohne Terminal erscheint nur das Fenster „openpacketmon“, kein
+Konsolenfenster; die 9 Helfer haben je einen Konsolen-Host ohne Fenster (`CREATE_NO_WINDOW`) und sind nach dem Beenden weg.
+Icon und Versionsangaben (Produktname, Version 0.3.10) stehen in der `.exe`. `openpacketmon.exe mcp` antwortet über Pipes
+(`initialize`, `tools/list`, `capture_status` mit der erwarteten Absage ohne offenes Fenster). Ausgaben von Kommandozeilen-Optionen
+erscheinen nur, wenn die Ausgabe umgeleitet wird, etwa `openpacketmon.exe --list-adapters | Out-Host` in PowerShell.
 
 **Erster Start des Fensters (2026-11-02, Debug-Fassung):** `openpacketmon.exe` öffnet das Fenster „openpacketmon“ (rund 370 MB
 Arbeitsspeicher in der Debug-Fassung) und startet 9 Helfer für die Adapter-Vorschau; nach dem Beenden des Prozesses waren nach 3 s
@@ -49,6 +56,7 @@ keine Helfer mehr übrig. Nur 8 s gelaufen und hart beendet, also weder Bedienun
 - Danach `cargo test --workspace` **grün** (386 bestanden, 5 übersprungen).
 
 **Smart App Control** (auf diesem Rechner an) blockiert ab und zu frisch gebaute, unsignierte Dateien aus `target\`, auch Testdateien
+und Build-Skripte von Abhängigkeiten (beim ersten Release-Build `crc32fast`; Abhilfe: dessen Ordner unter `target\release\build\` löschen)
 („Eine Anwendungssteuerungsrichtlinie hat diese Datei blockiert“, Fehler 4551; Einträge im Ereignisprotokoll
 `Microsoft-Windows-CodeIntegrity/Operational`, IDs 3033/3077). Es bewertet jede Datei einzeln; neu linken hilft (z. B. Zeitstempel von
 `src/main.rs` setzen, dann erneut `cargo test`). Für den Installer heißt das: Bei Testern mit Smart App Control kann ein unsigniertes
@@ -125,7 +133,9 @@ dabei unverändert weiter bauen; Windows-Code kommt hinter `#[cfg(windows)]`, Li
 
 | Stelle | Heute | Für Windows |
 |---|---|---|
-| `src/utils/formatted_strings.rs` `redirect_stdout_stderr_to_file` | nutzt die Crate `gag`, die nicht mehr in `Cargo.toml` steht, **baut im Release nicht** (2026-11-02 bestätigt: `gag` fehlt) | Funktion entfernen oder `gag` wieder aufnehmen; Log-Datei wird gebraucht, wenn es kein Konsolenfenster gibt |
+| `src/utils/formatted_strings.rs` `redirect_stdout_stderr_to_file` | nutzte die Crate `gag`, die nicht mehr in `Cargo.toml` steht, **baute im Release nicht** | **erledigt** (2026-11-02): Funktion entfernt, sie wurde nirgends aufgerufen. Ohne Konsole gehen Meldungen über `eprintln!` (z. B. `error_logger`) verloren; eine Log-Datei (`get_logs_file_path` gibt es noch) bei Bedarf später |
+| Konsolenfenster | ging mit dem Fenster auf | **erledigt** (2026-11-02): `windows_subsystem = "windows"` in `src/main.rs`, nur in der Release-Fassung (die Debug-Fassung behält die Konsole für ihre Ausgaben). Die Helfer startet `capture_helper.rs` mit `CREATE_NO_WINDOW`, sonst bekäme jeder ein eigenes Konsolenfenster. **Folge:** In der Release-Fassung zeigen `--version`, `--help`, `--list-adapters`, `--config-path`, `--restore-default` und Fehler zu `--adapter` im Terminal nichts an (Abhilfe bräuchte `unsafe` mit `AttachConsole` oder ein zweites Programm; ohne `unsafe` ginge ein Dialog). `openpacketmon.exe mcp` ist nicht betroffen, es spricht über Pipes |
+| Programm-Icon und Versionsangaben | fehlten | **erledigt** (2026-11-02): `dev/make-ico.py` setzt `resources/packaging/windows/openpacketmon.ico` aus den PNGs von 16 bis 256 px zusammen (unverändert als PNG eingebettet, ohne Bildbibliothek); `build.rs` bettet es mit `winresource` (MIT, nur Build-Abhängigkeit unter Windows) samt Produktname, Beschreibung und Version ein. Braucht `rc.exe` aus dem Windows SDK |
 | `src/mmdb/geo.rs` `geo_dir` | `HOME`, `.local/share` (`HOME` fehlt unter Windows) | `%LOCALAPPDATA%\openpacketmon\geo` (**erledigt** 2026-11-02) |
 | `src/mmdb/geo.rs` `geoipupdate_file` | `/var/lib/GeoIP/…` | unter Windows weglassen oder den Ordner von `geoipupdate` nehmen, Test anpassen |
 | `src/networking/traffic_preview.rs`, `capture_context.rs` | aus Sniffnet, schon für Windows vorbereitet | prüfen |
@@ -139,14 +149,13 @@ dabei unverändert weiter bauen; Windows-Code kommt hinter `#[cfg(windows)]`, Li
 | `src/mcp/` Tür auf `127.0.0.1` | unter Linux erreichbar für alle lokalen Benutzer, abgesichert durch den Nachweis | gleich; prüfen, ob die Windows-Firewall beim Lauschen auf `127.0.0.1` nachfragt (sollte sie nicht) |
 | Adapter ohne IP-Verkehr (`TrafficPreview::no_ip`, `CaptureError::NoIp`, 2026-11-02) | Bluetooth, NFLOG, NFQUEUE grau | unter Npcap prüfen, welche Adapter einen nicht unterstützten Link-Typ melden (z. B. Bluetooth, WAN Miniport) |
 
-Der Build von Windows braucht in `build.rs` zusätzlich das Programm-Icon: Sniffnet nutzte dafür `winresource`. Bei uns wurde das
-entfernt, es kommt für `openpacketmon.exe` mit einem eigenen `.ico` wieder dazu (aus
-`openpacketmon_256x256.png` u. a. erzeugen, **nicht** das `sniffnet.ico` des Originals).
+Das Programm-Icon bettet `build.rs` mit `winresource` ein, wie bei Sniffnet, aber mit eigenem `.ico` (nicht das `sniffnet.ico` des
+Originals); siehe Tabelle. Der Helfer `openpacketmon-capture.exe` hat kein Icon, er läuft ohne Fenster.
 
 ### Fenster (`src/gui/`)
 
 egui, wgpu und `rfd` laufen unter Windows, der Code dort ist bisher aber nur unter Linux gelaufen. Zu prüfen: Dateidialoge, Ton (`rodio` nutzt dort WASAPI statt ALSA),
-`LANG`-Abfrage in `language_of`, Konsole (`#![cfg_attr(windows, windows_subsystem = "windows")]`, sonst geht mit dem Fenster ein Konsolenfenster auf) und Verhalten beim Schließen.
+`LANG`-Abfrage in `language_of` und Verhalten beim Schließen. Die Konsole ist erledigt (Tabelle oben).
 
 Die Trennung der Rechte bleibt: Unter Linux hat nur der Helfer `openpacketmon-capture` die Mitschnittrechte und gibt sie nach dem
 Öffnen des Adapters ab, das Programm läuft ohne. Unter Windows entscheidet die Installation von Npcap, ob normale Benutzer
@@ -243,7 +252,9 @@ Was SignPath verlangt und was das für uns heißt:
 ## 7. Prüfwerkzeuge und CI
 
 - `deny.toml`: `targets` um `x86_64-pc-windows-msvc` ergänzen.
-- `dev/third-party-licenses.py`: `TARGET` gilt nur für Linux. Es kommen z. B. die `windows-*`-Crates dazu,
+- `dev/third-party-licenses.py`: läuft auch unter Windows und schreibt dort dieselbe Datei (Pfade mit `/`, Zeilenenden LF, seit
+  2026-11-02). `winresource` steht nicht darin: Es ist nur Build-Abhängigkeit unter Windows und wird nicht ins Programm übersetzt.
+  `TARGET` gilt nur für Linux. Es kommen z. B. die `windows-*`-Crates dazu,
   die Windows-Lizenzliste kann also größer werden. Am besten erzeugt das Skript eine gemeinsame Liste für beide Plattformen.
 - `dev/*.sh` laufen in Git Bash. `dev/build-deb.sh` und `dev/release.sh` sind nur für Linux gedacht.
 - `.github/workflows/ci.yml`: einen Job auf `windows-latest` ergänzen, mit Npcap SDK (Sniffnet lädt `npcap-sdk-1.16.zip` von
@@ -254,8 +265,8 @@ Was SignPath verlangt und was das für uns heißt:
 ## 8. Reihenfolge
 
 1. Einrichten (Abschnitt 1 bis 3), `cargo check --workspace` und die echte Fehlerliste mit Abschnitt 4 abgleichen. **Erledigt** (2026-11-02).
-2. Programm bauen und starten, ein Mitschnitt mit Npcap. **Teilweise:** Debug-Fassung baut und das Fenster startet; Release-Fassung
-   (`gag`) und Mitschnitt fehlen noch.
+2. Programm bauen und starten, ein Mitschnitt mit Npcap. **Teilweise:** Debug- und Release-Fassung bauen, das Fenster startet ohne
+   Konsole und mit Icon; der Mitschnitt fehlt noch.
 3. `cargo test`, Pfade und Rechte. **Tests grün** (2026-11-02); Rechte von `mcp-access.json` und Helfer erbt offene Dateien offen.
 4. Windows-Eigenheiten aus Abschnitt 5.
 5. CI, Lizenzliste, `deny.toml`.

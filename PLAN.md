@@ -990,7 +990,7 @@ Noch offen, in dieser Reihenfolge:
 1. ~~Antwort von Sniffnet~~ Haltepunkt am 2026-11-02 aufgehoben, Sniffnet vorher benachrichtigt (Einzelheiten
    `CLAUDE.local.md`). Antwortet Sniffnet, die Herkunftsangabe im Advisory prüfen; Einzelheiten zum Befund erst nach der
    Behebung im Original veröffentlichen.
-2. Nutzertest der egui-Fassung abschließen (zuletzt Test-Paket 0.3.10 mit den Adaptern ohne IP-Verkehr und den Punkten oben).
+2. ~~Nutzertest der egui-Fassung abschließen~~ erledigt: Test-Paket 0.3.10 ohne Befund (2026-11-02, 5.5).
 3. ~~Version setzen~~ erledigt 2026-11-02: **0.4.0** (Nutzer), Commit `4e94702`, CI grün. Ursprünglich: Version **0.4.0 oder 0.5.0** setzen: `Cargo.toml`, `capture/Cargo.toml`, `cargo update --workspace --offline`; in
    `CHANGELOG.md` `## [Unreleased]` zu `## [X.Y.Z] - Datum`; Release-Hinweise (Englisch) als Datei; committen, pushen, CI grün.
 4. Installationstest mit Fenster und Mitschnitt auf einem sauberen Ubuntu 24.04 und Debian 13 (VM oder anderer Rechner);
@@ -1007,7 +1007,8 @@ Noch offen, in dieser Reihenfolge:
    in Containern (Ubuntu 24.04, Debian 13) bestanden. Punkt 4 (Test mit Fenster auf sauberem System) steht weiter aus.
    Nutzer (2026-11-02): `.deb` aus dem Release heruntergeladen, als Update über 0.3.10 installiert, läuft wie erwartet. Vorher meldete
    0.3.10 nach dem Start die neue Version 0.4.0, der Link führte zum Release (Update-Prüfung im echten Einsatz bestätigt).
-8. Doku nachziehen: `CLAUDE.md`, `PLAN.md`, Übersicht `~/Claude/Projekte/CLAUDE.md`; Haltepunkt aus den Notizen entfernen.
+8. ~~Doku nachziehen~~ erledigt 2026-11-02: `CLAUDE.md`, `PLAN.md`, `docs/windows.md`, Übersicht `~/Claude/Projekte/CLAUDE.md`; die
+   Notiz zum Haltepunkt gilt jetzt nur noch dafür, Einzelheiten zum Befund nicht zu veröffentlichen.
 
 Geklärt (2026-10-30): Herkunft der Vorlage `../design-system`, siehe Phase 3 Punkt 7.
 
@@ -1290,6 +1291,10 @@ Mitschnitt-Programm treffen könnte. Sonst ein OV-Zertifikat; Azure Artifact Sig
 blockiert. Die kostenlosen Wege (SignPath, Certum Open Source ab 49 €) brauchen ein öffentlich sichtbares Projekt und warten damit am
 Haltepunkt 4.10, den der Nutzer abklärt. Ein OV-Zertifikat ist dem Nutzer zu teuer und fällt weg; Smart App Control auszuschalten
 ist für Tester kein Ausweg (`docs/windows.md` 6.1, `docs/windows-tester.md`).
+**Weiter (2026-11-02):** Haltepunkt aufgehoben, Repo öffentlich, Linux-Release v0.4.0 veröffentlicht. Nächster Schritt: Antrag für die
+Signatur. Empfehlung: Certum Open Source mit Cloud-Signatur, Antrag im Browser (geht auch unter Linux), signiert wird beim Bau des
+Installers auf dem Windows-Rechner; SignPath bleibt möglich, braucht aber erst ein unsigniertes Windows-Release und einen
+Windows-Build in GitHub Actions.
 
 #### 5.4 MCP-Anbindung (Idee des Nutzers, 2026-10-31; neu gefasst und begonnen 2026-11-02, vom Nutzer freigegeben; Stufen 1 bis 3 erledigt)
 

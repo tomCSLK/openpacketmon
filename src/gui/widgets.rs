@@ -9,6 +9,7 @@ use eframe::egui::{
 
 use crate::gui::theme::{Palette, palette, semibold_font};
 use crate::view::i18n::Lang;
+use egui::emath::GuiRounding as _;
 
 /// Height of the buttons and fields
 pub const CONTROL_H: f32 = 32.0;
@@ -67,14 +68,39 @@ pub fn small_button(ui: &mut Ui, text: impl Into<String>, kind: Kind) -> Respons
 
 fn sized_button(ui: &mut Ui, text: impl Into<String>, kind: Kind, height: f32) -> Response {
     let (fill, fg, stroke) = colors(palette(ui.ctx()), kind);
-    let text = RichText::new(text.into()).color(fg);
-    ui.add(
-        Button::new(text)
+    add_button(ui, &text.into(), fg, height, |button| {
+        button
             .fill(fill)
             .stroke(stroke)
             .corner_radius(CornerRadius::same(8))
-            .min_size(egui::vec2(0.0, height)),
-    )
+    })
+}
+
+/// Adds a button at least `height` high with its text in the middle of it. egui puts the text
+/// where the layout around the button aligns: at the top in the heads of the pages, in the middle
+/// of a row, so buttons side by side had their texts up to 2 px apart. The button keeps its size,
+/// place and label and gets a clear text, and the text is painted over it in the middle.
+fn add_button(
+    ui: &mut Ui,
+    label: &str,
+    color: Color32,
+    height: f32,
+    style: impl FnOnce(Button<'_>) -> Button<'_>,
+) -> Response {
+    let clear = RichText::new(label).color(Color32::TRANSPARENT);
+    let response = ui.add(style(Button::new(clear)).min_size(egui::vec2(0.0, height)));
+    if ui.is_rect_visible(response.rect) {
+        let galley = WidgetText::from(label).into_galley(
+            ui,
+            Some(TextWrapMode::Extend),
+            f32::INFINITY,
+            egui::TextStyle::Body,
+        );
+        let at = (response.rect.center() - galley.size() / 2.0)
+            .round_to_pixels(ui.ctx().pixels_per_point());
+        ui.painter().galley(at, galley, color);
+    }
+    response
 }
 
 /// A button that is shown but cannot be used
@@ -107,13 +133,12 @@ pub fn segmented(ui: &mut Ui, labels: &[String], chosen: usize) -> Option<usize>
                 ne: if i == last { 8 } else { 0 },
                 se: if i == last { 8 } else { 0 },
             };
-            let response = ui.add(
-                Button::new(RichText::new(label).color(fg))
+            let response = add_button(ui, label, fg, CONTROL_SM_H, |button| {
+                button
                     .fill(fill)
                     .stroke(Stroke::new(1.0, p.border_strong))
                     .corner_radius(radius)
-                    .min_size(egui::vec2(0.0, CONTROL_SM_H)),
-            );
+            });
             if response.clicked() {
                 clicked = Some(i);
             }
@@ -444,14 +469,29 @@ pub fn code(ui: &mut Ui, text: &str) -> Response {
 pub fn share_bar(ui: &mut Ui, width: f32, first: f32, second: f32, a: Color32, b: Color32) {
     let p = palette(ui.ctx());
     let (rect, _) = ui.allocate_exact_size(egui::vec2(width, 8.0), Sense::hover());
-    let radius = CornerRadius::same(3);
-    ui.painter().rect_filled(rect, radius, p.neutral_soft);
+    let painter = ui.painter();
+    painter.rect_filled(rect, CornerRadius::same(3), p.neutral_soft);
     let w = rect.width() / 100.0;
-    let mut one = rect;
-    one.set_width(first * w);
-    ui.painter().rect_filled(one, radius, a);
-    let mut two = rect;
-    two.min.x = one.max.x;
-    two.set_width(second * w);
-    ui.painter().rect_filled(two, radius, b);
+    let one = (first.max(0.0) * w).min(rect.width());
+    let both = (one + second.max(0.0) * w).min(rect.width());
+    if both <= 0.0 {
+        return;
+    }
+    // one shape, round outside and straight where the shares meet: both in the second color,
+    // the first one over it, so no background shows through at the seam
+    let mut filled = rect;
+    filled.set_width(both);
+    let last = if both > one { b } else { a };
+    painter.rect_filled(filled, CornerRadius::same(3), last);
+    if one > 0.0 && both > one {
+        let mut first = rect;
+        first.set_width(one);
+        let radius = CornerRadius {
+            nw: 3,
+            sw: 3,
+            ne: 0,
+            se: 0,
+        };
+        painter.rect_filled(first, radius, a);
+    }
 }

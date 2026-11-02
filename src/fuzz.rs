@@ -1,6 +1,7 @@
 //! Random tests of the parts that read data from the network or from the user: the dissectors
 //! with garbled packets of every protocol, the display and connection filters with random and
-//! deeply nested texts. `FUZZ_ITERATIONS` sets the number of rounds (a quick run by default;
+//! deeply nested texts. The access for AI assistants has its own in `src/mcp/` (`fuzz_…`), with
+//! the helpers from here. `FUZZ_ITERATIONS` sets the number of rounds (a quick run by default;
 //! a long one: `FUZZ_ITERATIONS=2000000 cargo test --release fuzz`).
 
 use pcap::Linktype;
@@ -12,14 +13,14 @@ use crate::dissect::tests::{ETH, client_hello, dhcp_message, dns_query, tcp_pack
 use crate::dissect::{Dissection, dissect, dissect_with, transport_payload};
 use crate::filter::{CONNECTION_FIELDS, FIELDS, Filter, MAX_LEN, PROTOCOLS, Packet};
 
-fn iterations(default: usize) -> usize {
+pub fn iterations(default: usize) -> usize {
     std::env::var("FUZZ_ITERATIONS")
         .ok()
         .and_then(|v| v.parse().ok())
         .unwrap_or(default)
 }
 
-fn rng() -> StdRng {
+pub fn rng() -> StdRng {
     let seed = std::env::var("FUZZ_SEED")
         .ok()
         .and_then(|v| v.parse().ok())
@@ -28,7 +29,7 @@ fn rng() -> StdRng {
 }
 
 /// Application payloads with their ports, the starting points of the mutations
-fn samples() -> Vec<(u16, bool, Vec<u8>)> {
+pub fn samples() -> Vec<(u16, bool, Vec<u8>)> {
     let mut dns_answer = dns_query(7, 0x8180, "www.example.org", 1, 1);
     dns_answer[7] = 2; // two answers, both names compressed
     for ip in [[93, 184, 216, 34], [93, 184, 216, 35]] {
@@ -85,7 +86,7 @@ fn samples() -> Vec<(u16, bool, Vec<u8>)> {
 }
 
 /// Changes a few bytes, ranges or length fields of `data`
-fn mutate(rng: &mut StdRng, data: &mut Vec<u8>) {
+pub fn mutate(rng: &mut StdRng, data: &mut Vec<u8>) {
     for _ in 0..rng.random_range(1..=6) {
         let len = data.len();
         match rng.random_range(0..8) {
@@ -230,7 +231,7 @@ fn fuzz_dissectors_with_garbled_packets() {
 }
 
 /// A random filter text from the words of the grammar and some random characters
-fn random_filter(rng: &mut StdRng) -> String {
+pub fn random_filter(rng: &mut StdRng) -> String {
     const SYMBOLS: [&str; 24] = [
         "and",
         "or",

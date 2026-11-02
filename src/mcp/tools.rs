@@ -635,8 +635,8 @@ fn masker_before(conversation: &Conversation, number: u64, seq: u32) -> Masker {
     };
     let mut masker = Masker::new();
     let mut next: Option<u32> = None;
-    // the state at the start of each segment, for retransmissions
-    let mut starts: Vec<(u32, Masker)> = Vec::new();
+    // the state at the start of the segments with the same sequence number, for retransmissions
+    let mut starts: Vec<Masker> = Vec::new();
     for packet in &conversation.packets {
         if packet.conn.map(|(key, _)| key) != Some(side) {
             continue;
@@ -645,11 +645,7 @@ fn masker_before(conversation: &Conversation, number: u64, seq: u32) -> Masker {
             return match next {
                 None => masker,
                 Some(n) if n == seq => masker,
-                _ => starts
-                    .iter()
-                    .rev()
-                    .find(|(s, _)| *s == seq)
-                    .map_or_else(Masker::unknown, |(_, m)| m.clone()),
+                _ => starts.pop().unwrap_or_else(Masker::unknown),
             };
         }
         let Some(payload) = dissect::transport_payload(&packet.data, conversation.link_type) else {
@@ -675,7 +671,9 @@ fn masker_before(conversation: &Conversation, number: u64, seq: u32) -> Masker {
                 masker = Masker::unknown();
             }
         }
-        starts.push((payload.seq, masker.clone()));
+        if payload.seq == seq {
+            starts.push(masker.clone());
+        }
         masker.mask(&mut bytes);
         next = Some(end);
     }
@@ -848,7 +846,7 @@ mod tests {
             Self {
                 _runtime: runtime,
                 engine,
-                index: FilterIndex::default(),
+                index: FilterIndex::with_values(crate::mcp::privacy::hide_in_values),
                 dir,
                 content: false,
             }
@@ -1248,10 +1246,191 @@ mod tests {
     }
 
     #[test]
+    fn a_filter_cannot_find_out_what_the_answers_hide() {
+        let fixture = Fixture::capture("oracle", &sample());
+        let count = |filter: &str| {
+            fixture.ok(PACKETS, &json!({ "filter": filter }))["total_matching"]
+                .as_u64()
+                .unwrap()
+        };
+        assert_eq!(count("http.request.uri contains \"/login\""), 1);
+        for guess in [
+            "http.request.uri contains \"secretquery\"",
+            "http.request.uri contains \"pass=\"",
+            "http.request.uri == \"/login?user=me&pass=SECRETQUERY\"",
+        ] {
+            assert_eq!(count(guess), 0, "{guess}");
+            let statistics = fixture.ok(STATISTICS, &json!({ "filter": guess }));
+            assert!(
+                !statistics["protocols"].to_string().contains("http"),
+                "{guess}"
+            );
+        }
+        // the window itself filters on the whole value
+        let window = FilterIndex::default();
+        let all = call(
+            &fixture.engine,
+            &window,
+            false,
+            PACKETS,
+            &json!({ "filter": "http.request.uri contains \"secretquery\"" }),
+        );
+        let Answer::Ok(all) = all else {
+            panic!("{all:?}")
+        };
+        assert_eq!(all["total_matching"], 1);
+    }
+
+    #[test]
     fn a_filter_answers_the_same_from_its_index() {
         let fixture = Fixture::capture("index", &sample());
         let first = fixture.ok(PACKETS, &json!({ "filter": "dns or http" }));
         let second = fixture.ok(PACKETS, &json!({ "filter": "dns or http" }));
         assert_eq!(first, second);
+    }
+
+    /// Every tool with random arguments over garbled packets, with and without the content of
+    /// packets: an answer or an error, never a panic, and a size the assistant can take. A secret
+    /// in a connection of its own stays hidden throughout.
+    #[test]
+    fn fuzz_tools_with_random_arguments() {
+        use rand::Rng;
+        use rand::rngs::StdRng;
+
+        use crate::dissect::tests::{tcp_packet, udp_packet};
+        use crate::fuzz::{iterations, mutate, random_filter, rng, samples};
+
+        const TOOLS: [&str; 10] = [
+            CAPTURE_STATUS,
+            OVERVIEW,
+            CONNECTIONS,
+            PACKETS,
+            PACKET_DETAIL,
+            STATISTICS,
+            FILTER_HELP,
+            FOLLOW_STREAM,
+            PACKET_BYTES,
+            "no_such_tool",
+        ];
+        const KEYS: [&str; 10] = [
+            "filter",
+            "connection_filter",
+            "offset",
+            "limit",
+            "page",
+            "number",
+            "format",
+            "direction",
+            "connections",
+            "other",
+        ];
+        fn value(rng: &mut StdRng, depth: u32) -> Value {
+            match rng.random_range(0..12) {
+                0 => Value::Null,
+                1 => json!(rng.random::<bool>()),
+                2 => json!(rng.random_range(0..120)),
+                3 => json!(
+                    *[0_i64, -1, i64::MIN, i64::MAX]
+                        .get(rng.random_range(0..4))
+                        .unwrap()
+                ),
+                4 => json!(u64::MAX),
+                5 => json!(rng.random::<f64>() * 1e300),
+                6 => json!(
+                    ["text", "hex", "both", "client", "server", "", "TEXT"][rng.random_range(0..7)]
+                ),
+                7 => json!("x".repeat(rng.random_range(900..1200))),
+                8 if depth < 3 => json!([value(rng, depth + 1), value(rng, depth + 1)]),
+                9 if depth < 3 => arguments(rng, depth + 1),
+                _ => json!(random_filter(rng)),
+            }
+        }
+        fn arguments(rng: &mut StdRng, depth: u32) -> Value {
+            let mut object = serde_json::Map::new();
+            for _ in 0..rng.random_range(0..5) {
+                let key = KEYS[rng.random_range(0..KEYS.len())];
+                object.insert(key.to_owned(), value(rng, depth));
+            }
+            Value::Object(object)
+        }
+
+        let mut rng = rng();
+        let samples = samples();
+        let mut packets: Vec<(u32, Vec<u8>)> = (0..80)
+            .map(|i| {
+                let (port, tcp, sample) = &samples[rng.random_range(0..samples.len())];
+                let mut payload = sample.clone();
+                mutate(&mut rng, &mut payload);
+                let ports = if rng.random() {
+                    (40_000, *port)
+                } else {
+                    (*port, 40_000)
+                };
+                let mut packet = if *tcp {
+                    tcp_packet(ports.0, ports.1, rng.random(), &payload)
+                } else {
+                    udp_packet(ports.0, ports.1, &payload)
+                };
+                if rng.random_ratio(1, 5) {
+                    mutate(&mut rng, &mut packet);
+                }
+                (1_000 + i, packet)
+            })
+            .collect();
+        let secret = b"GET /a?q=FUZZQUERY HTTP/1.1\r\nCookie: id=FUZZCOOKIE\r\n\r\n";
+        packets.push((
+            1_100,
+            with_payload([10, 0, 0, 1], [10, 0, 0, 2], (41_000, 80), secret),
+        ));
+        let fixture = Fixture::capture("fuzz", &packets);
+
+        let rounds = iterations(2_000);
+        for round in 0..rounds {
+            let tool = TOOLS[rng.random_range(0..TOOLS.len())];
+            let mut args = match rng.random_range(0..10) {
+                0 => value(&mut rng, 2),
+                _ => arguments(&mut rng, 0),
+            };
+            // most questions name a packet that is there
+            if rng.random_ratio(2, 3)
+                && let Some(object) = args.as_object_mut()
+            {
+                object.insert("number".to_owned(), json!(rng.random_range(1..=82)));
+            }
+            let content = rng.random();
+            let answer = call(&fixture.engine, &fixture.index, content, tool, &args);
+            let text = match &answer {
+                Answer::Ok(value) => value.to_string(),
+                Answer::Error(text) => text.clone(),
+                Answer::Refused => panic!("{tool} {args}: refused"),
+            };
+            assert!(
+                text.len() < 1024 * 1024,
+                "{tool} {args}: {} bytes",
+                text.len()
+            );
+            assert!(
+                !text.contains("FUZZQUERY") && !text.contains("FUZZCOOKIE"),
+                "{tool} {args}: {text}"
+            );
+            // and now and then the packet with the secret itself
+            if round % 50 == 0 {
+                for tool in [PACKET_DETAIL, FOLLOW_STREAM, PACKET_BYTES, PACKETS] {
+                    let args = json!({ "number": 81, "filter": "tcp.port == 41000" });
+                    let text = match call(&fixture.engine, &fixture.index, true, tool, &args) {
+                        Answer::Ok(value) => value.to_string(),
+                        other => panic!("{tool}: {other:?}"),
+                    };
+                    assert!(
+                        !text.contains("FUZZQUERY") && !text.contains("FUZZCOOKIE"),
+                        "{text}"
+                    );
+                    // it is the packet with the secret, and its stream shows the line
+                    if tool == FOLLOW_STREAM {
+                        assert!(text.contains("Cookie: xxxxxxxxxxxxx"), "{text}");
+                    }
+                }
+            }
+        }
     }
 }

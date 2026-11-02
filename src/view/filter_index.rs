@@ -10,6 +10,7 @@ use std::collections::{HashSet, VecDeque};
 use std::sync::{Mutex, PoisonError};
 use std::time::{Duration, Instant};
 
+use crate::dissect::Dissection;
 use crate::engine::analysis;
 use crate::engine::packets::SharedPacketStore;
 use crate::filter::Filter;
@@ -24,8 +25,17 @@ const CHUNK: usize = 2048;
 /// judged without it
 const PENDING: Duration = Duration::from_secs(1);
 
-#[derive(Default)]
-pub struct FilterIndex(Mutex<Vec<Entry>>);
+pub struct FilterIndex {
+    entries: Mutex<Vec<Entry>>,
+    /// Changes the values of a packet before the filter sees them
+    values: fn(&mut Dissection),
+}
+
+impl Default for FilterIndex {
+    fn default() -> Self {
+        Self::with_values(|_| {})
+    }
+}
 
 struct Entry {
     store: u64,
@@ -42,6 +52,15 @@ struct Entry {
 }
 
 impl FilterIndex {
+    /// An index whose filters see the values of a packet as `values` leaves them: the access for
+    /// AI assistants filters on what its answers show, so that a filter cannot find out what they hide
+    pub fn with_values(values: fn(&mut Dissection)) -> Self {
+        Self {
+            entries: Mutex::default(),
+            values,
+        }
+    }
+
     /// Calls `f` with the numbers of the stored packets that pass `filter` (whose text is `text`)
     pub fn with_matches<R>(
         &self,
@@ -50,9 +69,9 @@ impl FilterIndex {
         filter: &Filter,
         f: impl FnOnce(&VecDeque<u64>) -> R,
     ) -> R {
-        let mut entries = self.0.lock().unwrap_or_else(PoisonError::into_inner);
+        let mut entries = self.entries.lock().unwrap_or_else(PoisonError::into_inner);
         let entry = entry(&mut entries, store, text, false);
-        update(entry, store, filter);
+        update(entry, store, filter, self.values);
         f(&entry.matches)
     }
 
@@ -66,7 +85,7 @@ impl FilterIndex {
         connections: &HashSet<AddressPortPair>,
         f: impl FnOnce(&VecDeque<u64>) -> R,
     ) -> R {
-        let mut entries = self.0.lock().unwrap_or_else(PoisonError::into_inner);
+        let mut entries = self.entries.lock().unwrap_or_else(PoisonError::into_inner);
         let entry = entry(&mut entries, store, text, true);
         if entry.connections.as_ref() != Some(connections) {
             entry.connections = Some(connections.clone());
@@ -143,7 +162,12 @@ fn update_connections(
     }
 }
 
-fn update(entry: &mut Entry, store: &SharedPacketStore, filter: &Filter) {
+fn update(
+    entry: &mut Entry,
+    store: &SharedPacketStore,
+    filter: &Filter,
+    values: fn(&mut Dissection),
+) {
     loop {
         let (chunk, first, last, link_type) = {
             let store = store.lock();
@@ -179,6 +203,7 @@ fn update(entry: &mut Entry, store: &SharedPacketStore, filter: &Filter) {
                 return;
             }
             entry.pending_since = None;
+            values(&mut dissected.d);
             if filter.matches(&filter_packet(packet, &dissected.d)) {
                 entry.matches.push_back(packet.number);
             }

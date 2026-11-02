@@ -188,6 +188,11 @@ pub fn dissect(data: &[u8], link_type: LinkType) -> Dissection {
 /// Dissects a packet whose TCP payload continues with `more` (the payloads of the following
 /// segments, see [`Dissection::followup`]); fields in these bytes lie beyond the packet's bytes
 pub fn dissect_with(data: &[u8], link_type: LinkType, more: &[u8]) -> Dissection {
+    layers(data, link_type, more, true)
+}
+
+/// The layers of a packet, up to the transport layer only without `app`
+fn layers(data: &[u8], link_type: LinkType, more: &[u8], app: bool) -> Dissection {
     let mut d = Dissection::new();
     let next = match link_type {
         LinkType::Ethernet(_) | LinkType::Unsupported(_) => link::ethernet(data, &mut d),
@@ -226,6 +231,7 @@ pub fn dissect_with(data: &[u8], link_type: LinkType, more: &[u8]) -> Dissection
         }
         if let Some(range) = payload
             && !range.is_empty()
+            && app
         {
             let handled = match d.transport.clone() {
                 Some(t) if t.tcp && !more.is_empty() => {
@@ -273,7 +279,8 @@ pub struct Payload {
 /// The payload of a TCP segment or UDP datagram, for following a stream; `None` for other
 /// packets and for those whose payload was not captured completely
 pub fn transport_payload(data: &[u8], link_type: LinkType) -> Option<Payload> {
-    let d = dissect(data, link_type);
+    // the application layer has nothing to say here, and a stream goes through many packets
+    let d = layers(data, link_type, &[], false);
     if d.truncated {
         return None;
     }
@@ -287,11 +294,13 @@ pub fn transport_payload(data: &[u8], link_type: LinkType) -> Option<Payload> {
 /// The captured part of the payload of a TCP segment or UDP datagram, also when the rest was not
 /// captured; `None` for other packets
 pub fn captured_payload(data: &[u8], link_type: LinkType) -> Option<Payload> {
-    dissect(data, link_type).transport.map(|t| Payload {
-        tcp: t.tcp,
-        seq: t.seq,
-        range: t.payload,
-    })
+    layers(data, link_type, &[], false)
+        .transport
+        .map(|t| Payload {
+            tcp: t.tcp,
+            seq: t.seq,
+            range: t.payload,
+        })
 }
 
 // ---- reading -------------------------------------------------------------------------------

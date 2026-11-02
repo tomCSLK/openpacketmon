@@ -39,6 +39,11 @@ over many packets, and it keeps working on it: try again in a moment.";
 const REFUSED: &str = "openpacketmon refused the question. Ask the user to turn its access for \
 AI assistants off and on again in the settings.";
 
+const STRANGER: &str = "Another program listens where openpacketmon should be, and it could not \
+show that it knows the access token. Nothing was sent to it. Tell the user: openpacketmon may have \
+closed without cleaning up, or another program is posing as it; reopening openpacketmon and \
+turning its access for AI assistants on again writes a new address.";
+
 #[derive(Clone)]
 struct Server {
     tool_router: ToolRouter<Self>,
@@ -53,6 +58,7 @@ fn text_result(result: Result<Value, AskError>) -> CallToolResult {
         }
         Err(AskError::NoAnswer) => CallToolResult::error(vec![ContentBlock::text(NO_ANSWER)]),
         Err(AskError::Refused) => CallToolResult::error(vec![ContentBlock::text(REFUSED)]),
+        Err(AskError::Stranger) => CallToolResult::error(vec![ContentBlock::text(STRANGER)]),
         Err(AskError::Tool(text)) => CallToolResult::error(vec![ContentBlock::text(text)]),
     }
 }

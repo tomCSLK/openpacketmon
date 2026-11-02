@@ -24,6 +24,7 @@ First public version. This list describes what differs from Sniffnet.
   connection filter the values of the capture
 - AI assistants can read the capture over MCP (`openpacketmon mcp`): state, overview, connections, packets without their contents and statistics, off until turned on in the settings
 - Packet contents for AI assistants (follow stream, bytes of a packet) with a switch of their own that ends with the window, secrets in HTTP headers, URL queries and passwords replaced by `x`; the sidebar shows while assistants have access
+- The window and `openpacketmon mcp` prove to each other that they know the access token without sending it, and the filters of an assistant see hidden values as hidden
 - Options `--adapter`, `--import` and `--list-adapters`
 - Debian package with a start menu entry
 - Connections are filtered with one field in the grammar of the display filter, with fields of their own (`ip.addr`,
@@ -52,7 +53,8 @@ First public version. This list describes what differs from Sniffnet.
 - Display filter with about 90 fields, e.g. `dns`, `tls.sni contains amazon`, `ip.addr == 192.168.1.0/24 and not arp`,
   `dns.time > 100ms`; checked while typing and explained when wrong
 - Coloring rules in the packet list (errors and resets, TCP setup and teardown, DNS, local services, TLS/QUIC, HTTP …)
-- Follow stream: the payload of a TCP or UDP connection in both directions as text or hex
+- Follow stream: the payload of a TCP or UDP connection in both directions as text or hex; for long connections it reads only the
+  headers of each packet
 - Saving the stored packets (all or the filtered ones) as a PCAP file
 - TCP analysis of the stored packets: retransmissions, gaps, segments out of order, duplicate ACKs, zero windows,
   keep-alives and window updates are marked and can be filtered (`tcp.analysis.flags`, `tcp.analysis.retransmission` …);

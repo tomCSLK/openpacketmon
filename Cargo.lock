@@ -3470,7 +3470,7 @@ dependencies = [
 
 [[package]]
 name = "openpacketmon"
-version = "0.3.8"
+version = "0.3.9"
 dependencies = [
  "async-channel",
  "clap",
@@ -3507,6 +3507,7 @@ dependencies = [
  "serde_json",
  "serde_test",
  "serial_test",
+ "sha2",
  "sniffnet-packet-parser",
  "surge-ping",
  "tokio",
@@ -3515,7 +3516,7 @@ dependencies = [
 
 [[package]]
 name = "openpacketmon-capture"
-version = "0.3.8"
+version = "0.3.9"
 dependencies = [
  "pcap",
  "rustix 1.1.5",

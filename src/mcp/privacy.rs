@@ -8,6 +8,8 @@
 
 use serde_json::Value;
 
+use crate::dissect::{self, Dissection};
+
 /// Longest text in an answer
 const MAX_CHARS: usize = 500;
 const HIDDEN: &str = "[hidden]";
@@ -16,6 +18,8 @@ const HIDDEN: &str = "[hidden]";
 const SECRET_HEADERS: [&str; 8] = [
     "cookie", "auth", "token", "secret", "password", "session", "api-key", "apikey",
 ];
+/// Filter fields whose values hold a URL, and with it a query the answers hide
+const URL_FIELDS: [&str; 2] = ["http.request.uri", "ssdp.location"];
 /// What takes the place of a hidden byte
 const MASK: u8 = b'x';
 /// Longest first word or header name a line is looked at for
@@ -100,6 +104,18 @@ pub fn hide_header(line: &str) -> String {
         format!("{name}: {HIDDEN}")
     } else {
         hide_query(line)
+    }
+}
+
+/// The values of a packet as the filter of an assistant sees them: without what the answers hide,
+/// so that trying filters cannot find it out either
+pub fn hide_in_values(d: &mut Dissection) {
+    for (key, value) in &mut d.values {
+        if URL_FIELDS.contains(key)
+            && let dissect::Value::Text(text) = value
+        {
+            *text = hide_query(text);
+        }
     }
 }
 
@@ -383,5 +399,73 @@ mod tests {
             hide_header("Referer: https://example.com/a?id=1"),
             "Referer: https://example.com/a?[hidden]"
         );
+    }
+
+    /// Random texts of header lines, URLs, commands and bytes, masked whole and in random pieces:
+    /// the pieces change nothing, the length stays, and only `x` takes the place of a byte
+    #[test]
+    fn fuzz_masker_with_random_pieces() {
+        use rand::Rng;
+
+        const PARTS: [&[u8]; 22] = [
+            b"GET /a?b=c HTTP/1.1",
+            b"HTTP/1.1 200 OK",
+            b"NOTIFY * HTTP/1.1",
+            b"Cookie: id=1",
+            b"Set-Cookie: s=2",
+            b"Authorization: Basic abc",
+            b"X-Api-Key: k",
+            b"Location: /n?code=3",
+            b"Host: example.org",
+            b"PASS hunter2",
+            b"AUTH PLAIN abc",
+            b"\r\n",
+            b"\n",
+            b"\r",
+            b" ",
+            b"\t",
+            b":",
+            b"?",
+            b"=",
+            b"x-token",
+            b"\xff\x00",
+            b"user",
+        ];
+        let mut rng = crate::fuzz::rng();
+        for _ in 0..crate::fuzz::iterations(20_000) {
+            let mut text = Vec::new();
+            for _ in 0..rng.random_range(0..40) {
+                if rng.random_ratio(1, 6) {
+                    text.push(rng.random());
+                } else {
+                    text.extend_from_slice(PARTS[rng.random_range(0..PARTS.len())]);
+                }
+            }
+            let start = if rng.random() {
+                Masker::new()
+            } else {
+                Masker::unknown()
+            };
+            let mut whole = text.clone();
+            start.clone().mask(&mut whole);
+            let mut pieces = text.clone();
+            let mut masker = start;
+            let mut rest = &mut pieces[..];
+            while !rest.is_empty() {
+                let n = rng.random_range(0..=rest.len());
+                let (piece, after) = rest.split_at_mut(n);
+                masker.mask(piece);
+                rest = after;
+            }
+            assert_eq!(whole, pieces, "{:?}", String::from_utf8_lossy(&text));
+            assert_eq!(whole.len(), text.len());
+            for (before, after) in text.iter().zip(&whole) {
+                assert!(
+                    before == after || (*after == b'x' && !b"\r\n".contains(before)),
+                    "{:?}",
+                    String::from_utf8_lossy(&text)
+                );
+            }
+        }
     }
 }

@@ -107,8 +107,8 @@ claude mcp add openpacketmon -- openpacketmon mcp
 
 An assistant can read the state of the capture, an overview, the connections, the packets with their protocol fields, and the
 statistics, narrowed down with the same filters as in the window. It cannot change anything, and it gets no packet contents:
-no bytes, no streams, and neither the query of a URL nor secrets such as cookies in HTTP headers. A token in the path of a
-URL looks like any other path, so it is not hidden.
+no bytes, no streams, and neither the query of a URL nor secrets such as cookies in HTTP headers, and its filters cannot find
+them out either. A token in the path of a URL looks like any other path, so it is not hidden.
 
 For a closer look you can also allow packet contents (*Allow packet contents* in the same card). An assistant can then follow
 a stream as text or hex dump and read the bytes of a packet, which includes the content of unencrypted connections. This
@@ -124,7 +124,8 @@ of your assistant on.
 ### Security
 
 openpacketmon has no special rights and opens no network port, except for the access for AI assistants: when you turn that
-on, the window listens on `127.0.0.1` only and answers just to the token in a file only your user can read. Only the helper `openpacketmon-capture` may capture; it
+on, the window listens on `127.0.0.1` only and answers just to a program that proves it knows the token in a file only your user can
+read; the token itself never goes over the connection. Only the helper `openpacketmon-capture` may capture; it
 drops its rights once the adapter is open and hands the packets on without looking into them. Packets are analyzed in the
 program without rights, because their content comes from other computers. Please report vulnerabilities privately, see
 [SECURITY.md](SECURITY.md).

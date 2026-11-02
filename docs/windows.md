@@ -169,6 +169,12 @@ Originals); siehe Tabelle. Der Helfer `openpacketmon-capture.exe` hat kein Icon,
 egui, wgpu und `rfd` laufen unter Windows, der Code dort ist bisher aber nur unter Linux gelaufen. Zu prüfen: Dateidialoge, Ton (`rodio` nutzt dort WASAPI statt ALSA),
 `LANG`-Abfrage in `language_of` und Verhalten beim Schließen. Die Konsole ist erledigt (Tabelle oben).
 
+**Grafikschnittstelle (2026-11-02):** Mit den Vorgaben von egui nahm wgpu unter Windows Vulkan, und das Fenster blinkte, sobald die
+Maus darüber fuhr (Intel Arc Graphics, Treiber 32.0.101.9150). Vom Nutzer verglichen mit `WGPU_BACKEND`: Nur Vulkan blinkt, DirectX 12
+und OpenGL nicht. Seitdem gibt `wgpu_options` in `src/gui/mod.rs` unter Windows DirectX 12 vor, sonst OpenGL; Vulkan nicht mehr.
+`WGPU_BACKEND` (`dx12`, `vulkan`, `gl`) entscheidet weiter, wenn es gesetzt ist, etwa zur Fehlersuche bei Testern. Linux unverändert.
+Geprüft: Die Release-Fassung lädt `d3d12.dll`, nicht `vulkan-1.dll`.
+
 Die Trennung der Rechte bleibt: Unter Linux hat nur der Helfer `openpacketmon-capture` die Mitschnittrechte und gibt sie nach dem
 Öffnen des Adapters ab, das Programm läuft ohne. Unter Windows entscheidet die Installation von Npcap, ob normale Benutzer
 mitschneiden dürfen oder nur Administratoren. Das Programm soll nie als Administrator laufen müssen.

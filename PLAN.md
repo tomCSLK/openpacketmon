@@ -1259,6 +1259,9 @@ deinstalliert, mit 0.3.10 nur zum Testen); `deny.toml` mit Windows-Ziel und `BSL
 `dev/check-notices.sh`. **Offen:** Bedienung und Mitschnitt im Fenster (Nutzer), Test auf sauberem System (Windows-Sandbox), Version
 der Tester-Fassung (nennt der Nutzer), Systemsprache unter Windows (startet englisch), Rechte von `mcp-access.json`, CI-Job, Linux-Build
 nur über die CI geprüft.
+**Blinkendes Fenster (2026-11-02, vom Nutzer freigegeben):** Unter Windows nahm wgpu Vulkan, und das Fenster blinkte bei
+Mausbewegungen (Intel Arc); mit DirectX 12 und OpenGL nicht. `src/gui/mod.rs` gibt unter Windows jetzt DirectX 12 vor, sonst OpenGL;
+`WGPU_BACKEND` gilt weiter (`docs/windows.md` 4 „Fenster“).
 Früher entschieden (2026-10-30/31): Beginn erst nach dem ersten Release und nach MCP; der Installer soll, **wenn möglich, eine Code-Signatur**
 bekommen. Weg (`docs/windows.md` 6.1): zuerst kostenlos über die SignPath Foundation, das setzt ein unsigniertes Windows-Release und
 einen Build in GitHub Actions voraus, und die Zusage ist nicht sicher, weil deren Regel „No hacking tools“ ein

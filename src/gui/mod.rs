@@ -694,6 +694,28 @@ fn window_icon() -> Option<egui::IconData> {
     })
 }
 
+/// How the window draws: the defaults of egui, except for the graphics interfaces under Windows
+fn wgpu_options() -> eframe::egui_wgpu::WgpuConfiguration {
+    #[cfg(windows)]
+    {
+        use eframe::egui_wgpu::{WgpuConfiguration, WgpuSetup, WgpuSetupCreateNew};
+        use eframe::wgpu::Backends;
+
+        // Under Windows the window flickered with Vulkan whenever the mouse moved (Intel Arc,
+        // 2026-11-02), not with DirectX 12 or OpenGL: take DirectX 12, else OpenGL.
+        // `WGPU_BACKEND` still decides when it is set.
+        let mut setup = WgpuSetupCreateNew::without_display_handle();
+        setup.instance_descriptor.backends =
+            Backends::from_env().unwrap_or(Backends::DX12 | Backends::GL);
+        WgpuConfiguration {
+            wgpu_setup: WgpuSetup::CreateNew(setup),
+            ..WgpuConfiguration::default()
+        }
+    }
+    #[cfg(not(windows))]
+    eframe::egui_wgpu::WgpuConfiguration::default()
+}
+
 /// Opens the window and returns when it is closed
 pub fn run(engine: Engine, mcp: Access) -> Result<(), eframe::Error> {
     let mut viewport = ViewportBuilder::default()
@@ -707,6 +729,7 @@ pub fn run(engine: Engine, mcp: Access) -> Result<(), eframe::Error> {
     let options = eframe::NativeOptions {
         viewport,
         renderer: eframe::Renderer::Wgpu,
+        wgpu_options: wgpu_options(),
         ..eframe::NativeOptions::default()
     };
     eframe::run_native(

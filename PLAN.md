@@ -1295,6 +1295,8 @@ ist für Tester kein Ausweg (`docs/windows.md` 6.1, `docs/windows-tester.md`).
 Signatur. Empfehlung: Certum Open Source mit Cloud-Signatur, Antrag im Browser (geht auch unter Linux), signiert wird beim Bau des
 Installers auf dem Windows-Rechner; SignPath bleibt möglich, braucht aber erst ein unsigniertes Windows-Release und einen
 Windows-Build in GitHub Actions.
+**Certum (Nutzer, 2026-11-02):** Konto im Certum-Shop angelegt. Noch offen: Produkt kaufen, aktivieren, Identität prüfen lassen,
+Versorgerrechnung und Projektadresse hochladen (`docs/windows.md` 6.1).
 
 #### 5.4 MCP-Anbindung (Idee des Nutzers, 2026-10-31; neu gefasst und begonnen 2026-11-02, vom Nutzer freigegeben; Stufen 1 bis 3 erledigt)
 

@@ -1005,6 +1005,8 @@ Noch offen, in dieser Reihenfolge:
    https://github.com/tomCSLK/openpacketmon/releases/tag/v0.4.0; `.deb`, `THIRD-PARTY-LICENSES.txt`, `SHA256SUMS`,
    Download-Prüfung im Skript ok); `test_fetch_latest_release_from_github` danach grün. Vorher Installationstest des 0.4.0-Pakets
    in Containern (Ubuntu 24.04, Debian 13) bestanden. Punkt 4 (Test mit Fenster auf sauberem System) steht weiter aus.
+   Nutzer (2026-11-02): `.deb` aus dem Release heruntergeladen, als Update über 0.3.10 installiert, läuft wie erwartet. Vorher meldete
+   0.3.10 nach dem Start die neue Version 0.4.0, der Link führte zum Release (Update-Prüfung im echten Einsatz bestätigt).
 8. Doku nachziehen: `CLAUDE.md`, `PLAN.md`, Übersicht `~/Claude/Projekte/CLAUDE.md`; Haltepunkt aus den Notizen entfernen.
 
 Geklärt (2026-10-30): Herkunft der Vorlage `../design-system`, siehe Phase 3 Punkt 7.

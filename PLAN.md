@@ -991,7 +991,7 @@ Noch offen, in dieser Reihenfolge:
    `CLAUDE.local.md`). Antwortet Sniffnet, die Herkunftsangabe im Advisory prüfen; Einzelheiten zum Befund erst nach der
    Behebung im Original veröffentlichen.
 2. Nutzertest der egui-Fassung abschließen (zuletzt Test-Paket 0.3.10 mit den Adaptern ohne IP-Verkehr und den Punkten oben).
-3. Version **0.4.0 oder 0.5.0** setzen: `Cargo.toml`, `capture/Cargo.toml`, `cargo update --workspace --offline`; in
+3. ~~Version setzen~~ erledigt 2026-11-02: **0.4.0** (Nutzer), Commit `4e94702`, CI grün. Ursprünglich: Version **0.4.0 oder 0.5.0** setzen: `Cargo.toml`, `capture/Cargo.toml`, `cargo update --workspace --offline`; in
    `CHANGELOG.md` `## [Unreleased]` zu `## [X.Y.Z] - Datum`; Release-Hinweise (Englisch) als Datei; committen, pushen, CI grün.
 4. Installationstest mit Fenster und Mitschnitt auf einem sauberen Ubuntu 24.04 und Debian 13 (VM oder anderer Rechner);
    der Test im Container (siehe oben) prüft nur Abhängigkeiten, Installation, Rechte und Entfernen.
@@ -1001,8 +1001,10 @@ Noch offen, in dieser Reihenfolge:
 6. ~~Sichtbarkeit auf öffentlich~~ erledigt 2026-11-02 (Nutzer): per `gh api -X PATCH repos/tomCSLK/openpacketmon -f
    visibility=public` (das installierte `gh` kennt `--accept-visibility-change-consequences` nicht), danach „Private
    vulnerability reporting“ an (`enabled: true`). `tomCSLK/openpacketmon-old` bleibt privat.
-7. Release: `dev/release.sh --publish --notes <datei>`, danach
-   `cargo test test_fetch_latest_release_from_github -- --ignored` (geht erst mit einem Release).
+7. ~~Release~~ erledigt 2026-11-02: **v0.4.0** mit `dev/release.sh --publish --notes <datei>` (nur Linux,
+   https://github.com/tomCSLK/openpacketmon/releases/tag/v0.4.0; `.deb`, `THIRD-PARTY-LICENSES.txt`, `SHA256SUMS`,
+   Download-Prüfung im Skript ok); `test_fetch_latest_release_from_github` danach grün. Vorher Installationstest des 0.4.0-Pakets
+   in Containern (Ubuntu 24.04, Debian 13) bestanden. Punkt 4 (Test mit Fenster auf sauberem System) steht weiter aus.
 8. Doku nachziehen: `CLAUDE.md`, `PLAN.md`, Übersicht `~/Claude/Projekte/CLAUDE.md`; Haltepunkt aus den Notizen entfernen.
 
 Geklärt (2026-10-30): Herkunft der Vorlage `../design-system`, siehe Phase 3 Punkt 7.

@@ -471,6 +471,20 @@ impl App {
         let p = palette(ui.ctx());
         let t = self.t;
         ui.visuals_mut().hyperlink_color = p.side_muted;
+        if matches!(self.mcp.status(), crate::mcp::Status::Active { .. }) {
+            let content = self.mcp.content_allowed();
+            let (text, dot) = if content {
+                (t.get("mcp-open-content"), p.warn)
+            } else {
+                (t.get("mcp-open"), p.ok)
+            };
+            if access_note(ui, &text, dot, p.side_text)
+                .on_hover_text(t.get("mcp-open-hint"))
+                .clicked()
+            {
+                self.go(Page::Settings);
+            }
+        }
         if nav_item(ui, icons::THEME, &t.get("nav-theme"), false, None).clicked() {
             self.toggle_theme(ui.ctx());
         }
@@ -541,6 +555,29 @@ fn nav_label(ui: &mut Ui, text: &str) {
 }
 
 /// An entry of the side bar
+/// The note in the sidebar while assistants can ask: a dot and a line, which opens the settings
+fn access_note(ui: &mut Ui, text: &str, dot: Color32, color: Color32) -> Response {
+    let galley = egui::WidgetText::from(RichText::new(text).small().color(color)).into_galley(
+        ui,
+        Some(egui::TextWrapMode::Wrap),
+        ui.available_width() - 30.0,
+        egui::TextStyle::Small,
+    );
+    let size = egui::vec2(ui.available_width(), galley.size().y.max(14.0) + 8.0);
+    let (rect, response) = ui.allocate_exact_size(size, Sense::click());
+    response.widget_info(|| WidgetInfo::labeled(egui::Role::Link, true, text));
+    if response.hovered() {
+        ui.painter()
+            .rect_filled(rect, CornerRadius::same(8), palette(ui.ctx()).side_hover);
+    }
+    ui.painter()
+        .circle_filled(rect.left_center() + egui::vec2(20.0, 0.0), 4.0, dot);
+    let top = rect.center().y - galley.size().y / 2.0;
+    ui.painter()
+        .galley(egui::pos2(rect.left() + 38.0, top), galley, color);
+    response
+}
+
 fn nav_item(
     ui: &mut Ui,
     icon: egui::ImageSource<'static>,

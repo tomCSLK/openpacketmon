@@ -110,6 +110,13 @@ statistics, narrowed down with the same filters as in the window. It cannot chan
 no bytes, no streams, and neither the query of a URL nor secrets such as cookies in HTTP headers. A token in the path of a
 URL looks like any other path, so it is not hidden.
 
+For a closer look you can also allow packet contents (*Allow packet contents* in the same card). An assistant can then follow
+a stream as text or hex dump and read the bytes of a packet, which includes the content of unencrypted connections. This
+switch is never saved: it ends when you close the window or turn the access off. Even then the values of secret HTTP headers
+(cookies, authorization, tokens, sessions), the queries of URLs and passwords after `PASS` or `AUTH` are replaced by `x`;
+secrets in other places, for example in an unknown protocol, stay visible. The sidebar shows while assistants have access,
+and in amber while they can read packet contents.
+
 **What an assistant queries goes to its AI service**: addresses, host names and connections show what your devices do. Names
 and texts in a capture can come from other devices, so treat the answers with the usual care and keep the permission prompts
 of your assistant on.

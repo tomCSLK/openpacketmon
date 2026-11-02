@@ -66,3 +66,51 @@ pub struct FilterHelpArgs {
     #[serde(default)]
     pub connections: bool,
 }
+
+/// How the content of a stream is shown
+#[derive(Serialize, Deserialize, JsonSchema, Debug, Default, Clone, Copy, PartialEq, Eq)]
+#[schemars(crate = "rmcp::schemars")]
+#[serde(rename_all = "lowercase")]
+pub enum StreamFormat {
+    /// Printable characters, other bytes as `·`
+    #[default]
+    Text,
+    /// Hex dump with the printable characters next to it
+    Hex,
+}
+
+/// Which directions of a stream are shown
+#[derive(Serialize, Deserialize, JsonSchema, Debug, Default, Clone, Copy, PartialEq, Eq)]
+#[schemars(crate = "rmcp::schemars")]
+#[serde(rename_all = "lowercase")]
+pub enum StreamDirection {
+    #[default]
+    Both,
+    /// What the side that started the connection sent
+    Client,
+    /// What the other side sent
+    Server,
+}
+
+#[derive(Serialize, Deserialize, JsonSchema, Debug, Default)]
+#[schemars(crate = "rmcp::schemars")]
+pub struct FollowStreamArgs {
+    /// Number of any packet of the connection, from the `packets` tool
+    pub number: u64,
+    /// `text` (the default) or `hex`
+    #[serde(default)]
+    pub format: StreamFormat,
+    /// `both` (the default), `client` or `server`
+    #[serde(default)]
+    pub direction: StreamDirection,
+    /// Bytes of the shown content to skip, from `next_offset` of the answer before
+    #[serde(default)]
+    pub offset: Option<usize>,
+}
+
+#[derive(Serialize, Deserialize, JsonSchema, Debug, Default)]
+#[schemars(crate = "rmcp::schemars")]
+pub struct PacketBytesArgs {
+    /// Number of the packet, from the `packets` tool
+    pub number: u64,
+}

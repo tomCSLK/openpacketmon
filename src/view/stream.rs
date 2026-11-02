@@ -11,7 +11,7 @@ use crate::view::format;
 use crate::view::i18n::Lang;
 
 /// Payload bytes shown at most; the PCAP file has all of them
-const MAX_BYTES: usize = 1024 * 1024;
+pub const MAX_BYTES: usize = 1024 * 1024;
 
 /// A run of bytes in one direction
 #[derive(Debug, PartialEq, Eq)]
@@ -112,7 +112,7 @@ pub fn assemble(
 }
 
 /// Bytes as text: printable ASCII and line breaks, other bytes as `·`
-fn as_text(data: &[u8]) -> String {
+pub fn as_text(data: &[u8]) -> String {
     data.iter()
         .map(|b| match b {
             b'\n' | b'\t' => char::from(*b),
@@ -125,7 +125,7 @@ fn as_text(data: &[u8]) -> String {
 }
 
 /// Bytes as hex dump lines
-fn as_hex(data: &[u8]) -> String {
+pub fn as_hex(data: &[u8]) -> String {
     let mut out = String::new();
     for (i, line) in data.chunks(16).enumerate() {
         let _ = write!(out, "{:08x}  ", i * 16);
@@ -191,6 +191,45 @@ pub struct Stream {
     pub connection: AddressPortPair,
 }
 
+/// The kept packets of the connection of packet `n`, both directions in capture order
+pub struct Conversation {
+    pub packets: Vec<StoredPacket>,
+    pub link_type: sniffnet_packet_parser::LinkType,
+    pub headers_only: bool,
+    /// The direction of packet `n`
+    pub key: AddressPortPair,
+    /// The direction of the side that started the connection: that of its first kept packet
+    pub client_key: AddressPortPair,
+}
+
+/// The connection of packet `n`, if it is kept and belongs to one
+pub fn conversation(engine: &Engine, n: u64) -> Option<Conversation> {
+    let store = engine.lock().packets.clone()?;
+    let store = store.lock();
+    let packet = store.get(n)?;
+    let (key, _) = packet.conn?;
+    let reverse = AddressPortPair {
+        src_ip: key.dst_ip,
+        src_port: key.dst_port,
+        dst_ip: key.src_ip,
+        dst_port: key.src_port,
+        ..key
+    };
+    let packets: Vec<StoredPacket> = store
+        .iter()
+        .filter(|p| p.conn.is_some_and(|(k, _)| k == key || k == reverse))
+        .cloned()
+        .collect();
+    let client_key = packets.first().and_then(|p| p.conn).map_or(key, |(k, _)| k);
+    Some(Conversation {
+        packets,
+        link_type: store.link_type(),
+        headers_only: store.headers_only(),
+        key,
+        client_key,
+    })
+}
+
 /// The connection of packet `n` as a stream, if it is kept and belongs to one
 pub fn stream(
     t: Lang,
@@ -199,27 +238,13 @@ pub fn stream(
     view: StreamView,
     side: StreamSide,
 ) -> Option<Stream> {
-    let store = engine.lock().packets.clone()?;
-    let (packets, link_type, headers_only, key) = {
-        let store = store.lock();
-        let packet = store.get(n)?;
-        let (key, _) = packet.conn?;
-        let reverse = AddressPortPair {
-            src_ip: key.dst_ip,
-            src_port: key.dst_port,
-            dst_ip: key.src_ip,
-            dst_port: key.src_port,
-            ..key
-        };
-        let packets: Vec<StoredPacket> = store
-            .iter()
-            .filter(|p| p.conn.is_some_and(|(k, _)| k == key || k == reverse))
-            .cloned()
-            .collect();
-        (packets, store.link_type(), store.headers_only(), key)
-    };
-    // the side of the first packet started the connection
-    let client_key = packets.first().and_then(|p| p.conn).map_or(key, |(k, _)| k);
+    let Conversation {
+        packets,
+        link_type,
+        headers_only,
+        key,
+        client_key,
+    } = conversation(engine, n)?;
     let (chunks, counts, cut) = assemble(link_type, &packets, &client_key);
     let shown = chunks
         .into_iter()

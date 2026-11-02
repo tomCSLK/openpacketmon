@@ -55,6 +55,9 @@ pub struct Access {
     running: Arc<Mutex<Option<Running>>>,
     failed: Arc<AtomicBool>,
     calls: Arc<AtomicU64>,
+    /// Whether assistants may read the content of packets; never stored, and off with every
+    /// opening of the door
+    content: Arc<AtomicBool>,
 }
 
 impl Access {
@@ -66,6 +69,7 @@ impl Access {
             running: Arc::default(),
             failed: Arc::default(),
             calls: Arc::default(),
+            content: Arc::default(),
         }
     }
 
@@ -77,6 +81,7 @@ impl Access {
             return;
         }
         self.failed.store(false, Ordering::Relaxed);
+        self.content.store(false, Ordering::Relaxed);
         if let Some(open) = running.take() {
             open.stop.store(true, Ordering::Relaxed);
             let _ = open.thread.join();
@@ -94,6 +99,17 @@ impl Access {
                 self.failed.store(true, Ordering::Relaxed);
             }
         }
+    }
+
+    /// Allows the content of packets, as long as the door is open
+    pub fn allow_content(&self, allowed: bool) {
+        let running = self.running.lock().unwrap_or_else(PoisonError::into_inner);
+        self.content
+            .store(allowed && running.is_some(), Ordering::Relaxed);
+    }
+
+    pub fn content_allowed(&self) -> bool {
+        self.content.load(Ordering::Relaxed)
     }
 
     pub fn status(&self) -> Status {
@@ -135,6 +151,7 @@ impl Access {
             token,
             stop: stop.clone(),
             calls: self.calls.clone(),
+            content: self.content.clone(),
             clients: Arc::default(),
             index: Arc::default(),
         };
@@ -197,6 +214,7 @@ struct Door {
     token: String,
     stop: Arc<AtomicBool>,
     calls: Arc<AtomicU64>,
+    content: Arc<AtomicBool>,
     clients: Arc<AtomicUsize>,
     /// The filters of the assistants, apart from those of the window
     index: Arc<FilterIndex>,
@@ -254,7 +272,14 @@ impl Door {
             return Answer::Refused;
         }
         self.calls.fetch_add(1, Ordering::Relaxed);
-        tools::call(&self.engine, &self.index, &request.tool, &request.arguments)
+        let content = self.content.load(Ordering::Relaxed);
+        tools::call(
+            &self.engine,
+            &self.index,
+            content,
+            &request.tool,
+            &request.arguments,
+        )
     }
 }
 
@@ -268,7 +293,7 @@ mod tests {
     use crate::config::conf::Conf;
     use crate::engine::tests::{frame, write_pcap};
     use crate::mcp::protocol::{AskError, ask};
-    use crate::mcp::tools::{CAPTURE_STATUS, FILTER_HELP};
+    use crate::mcp::tools::{CAPTURE_STATUS, FILTER_HELP, FOLLOW_STREAM};
     use crate::networking::types::capture_context::CaptureSourcePicklist;
 
     struct Fixture {
@@ -436,6 +461,33 @@ mod tests {
         assert!(help["examples"].to_string().contains("program contains"));
         let wrong = ask(&fixture.path(), FILTER_HELP, json!({ "connections": 1 }));
         assert!(matches!(wrong, Err(AskError::Tool(_))));
+    }
+
+    #[test]
+    fn the_content_of_packets_needs_its_own_allowance_and_ends_with_the_door() {
+        let fixture = Fixture::new("content");
+        let stream =
+            |fixture: &Fixture| ask(&fixture.path(), FOLLOW_STREAM, json!({ "number": 1 }));
+        fixture.access.allow_content(true);
+        // a closed door allows nothing
+        assert!(!fixture.access.content_allowed());
+        fixture.access.apply(true);
+        assert!(!fixture.access.content_allowed());
+        let Err(AskError::Tool(off)) = stream(&fixture) else {
+            panic!("the content was not refused");
+        };
+        assert!(off.contains("Allow packet contents"), "{off}");
+
+        fixture.access.allow_content(true);
+        assert!(fixture.access.content_allowed());
+        let Err(AskError::Tool(on)) = stream(&fixture) else {
+            panic!("there is no capture");
+        };
+        assert!(on.contains("No capture"), "{on}");
+
+        fixture.access.apply(false);
+        fixture.access.apply(true);
+        assert!(!fixture.access.content_allowed());
     }
 
     #[test]

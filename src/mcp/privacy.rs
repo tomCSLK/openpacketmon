@@ -1,6 +1,10 @@
 //! What must not leave the window with an answer. Everything an assistant receives goes to its AI
 //! service, and much of it was written by other devices: a host name can hold an instruction, and
 //! a request can hold a password.
+//!
+//! The fields of the dissectors are texts ([`hide_header`], [`hide_query`]); the content of packets
+//! is bytes, so [`Masker`] overwrites the same secrets there, byte for byte, before they become
+//! text or a hex dump.
 
 use serde_json::Value;
 
@@ -12,6 +16,28 @@ const HIDDEN: &str = "[hidden]";
 const SECRET_HEADERS: [&str; 8] = [
     "cookie", "auth", "token", "secret", "password", "session", "api-key", "apikey",
 ];
+/// What takes the place of a hidden byte
+const MASK: u8 = b'x';
+/// Longest first word or header name a line is looked at for
+const MAX_NAME: usize = 64;
+/// First words of a line that carries a URL: HTTP and its relatives SSDP and GENA
+const URL_COMMANDS: [&[u8]; 13] = [
+    b"GET",
+    b"POST",
+    b"PUT",
+    b"HEAD",
+    b"DELETE",
+    b"OPTIONS",
+    b"PATCH",
+    b"CONNECT",
+    b"TRACE",
+    b"NOTIFY",
+    b"M-SEARCH",
+    b"SUBSCRIBE",
+    b"UNSUBSCRIBE",
+];
+/// First words after which the rest of the line is a password: FTP, POP3, SMTP
+const SECRET_COMMANDS: [&[u8]; 2] = [b"PASS", b"AUTH"];
 
 /// Characters a person does not see but a language model reads: format characters that hide or
 /// turn around text, and the tag characters that spell out whole sentences
@@ -70,11 +96,146 @@ pub fn hide_header(line: &str) -> String {
     let Some((name, _)) = line.split_once(':') else {
         return hide_query(line);
     };
-    let lower = name.to_ascii_lowercase();
-    if SECRET_HEADERS.iter().any(|secret| lower.contains(secret)) {
+    if is_secret_name(name) {
         format!("{name}: {HIDDEN}")
     } else {
         hide_query(line)
+    }
+}
+
+fn is_secret_name(name: &str) -> bool {
+    let lower = name.to_ascii_lowercase();
+    SECRET_HEADERS.iter().any(|secret| lower.contains(secret))
+}
+
+/// Where in a line the [`Masker`] is
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+enum Line {
+    Start,
+    /// The first word, or the name of a header
+    Name,
+    /// The value of a secret, up to the end of the line
+    Secret,
+    /// A line that can hold a URL, whose queries are hidden
+    Url,
+    Query,
+    /// Nothing to hide
+    Plain,
+}
+
+/// Hides the secrets of text protocols in bytes as they went over the wire, keeping their
+/// length: the values of headers such as `Cookie` and `Authorization`, the queries of URLs in
+/// requests and headers, and what follows `PASS` and `AUTH`. It goes through a direction of a
+/// connection piece by piece and remembers where a line began, so a secret cut in two by the
+/// packets stays hidden.
+#[derive(Clone, Debug)]
+pub struct Masker {
+    line: Line,
+    name: Vec<u8>,
+    /// The line before was a secret, so its continuation is too
+    secret_before: bool,
+}
+
+impl Masker {
+    /// At the start of a line
+    pub fn new() -> Self {
+        Self {
+            line: Line::Start,
+            name: Vec::new(),
+            secret_before: false,
+        }
+    }
+
+    /// After bytes that were not seen: the rest of the line could be anything, so it is hidden
+    pub fn unknown() -> Self {
+        Self {
+            line: Line::Secret,
+            name: Vec::new(),
+            secret_before: true,
+        }
+    }
+
+    pub fn mask(&mut self, bytes: &mut [u8]) {
+        for byte in bytes {
+            self.next(byte);
+        }
+    }
+
+    fn next(&mut self, byte: &mut u8) {
+        match *byte {
+            b'\n' => {
+                self.secret_before = self.line == Line::Secret;
+                self.line = Line::Start;
+                self.name.clear();
+                return;
+            }
+            b'\r' => return,
+            _ => {}
+        }
+        if self.line == Line::Start {
+            self.line = if *byte == b' ' || *byte == b'\t' {
+                if self.secret_before {
+                    Line::Secret
+                } else {
+                    Line::Url
+                }
+            } else {
+                Line::Name
+            };
+        }
+        match self.line {
+            Line::Name => self.name_byte(*byte),
+            Line::Secret => {
+                if *byte != b' ' && *byte != b'\t' {
+                    *byte = MASK;
+                }
+            }
+            Line::Url => {
+                if *byte == b'?' {
+                    self.line = Line::Query;
+                }
+            }
+            Line::Query => {
+                if *byte == b' ' || *byte == b'\t' {
+                    self.line = Line::Url;
+                } else {
+                    *byte = MASK;
+                }
+            }
+            Line::Start | Line::Plain => {}
+        }
+    }
+
+    /// A byte of the first word: a colon ends the name of a header, a space a command
+    fn name_byte(&mut self, byte: u8) {
+        match byte {
+            b':' => {
+                let name = String::from_utf8_lossy(&self.name);
+                self.line = if self.name.is_empty() {
+                    Line::Plain
+                } else if is_secret_name(&name) {
+                    Line::Secret
+                } else {
+                    Line::Url
+                };
+            }
+            b' ' | b'\t' => {
+                let word = self.name.as_slice();
+                self.line = if URL_COMMANDS.contains(&word) {
+                    Line::Url
+                } else if SECRET_COMMANDS.iter().any(|c| c.eq_ignore_ascii_case(word)) {
+                    Line::Secret
+                } else {
+                    Line::Plain
+                };
+            }
+            b if (b.is_ascii_alphanumeric() || b == b'-' || b == b'_')
+                && self.name.len() < MAX_NAME =>
+            {
+                self.name.push(b);
+            }
+            _ => self.line = Line::Plain,
+        }
     }
 }
 
@@ -135,6 +296,71 @@ mod tests {
             hide_query("GET /index.html HTTP/1.1"),
             "GET /index.html HTTP/1.1"
         );
+    }
+
+    fn masked(pieces: &[&str]) -> String {
+        let mut masker = Masker::new();
+        let mut out = Vec::new();
+        for piece in pieces {
+            let mut bytes = piece.as_bytes().to_vec();
+            masker.mask(&mut bytes);
+            assert_eq!(bytes.len(), piece.len());
+            out.extend(bytes);
+        }
+        String::from_utf8(out).unwrap()
+    }
+
+    #[test]
+    fn the_secrets_of_a_request_are_overwritten_in_its_bytes() {
+        let request = "GET /login?user=me&pass=1 HTTP/1.1\r\nHost: example.com\r\n\
+            Cookie: id=1; b=2\r\nAuthorization: Basic dXNl\r\n  cjpw\r\n\
+            Referer: https://example.com/a?id=1\r\nX-Api-Key: 123\r\n\r\nbody?a=b";
+        assert_eq!(
+            masked(&[request]),
+            "GET /login?xxxxxxxxxxxxxx HTTP/1.1\r\nHost: example.com\r\n\
+            Cookie: xxxxx xxx\r\nAuthorization: xxxxx xxxx\r\n  xxxx\r\n\
+            Referer: https://example.com/a?xxxx\r\nX-Api-Key: xxx\r\n\r\nbody?a=b"
+        );
+        let response = "HTTP/1.1 302 Found\r\nSet-Cookie: id=1\r\nLocation: /n?c=2\r\n\r\n";
+        assert_eq!(
+            masked(&[response]),
+            "HTTP/1.1 302 Found\r\nSet-Cookie: xxxx\r\nLocation: /n?xxx\r\n\r\n"
+        );
+        assert_eq!(
+            masked(&["USER me\r\nPASS hunter2\r\nAUTH PLAIN AGZvbwBiYXI=\r\n"]),
+            "USER me\r\nPASS xxxxxxx\r\nAUTH xxxxx xxxxxxxxxxxx\r\n"
+        );
+    }
+
+    #[test]
+    fn a_secret_cut_by_the_packets_stays_hidden() {
+        assert_eq!(
+            masked(&["GET / HTTP/1.1\r\nCoo", "kie: id=SEC", "RET\r\nHost: a\r\n"]),
+            "GET / HTTP/1.1\r\nCookie: xxxxxxxxx\r\nHost: a\r\n"
+        );
+        assert_eq!(masked(&["GET /a?b", "=c HTTP/1.1"]), "GET /a?xxx HTTP/1.1");
+    }
+
+    #[test]
+    fn after_unseen_bytes_the_rest_of_the_line_is_hidden() {
+        let mut bytes = b"id=SECRET\r\nHost: a\r\n".to_vec();
+        Masker::unknown().mask(&mut bytes);
+        assert_eq!(bytes, b"xxxxxxxxx\r\nHost: a\r\n");
+    }
+
+    #[test]
+    fn other_content_stays_as_it_is() {
+        for text in [
+            "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\n\r\n<p>Hello? Yes.</p>",
+            "{\"a\": \"b?c\"}",
+            "SSH-2.0-OpenSSH_9.6\r\n",
+        ] {
+            assert_eq!(masked(&[text]), text);
+        }
+        let binary: Vec<u8> = (0..=255).collect();
+        let mut copy = binary.clone();
+        Masker::new().mask(&mut copy);
+        assert_eq!(copy, binary);
     }
 
     #[test]

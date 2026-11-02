@@ -38,6 +38,8 @@ struct Form {
     packets_memory: usize,
     packets_headers: bool,
     mcp_enabled: bool,
+    /// Never stored: it ends with the window
+    mcp_content: bool,
 }
 
 impl Form {
@@ -77,6 +79,7 @@ impl Form {
             packets_memory: state.conf.packet_store.max_megabytes(),
             packets_headers: s.packets_headers,
             mcp_enabled: s.mcp_enabled,
+            mcp_content: false,
         }
     }
 }
@@ -114,8 +117,9 @@ pub fn show(app: &mut App, ui: &mut Ui) {
     if app.pages.settings.view.is_none() {
         let state = app.engine.lock();
         let view = settings(t, &state);
-        let form = Form::new(&view, &state);
+        let mut form = Form::new(&view, &state);
         drop(state);
+        form.mcp_content = app.mcp.content_allowed();
         app.pages.settings.view = Some((view, form));
     }
     if let Some(result) = app.pages.settings.geo.take() {
@@ -452,6 +456,14 @@ fn mcp_card(ui: &mut Ui, t: Lang, form: &mut Form, status: Status) {
             }
             ui.checkbox(&mut form.mcp_enabled, t.get("settings-mcp-enabled"));
             widgets::hint(ui, &t.get("settings-mcp-hint"));
+            if !form.mcp_enabled {
+                form.mcp_content = false;
+            }
+            ui.add_enabled(
+                form.mcp_enabled,
+                egui::Checkbox::new(&mut form.mcp_content, t.get("settings-mcp-content")),
+            );
+            widgets::hint(ui, &t.get("settings-mcp-content-hint"));
             if let Status::Active { calls } = status {
                 ui.label(t.get1("settings-mcp-active", "calls", calls.to_string()));
             }
@@ -484,6 +496,7 @@ fn store(app: &mut App, ctx: &egui::Context) {
         mcp_enabled: form.mcp_enabled,
     };
     let theme = form.theme;
+    let content = form.mcp_enabled && form.mcp_content;
     {
         let mut state = app.engine.lock();
         apply_settings(&mut state, &change);
@@ -491,6 +504,7 @@ fn store(app: &mut App, ctx: &egui::Context) {
     }
     app.engine.store_conf();
     app.mcp.apply(change.mcp_enabled);
+    app.mcp.allow_content(content);
     ctx.set_theme(theme_preference(theme));
     let language = app.engine.lock().conf.language.clone();
     app.t = language_of(&language);

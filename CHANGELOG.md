@@ -23,6 +23,7 @@ First public version. This list describes what differs from Sniffnet.
 - The filter fields suggest fields, operators and connectors while typing, with short explanations, and in the
   connection filter the values of the capture
 - AI assistants can read the capture over MCP (`openpacketmon mcp`): state, overview, connections, packets without their contents and statistics, off until turned on in the settings
+- Packet contents for AI assistants (follow stream, bytes of a packet) with a switch of their own that ends with the window, secrets in HTTP headers, URL queries and passwords replaced by `x`; the sidebar shows while assistants have access
 - Options `--adapter`, `--import` and `--list-adapters`
 - Debian package with a start menu entry
 - Connections are filtered with one field in the grammar of the display filter, with fields of their own (`ip.addr`,

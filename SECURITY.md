@@ -42,4 +42,7 @@ Known and documented, not vulnerabilities in themselves:
 - The answers to an assistant carry no payload, and HTTP cookies, authorization headers and the queries of URLs are hidden. That is a
   list of known places, not a guarantee: a secret in the path of a URL stays, and the display filter still matches on hidden values, so
   an assistant could find out such a value by trying.
+- Packet contents (streams and bytes) reach an assistant only while the user allows them in the window; that switch is never saved.
+  The same secrets are then overwritten with `x` in the bytes, together with passwords after `PASS` and `AUTH`. Everything else in the
+  content of an unencrypted connection, such as a password in a form or in an unknown protocol, goes to the AI service.
 - The packet store keeps the captured packets in memory, including their contents, until the capture is stopped or the program ends.

@@ -3470,7 +3470,7 @@ dependencies = [
 
 [[package]]
 name = "openpacketmon"
-version = "0.3.7"
+version = "0.3.8"
 dependencies = [
  "async-channel",
  "clap",
@@ -3515,7 +3515,7 @@ dependencies = [
 
 [[package]]
 name = "openpacketmon-capture"
-version = "0.3.7"
+version = "0.3.8"
 dependencies = [
  "pcap",
  "rustix 1.1.5",

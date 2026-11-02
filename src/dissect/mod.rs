@@ -284,6 +284,16 @@ pub fn transport_payload(data: &[u8], link_type: LinkType) -> Option<Payload> {
     })
 }
 
+/// The captured part of the payload of a TCP segment or UDP datagram, also when the rest was not
+/// captured; `None` for other packets
+pub fn captured_payload(data: &[u8], link_type: LinkType) -> Option<Payload> {
+    dissect(data, link_type).transport.map(|t| Payload {
+        tcp: t.tcp,
+        seq: t.seq,
+        range: t.payload,
+    })
+}
+
 // ---- reading -------------------------------------------------------------------------------
 
 /// Printable text of bytes (other bytes as `·`), for names and headers read from the wire

@@ -149,6 +149,60 @@ fn the_access_for_assistants_is_turned_on_in_the_settings() {
 
 #[test]
 #[serial]
+fn the_content_of_packets_is_allowed_until_the_access_closes() {
+    let fixture = engine_with(0);
+    let mut harness = window_of_size(&fixture, Theme::Light, Lang::En, 2_000.0);
+    let dir = std::env::temp_dir().join(format!("openpacketmon-gui-mcp-{}", std::process::id()));
+    let mcp = crate::mcp::Access::new(fixture.engine.clone(), Some(dir.join("access.json")));
+    harness.state_mut().mcp = mcp.clone();
+    harness.state_mut().page = Page::Settings;
+    settle(&mut harness);
+    let label = |harness: &Harness<'static, App>, id: &str| harness.state().t.get(id);
+    assert!(
+        harness
+            .query_by_label(&label(&harness, "mcp-open"))
+            .is_none()
+    );
+
+    // saving takes over the language of the settings, so every label is asked for anew
+    for (click, content) in [
+        (&["settings-mcp-enabled", "settings-mcp-content"][..], true),
+        (&["settings-mcp-content"][..], false),
+    ] {
+        for id in click {
+            harness.get_by_label(&label(&harness, id)).click();
+            harness.step();
+        }
+        harness.get_by_label(&label(&harness, "save")).click();
+        settle(&mut harness);
+        assert!(matches!(mcp.status(), crate::mcp::Status::Active { .. }));
+        assert_eq!(mcp.content_allowed(), content);
+        let note = if content {
+            "mcp-open-content"
+        } else {
+            "mcp-open"
+        };
+        let _ = harness.get_by_label(&label(&harness, note));
+    }
+
+    harness
+        .get_by_label(&label(&harness, "settings-mcp-enabled"))
+        .click();
+    harness.step();
+    harness.get_by_label(&label(&harness, "save")).click();
+    settle(&mut harness);
+    assert_eq!(mcp.status(), crate::mcp::Status::Off);
+    assert!(!mcp.content_allowed());
+    assert!(
+        harness
+            .query_by_label(&label(&harness, "mcp-open"))
+            .is_none()
+    );
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+#[test]
+#[serial]
 #[ignore = "writes pictures for a person to look at"]
 fn shots() {
     let folder = PathBuf::from(std::env::var("GUI_SHOTS").unwrap());
@@ -256,6 +310,29 @@ fn shots() {
     shot(&mut harness, &folder, "statistics-tall");
     harness.state_mut().go(Page::Settings);
     shot(&mut harness, &folder, "settings-tall");
+
+    // while assistants have access, and read packet contents
+    let access = folder.join("mcp-access");
+    busy.engine.lock().conf.mcp.enabled = true;
+    for theme in [Theme::Light, Theme::Dark] {
+        let mut harness = window_of_size(&busy, theme, Lang::De, 2_000.0);
+        let mcp = crate::mcp::Access::new(busy.engine.clone(), Some(access.join("access.json")));
+        mcp.apply(true);
+        mcp.allow_content(true);
+        harness.state_mut().mcp = mcp.clone();
+        harness.state_mut().go(Page::Settings);
+        let name = if theme == Theme::Light {
+            "light"
+        } else {
+            "dark"
+        };
+        shot(&mut harness, &folder, &format!("settings-mcp-{name}"));
+        mcp.allow_content(false);
+        shot(&mut harness, &folder, &format!("settings-mcp-off-{name}"));
+        mcp.apply(false);
+    }
+    busy.engine.lock().conf.mcp.enabled = false;
+    let _ = std::fs::remove_dir_all(&access);
 
     let mut harness = window(&busy, Theme::Dark, Lang::En);
     for (name, page) in [

@@ -112,7 +112,9 @@ fn every_tool_only_reads() {
             "capture_status",
             "connections",
             "filter_help",
+            "follow_stream",
             "overview",
+            "packet_bytes",
             "packet_detail",
             "packets",
             "statistics",
@@ -129,8 +131,10 @@ fn every_tool_only_reads() {
     for name in ["filter", "connection_filter", "offset", "limit"] {
         assert!(properties.contains_key(name), "{packets}");
     }
-    let detail = tools.iter().find(|t| t["name"] == "packet_detail").unwrap();
-    assert_eq!(detail["inputSchema"]["required"], json!(["number"]));
+    for name in ["packet_detail", "packet_bytes", "follow_stream"] {
+        let tool = tools.iter().find(|t| t["name"] == name).unwrap();
+        assert_eq!(tool["inputSchema"]["required"], json!(["number"]), "{tool}");
+    }
 }
 
 #[test]

@@ -473,7 +473,7 @@ fn device_fields(ui: &mut Ui, t: Lang, form: &mut Form, snapshot: &Snapshot) {
                     }
                     ui.vertical(|ui| {
                         ui.spacing_mut().item_spacing.y = 0.0;
-                        let name = RichText::new(&adapter.name).strong();
+                        let name = RichText::new(&adapter.label).strong();
                         ui.radio_value(&mut form.device, adapter.name.clone(), name);
                         if !adapter.desc.is_empty() {
                             ui.label(RichText::new(&adapter.desc).small().color(p.muted));
@@ -526,7 +526,7 @@ fn no_ip_row(ui: &mut Ui, t: Lang, adapter: &AdapterRow) {
     let note = t.get("capture-no-ip");
     ui.vertical(|ui| {
         ui.spacing_mut().item_spacing.y = 0.0;
-        let name = RichText::new(&adapter.name).strong();
+        let name = RichText::new(&adapter.label).strong();
         ui.add_enabled(false, egui::RadioButton::new(false, name))
             .on_disabled_hover_text(&note);
         if !adapter.desc.is_empty() {

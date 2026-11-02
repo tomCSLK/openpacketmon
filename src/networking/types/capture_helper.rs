@@ -35,6 +35,10 @@ impl CaptureHelper {
         buffer: i32,
         bpf: Option<&str>,
     ) -> Result<Self, String> {
+        #[cfg(test)]
+        if !tests::REAL_HELPERS.load(std::sync::atomic::Ordering::Relaxed) {
+            return Err("no helpers in unit tests".to_owned());
+        }
         let path = helper_path();
         let mut command = Command::new(&path);
         command
@@ -216,8 +220,15 @@ fn helper_path() -> PathBuf {
 
 #[cfg(test)]
 #[allow(clippy::unwrap_used)]
-mod tests {
+pub(crate) mod tests {
     use std::io::Cursor;
+    use std::sync::atomic::AtomicBool;
+
+    /// Unit tests start no helpers, unless a test turns this on: the helpers would capture on the
+    /// real adapters, and under Windows each would inherit the files the other tests running at
+    /// that moment have open, and keep them locked (`docs/windows.md` 4). Under Linux the helper
+    /// in `target/` has no rights anyway.
+    pub(crate) static REAL_HELPERS: AtomicBool = AtomicBool::new(false);
 
     use openpacketmon_capture::{
         Stats, write_failed, write_packet, write_ready, write_stats, write_timeout,

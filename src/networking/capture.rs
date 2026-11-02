@@ -36,6 +36,10 @@ use crate::utils::formatted_strings::get_domain_from_r_dns;
 
 const REVERSE_DNS_LOOKUP_THREADS: usize = 5;
 
+/// Disconnects once the capture threads have ended and closed their files (nothing is ever sent):
+/// under Windows a process started meanwhile would inherit the open files and keep them locked
+pub type CaptureEnded = std::sync::mpsc::Receiver<()>;
+
 /// Spawns the backend thread that feeds `tx` with traffic updates.
 #[allow(clippy::too_many_arguments)]
 pub fn spawn_capture_thread(
@@ -46,13 +50,15 @@ pub fn spawn_capture_thread(
     tx: Sender<BackendTrafficMessage>,
     freeze_rxs: (Receiver<()>, Receiver<()>),
     packet_store: Option<SharedPacketStore>,
-) {
+) -> CaptureEnded {
+    let (running, ended) = std::sync::mpsc::channel();
     match capture_context {
         CaptureContext::Ipfix(socket) => {
             let _ = thread::Builder::new()
                 .name("thread_collect_ipfix".to_string())
                 .spawn(move || {
                     collect_ipfix(cap_id, &socket, &mmdb_readers, &tx, freeze_rxs);
+                    drop(running);
                 })
                 .log_err(location!());
         }
@@ -68,11 +74,14 @@ pub fn spawn_capture_thread(
                         &tx,
                         freeze_rxs,
                         packet_store.as_ref(),
+                        &running,
                     );
+                    drop(running);
                 })
                 .log_err(location!());
         }
     }
+    ended
 }
 
 /// Spawns the pool of reverse-DNS lookup threads and returns the resolution state wired to it.

@@ -1,0 +1,4 @@
+# Windows: build the C runtime into the programs, so they start on systems without the
+# Visual C++ Redistributable (VCRUNTIME140.dll); see docs/windows.md 4.
+[target.x86_64-pc-windows-msvc]
+rustflags = ["-C", "target-feature=+crt-static"]

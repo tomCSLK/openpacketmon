@@ -15,7 +15,11 @@ use crate::view::settings::packets_max_choices;
 
 /// A network adapter in the selection
 pub struct AdapterRow {
+    /// Identifies the adapter, not shown under Windows (`\Device\NPF_{GUID}`)
     pub name: String,
+    /// Shown in bold: the name, under Windows the description
+    pub label: String,
+    /// Shown below, may be empty
     pub desc: String,
     pub addresses: String,
     pub selected: bool,
@@ -78,7 +82,8 @@ pub fn capture_setup(t: Lang, state: &EngineState) -> CaptureSetup {
         .iter()
         .map(|p| AdapterRow {
             name: p.device.get_name().clone(),
-            desc: p.device.get_desc().cloned().unwrap_or_default(),
+            label: p.device.display_name(),
+            desc: p.device.display_desc(),
             addresses: p
                 .device
                 .get_addresses()
@@ -138,7 +143,7 @@ fn running_capture(t: Lang, state: &EngineState) -> RunningCapture {
     let source = &state.capture_source;
     RunningCapture {
         kind: source_kind(t, source),
-        name: source.get_name(),
+        name: source.display_name(),
         state: capture_state(t, state),
         frozen: state.frozen,
         filter: if source.supports_filters() && state.conf.filters.is_some_filter_active() {

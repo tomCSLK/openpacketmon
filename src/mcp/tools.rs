@@ -186,7 +186,8 @@ fn source_name(source: &CaptureSource) -> String {
         CaptureSource::File(_) => Path::new(&name)
             .file_name()
             .map_or(name.clone(), |n| n.to_string_lossy().into_owned()),
-        CaptureSource::Device(_) | CaptureSource::Ipfix(_) => name,
+        CaptureSource::Device(_) => source.display_name(),
+        CaptureSource::Ipfix(_) => name,
     }
 }
 
@@ -893,7 +894,7 @@ mod tests {
     impl Drop for Fixture {
         fn drop(&mut self) {
             self.engine.stop();
-            let _ = std::fs::remove_dir_all(&self.dir);
+            crate::engine::tests::remove_test_dir(&self.dir);
         }
     }
 

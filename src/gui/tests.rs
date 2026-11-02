@@ -15,7 +15,7 @@ use serial_test::serial;
 use super::*;
 use crate::config::conf::Conf;
 use crate::config::favorite::Favorite;
-use crate::engine::tests::{frame, write_pcap};
+use crate::engine::tests::{frame, remove_test_dir, write_pcap};
 use crate::networking::capture::BackendTrafficMessage;
 use crate::networking::types::capture_context::CaptureSourcePicklist;
 
@@ -23,9 +23,22 @@ struct Fixture {
     // the jobs of the engine run here
     _runtime: tokio::runtime::Runtime,
     engine: Engine,
+    /// Folder of the capture file, removed at the end
+    dir: Option<PathBuf>,
 }
 
+impl Drop for Fixture {
+    fn drop(&mut self) {
+        if let Some(dir) = &self.dir {
+            self.engine.stop();
+            remove_test_dir(dir);
+        }
+    }
+}
+
+/// A capture file in a folder of its own
 fn sample_file(rows: usize) -> PathBuf {
+    static NEXT: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
     let local = [192, 168, 1, 10];
     let dns = [192, 168, 1, 1];
     let web = [192, 168, 1, 20];
@@ -41,7 +54,11 @@ fn sample_file(rows: usize) -> PathBuf {
             _ => (second, frame(far, local, 443, port, true, 1_000)),
         });
     }
-    let dir = std::env::temp_dir().join(format!("openpacketmon-gui-{}", std::process::id()));
+    let dir = std::env::temp_dir().join(format!(
+        "openpacketmon-gui-{}-{}",
+        std::process::id(),
+        NEXT.fetch_add(1, std::sync::atomic::Ordering::Relaxed)
+    ));
     std::fs::create_dir_all(&dir).unwrap();
     let path = dir.join(format!("sample-{rows}.pcap"));
     write_pcap(&path, &packets);
@@ -59,8 +76,10 @@ fn wait_for(what: &str, done: impl Fn() -> bool) {
 fn engine_with(rows: usize) -> Fixture {
     let runtime = tokio::runtime::Runtime::new().unwrap();
     let engine = Engine::new(Conf::default(), runtime.handle().clone());
+    let mut dir = None;
     if rows > 0 {
         let path = sample_file(rows);
+        dir = path.parent().map(Path::to_path_buf);
         {
             let mut state = engine.lock();
             state.set_capture_source(CaptureSourcePicklist::File);
@@ -74,6 +93,7 @@ fn engine_with(rows: usize) -> Fixture {
     Fixture {
         _runtime: runtime,
         engine,
+        dir,
     }
 }
 
@@ -198,7 +218,7 @@ fn the_content_of_packets_is_allowed_until_the_access_closes() {
             .query_by_label(&label(&harness, "mcp-open"))
             .is_none()
     );
-    let _ = std::fs::remove_dir_all(&dir);
+    remove_test_dir(&dir);
 }
 
 #[test]
@@ -337,7 +357,7 @@ fn shots() {
         mcp.apply(false);
     }
     busy.engine.lock().conf.mcp.enabled = false;
-    let _ = std::fs::remove_dir_all(&access);
+    remove_test_dir(&access);
 
     let mut harness = window(&busy, Theme::Dark, Lang::En);
     for (name, page) in [

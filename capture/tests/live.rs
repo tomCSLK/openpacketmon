@@ -1,6 +1,6 @@
 //! Runs the helper on a real adapter: the loopback adapter of a private network namespace, where
 //! it can capture without any rights being set up. Where namespaces are not available (some CI
-//! runners), this test only says so.
+//! runners), this test only says so. Under Windows the loopback adapter of Npcap, if installed.
 
 #![allow(clippy::unwrap_used, clippy::print_stderr)]
 
@@ -123,14 +123,6 @@ impl Helper {
 fn inside_the_namespace() {
     let receiver = UdpSocket::bind(("127.0.0.1", PORT)).unwrap();
     let other_receiver = UdpSocket::bind(("127.0.0.1", OTHER_PORT)).unwrap();
-    let sender = UdpSocket::bind("127.0.0.1:0").unwrap();
-    assert_ne!(
-        receiver.local_addr().unwrap(),
-        other_receiver.local_addr().unwrap()
-    );
-    let send = |payload: &[u8], port| {
-        sender.send_to(payload, ("127.0.0.1", port)).unwrap();
-    };
 
     let mut helper = Helper::start("lo", &format!("udp port {PORT}"));
     assert_eq!(helper.next(), Frame::Ready { link_type: 1 });
@@ -140,6 +132,72 @@ fn inside_the_namespace() {
     assert_eq!(helper.status("CapPrm:"), "0000000000000000");
     assert_eq!(helper.status("CapInh:"), "0000000000000000");
     assert_eq!(helper.status("NoNewPrivs:"), "1");
+
+    exercise(helper, &receiver, &other_receiver);
+}
+
+/// Under Windows on the loopback adapter of Npcap, which needs no rights of its own
+#[cfg(windows)]
+#[test]
+fn captures_on_the_npcap_loopback_adapter() {
+    let system = std::path::PathBuf::from(std::env::var_os("SystemRoot").unwrap()).join("System32");
+    if !system.join("wpcap.dll").is_file() {
+        eprintln!("skipped: Npcap is not installed");
+        return;
+    }
+    let receiver = UdpSocket::bind(("127.0.0.1", PORT)).unwrap();
+    let other_receiver = UdpSocket::bind(("127.0.0.1", OTHER_PORT)).unwrap();
+
+    let mut helper = Helper::start(r"\Device\NPF_Loopback", &format!("udp port {PORT}"));
+    // under Npcap a blocking read without packets might never return; then this test would hang
+    let done = watchdog(helper.child.id());
+    match helper.next() {
+        Frame::Ready { link_type } => eprintln!("loopback adapter, link type {link_type}"),
+        Frame::Failed => {
+            eprintln!(
+                "skipped: no loopback adapter ({})",
+                String::from_utf8_lossy(&helper.data)
+            );
+            done.store(true, std::sync::atomic::Ordering::Relaxed);
+            return;
+        }
+        other => panic!("unexpected {other:?}"),
+    }
+    exercise(helper, &receiver, &other_receiver);
+
+    let mut unknown = Helper::start("no-such-adapter", "");
+    assert_eq!(unknown.next(), Frame::Failed);
+    assert!(String::from_utf8_lossy(&unknown.data).contains("no-such-adapter"));
+    assert!(!unknown.child.wait().unwrap().success());
+    done.store(true, std::sync::atomic::Ordering::Relaxed);
+}
+
+/// Ends the helper after a minute unless the test is done: a hanging read fails the test then
+#[cfg(windows)]
+fn watchdog(pid: u32) -> std::sync::Arc<std::sync::atomic::AtomicBool> {
+    let done = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+    let flag = done.clone();
+    std::thread::spawn(move || {
+        sleep(Duration::from_secs(60));
+        if !flag.load(std::sync::atomic::Ordering::Relaxed) {
+            let _ = Command::new("taskkill")
+                .args(["/F", "/PID", &pid.to_string()])
+                .status();
+        }
+    });
+    done
+}
+
+/// Filter, pause, resume, statistics and the end with the standard input, on an opened adapter
+fn exercise(mut helper: Helper, receiver: &UdpSocket, other_receiver: &UdpSocket) {
+    assert_ne!(
+        receiver.local_addr().unwrap(),
+        other_receiver.local_addr().unwrap()
+    );
+    let sender = UdpSocket::bind("127.0.0.1:0").unwrap();
+    let send = |payload: &[u8], port| {
+        sender.send_to(payload, ("127.0.0.1", port)).unwrap();
+    };
 
     send(b"seen-first", PORT);
     send(b"not-in-the-filter", OTHER_PORT);

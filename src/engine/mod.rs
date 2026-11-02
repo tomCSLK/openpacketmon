@@ -25,6 +25,9 @@ use crate::networking::types::latency::{LatencyStatus, measure_latency};
 use crate::utils::check_updates::{UpdateStatus, is_newer_release_available};
 use crate::utils::error_logger::{ErrorLogger, Location};
 
+/// Longest wait in [`Engine::stop`] for the capture threads to end
+const CAPTURE_END_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(2);
+
 #[derive(Clone)]
 pub struct Engine {
     state: Arc<Mutex<EngineState>>,
@@ -75,7 +78,18 @@ impl Engine {
 
     /// Stops the current capture, clears its data and shows the adapter previews again
     pub fn stop(&self) {
-        self.lock().stop();
+        let ended = {
+            let mut state = self.lock();
+            state.stop();
+            state.take_capture_ended()
+        };
+        // The previews start a helper per adapter. Under Windows a process inherits the files
+        // open at its start, so the capture must have closed the file it imports or writes first,
+        // or the file stays locked as long as the helpers run. The capture threads notice the stop
+        // within 150 ms (the timeout of the helper and of the packet channel); never wait forever.
+        if let Some(ended) = ended {
+            let _ = ended.recv_timeout(CAPTURE_END_TIMEOUT);
+        }
         self.start_previews();
     }
 
@@ -163,6 +177,24 @@ pub(crate) mod tests {
     use crate::networking::types::capture_context::CaptureSourcePicklist;
     use crate::networking::types::data_representation::DataRepr;
     use crate::networking::types::service::Service;
+
+    /// Removes the folder of a test and fails the test if that does not work. Under Windows a file
+    /// may stay locked for a moment after it was closed (virus scanner, indexer), so it tries again
+    /// for a while. During a panic it only tries once, a second panic would abort all tests.
+    pub(crate) fn remove_test_dir(dir: &std::path::Path) {
+        let deadline = Instant::now() + Duration::from_secs(10);
+        loop {
+            match std::fs::remove_dir_all(dir) {
+                Ok(()) => return,
+                Err(e) if e.kind() == std::io::ErrorKind::NotFound => return,
+                Err(_) if std::thread::panicking() => return,
+                Err(_) if Instant::now() < deadline => {
+                    std::thread::sleep(Duration::from_millis(100));
+                }
+                Err(e) => panic!("could not remove {}: {e}", dir.display()),
+            }
+        }
+    }
 
     /// Ethernet frame with an IPv4 header and a TCP (`tcp = true`) or UDP header
     pub(crate) fn frame(
@@ -326,7 +358,104 @@ pub(crate) mod tests {
             assert!(!state.is_running());
             assert_eq!(state.info_traffic.map.len(), 0);
         }
-        let _ = std::fs::remove_dir_all(dir);
+        // the file is closed once the capture has stopped, also under Windows, where the helpers of
+        // the adapter previews would otherwise inherit it and keep it locked
+        remove_test_dir(&dir);
+    }
+
+    /// Under Windows the helpers of the adapter previews inherit the files open when they start;
+    /// stopping must close the imported file before it starts them, or the file stays locked as
+    /// long as they run. Needs real helpers (Npcap under Windows) and no other test at the same
+    /// time: `cargo test --bin openpacketmon the_imported_file -- --ignored`
+    #[test]
+    #[serial]
+    #[ignore = "starts real capture helpers, run it alone"]
+    fn the_imported_file_is_free_right_after_stopping() {
+        use crate::networking::types::capture_helper::tests::REAL_HELPERS;
+        use std::sync::atomic::Ordering;
+
+        REAL_HELPERS.store(true, Ordering::Relaxed);
+        let dir = std::env::temp_dir().join(format!("openpacketmon-stop-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("long.pcap");
+        // long enough to be still reading when stopped
+        let packets: Vec<_> = (0..200_000_u32)
+            .map(|i| {
+                let port = 40_000 + u16::try_from(i % 1_000).unwrap();
+                (
+                    1_000 + i / 1_000,
+                    frame([192, 168, 1, 10], [192, 168, 1, 20], port, 443, true, 100),
+                )
+            })
+            .collect();
+        write_pcap(&path, &packets);
+
+        let runtime = tokio::runtime::Runtime::new().unwrap();
+        let engine = Engine::new(Conf::default(), runtime.handle().clone());
+        // the previews are running, with their helpers
+        std::thread::sleep(Duration::from_secs(2));
+        let import = |path: &std::path::Path| {
+            let mut state = engine.lock();
+            state.set_capture_source(CaptureSourcePicklist::File);
+            state.set_pcap_import(path.to_string_lossy().to_string());
+        };
+        // locked by a helper, the file would stay so for as long as the previews run
+        let free = |path: &std::path::Path| {
+            let deadline = Instant::now() + Duration::from_secs(2);
+            while let Err(e) = std::fs::remove_file(path) {
+                assert!(Instant::now() < deadline, "still locked: {e}");
+                std::thread::sleep(Duration::from_millis(50));
+            }
+        };
+
+        // stopped while reading
+        import(&path);
+        assert!(engine.start());
+        std::thread::sleep(Duration::from_millis(200));
+        assert!(
+            !engine.lock().traffic_history.no_more_packets(),
+            "already read"
+        );
+        engine.stop();
+        free(&path);
+
+        // read to the end, with many addresses still waiting for their names (documentation
+        // addresses, nobody answers quickly for them)
+        let short = dir.join("short.pcap");
+        let remote: Vec<_> = (0..500_u32)
+            .map(|i| {
+                let host = u8::try_from(i % 250 + 1).unwrap();
+                let net = if i < 250 {
+                    [198, 51, 100]
+                } else {
+                    [203, 0, 113]
+                };
+                (
+                    1_000 + i / 100,
+                    frame(
+                        [192, 168, 1, 10],
+                        [net[0], net[1], net[2], host],
+                        40_000,
+                        443,
+                        true,
+                        100,
+                    ),
+                )
+            })
+            .collect();
+        write_pcap(&short, &remote);
+        import(&short);
+        assert!(engine.start());
+        let deadline = Instant::now() + Duration::from_secs(30);
+        while !engine.lock().traffic_history.no_more_packets() {
+            assert!(Instant::now() < deadline, "not read");
+            std::thread::sleep(Duration::from_millis(20));
+        }
+        engine.stop();
+        free(&short);
+
+        remove_test_dir(&dir);
+        REAL_HELPERS.store(false, Ordering::Relaxed);
     }
 
     #[test]
@@ -378,6 +507,6 @@ pub(crate) mod tests {
                     if link.starts_with("BLUETOOTH_HCI_H4_WITH_PHDR")
             ));
         }
-        let _ = std::fs::remove_dir_all(dir);
+        remove_test_dir(&dir);
     }
 }

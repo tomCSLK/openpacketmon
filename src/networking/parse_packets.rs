@@ -34,6 +34,8 @@ pub fn parse_packets(
     tx: &Sender<BackendTrafficMessage>,
     freeze_rxs: (Receiver<()>, Receiver<()>),
     packet_store: Option<&SharedPacketStore>,
+    // the caller drops it when this function returns; a clone goes to the thread reading the packets
+    running: &std::sync::mpsc::Sender<()>,
 ) {
     let (mut freeze_rx, mut freeze_rx_2) = freeze_rxs;
 
@@ -58,7 +60,13 @@ pub fn parse_packets(
     let (pcap_tx, pcap_rx) = std::sync::mpsc::sync_channel(10_000);
     let _ = thread::Builder::new()
         .name("thread_packet_stream".to_string())
-        .spawn(move || packet_stream(cap, &pcap_tx, &mut freeze_rx_2))
+        .spawn({
+            let running = running.clone();
+            move || {
+                packet_stream(cap, &pcap_tx, &mut freeze_rx_2);
+                drop(running);
+            }
+        })
         .log_err(location!());
 
     let mut stop_reported = false;
@@ -105,11 +113,15 @@ pub fn parse_packets(
                         resolutions_state.new_hosts_to_send(),
                         true,
                     ));
-                    // wait until there is still some IP address waiting for resolution
+                    // wait until there is still some IP address waiting for resolution,
+                    // unless the capture is stopped meanwhile
                     let mut pending_hosts = Vec::new();
                     while !resolutions_state.addresses_waiting_resolution.is_empty() {
+                        if tx.is_closed() {
+                            return;
+                        }
                         pending_hosts.extend(resolutions_state.new_hosts_to_send());
-                        thread::sleep(Duration::from_secs(1));
+                        thread::sleep(Duration::from_millis(100));
                     }
                     // send one last message including all pending hosts
                     let _ = tx
@@ -268,7 +280,9 @@ fn packet_stream(
             header: *p.header,
             data: p.data.into(),
         });
-        if tx.send((packet_owned, cap.stats().ok())).is_err() {
+        // a file read to the end is closed right away, not only when the capture is stopped
+        let end_of_file = matches!(packet_owned, Err(pcap::Error::NoMorePackets));
+        if tx.send((packet_owned, cap.stats().ok())).is_err() || end_of_file {
             return;
         }
     }

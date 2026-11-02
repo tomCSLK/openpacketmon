@@ -324,7 +324,9 @@ mod tests {
         assert_eq!(u32::from_le_bytes(pcap[32..36].try_into().unwrap()), 60);
 
         // the written file can be read again by libpcap
-        let dir = std::env::temp_dir().join(format!("openpacketmon-test-{}", std::process::id()));
+        // not the folder of `engine::tests`, the tests may run at the same time
+        let dir =
+            std::env::temp_dir().join(format!("openpacketmon-test-store-{}", std::process::id()));
         std::fs::create_dir_all(&dir).unwrap();
         let path = dir.join("store.pcap");
         std::fs::write(&path, &pcap).unwrap();
@@ -335,6 +337,6 @@ mod tests {
         assert!(cap.next_packet().is_err());
         // Windows does not delete a file that is still open
         drop(cap);
-        std::fs::remove_dir_all(&dir).unwrap();
+        crate::engine::tests::remove_test_dir(&dir);
     }
 }

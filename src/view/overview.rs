@@ -30,7 +30,7 @@ pub struct Tile {
 fn capture_head(t: Lang, state: &EngineState) -> Option<CaptureHead> {
     state.is_running().then(|| CaptureHead {
         kind: source_kind(t, &state.capture_source),
-        name: state.capture_source.get_name(),
+        name: state.capture_source.display_name(),
         state: capture_state(t, state),
         frozen: state.frozen,
         finished: state.traffic_history.no_more_packets(),

@@ -3,10 +3,13 @@
 Stand: 2026-10-30, ergänzt 2026-11-02 (MCP, Mitschnitt-Helfer, vorgezogener Beginn, Installer für Tester, Erfahrungen beim Einrichten des Windows-Rechners). Diese Datei beschreibt, was nötig ist, um das Projekt auf einem Windows-Rechner fortzusetzen und dort eine
 Windows-Version zu bauen und zu testen.
 
-**Heutiger Stand (2026-11-02):** Im Zweig `windows` bauen **Debug- und Release-Fassung** unter Windows, die Tests sind grün, und
+**Heutiger Stand (2026-11-02, abends):** Im Zweig `windows` bauen **Debug- und Release-Fassung** unter Windows, die Tests sind grün, und
 das Fenster startet. Die Release-Fassung öffnet kein Konsolenfenster, auch nicht für die Helfer, und `openpacketmon.exe` trägt Icon
-und Versionsangaben (Abschnitt 4). Bedient, mitgeschnitten und importiert wurde darin noch nichts, und es gibt keinen Installer.
-Eine Fassung für Tester gibt es also noch nicht.
+und Versionsangaben (Abschnitt 4). Dazu gekommen: Adapter erscheinen mit ihrer Beschreibung statt `\Device\NPF_{…}`, eine
+importierte PCAP-Datei ist gleich nach dem Stoppen wieder frei, ohne Npcap startet das Programm mit einem Hinweis statt abzustürzen,
+die C-Laufzeit ist statisch gelinkt, der Helfer schneidet im Test auf dem Npcap-Loopback-Adapter mit, und es gibt einen
+**Installer** (Inno Setup, `dev/build-installer.ps1`, Abschnitt 6) samt Anleitung für Tester (`docs/windows-tester.md`).
+**Noch nicht von Hand ausprobiert:** Bedienung und Mitschnitt im Fenster, Installation auf einem sauberen System. Weitergegeben wurde noch nichts.
 Die Punkte in Abschnitt 4 stammen aus einer Durchsicht des Codes auf dem Linux-Rechner, ergänzt um das, was unter Windows
 aufgefallen ist.
 
@@ -43,17 +46,21 @@ keine Helfer mehr übrig. Nur 8 s gelaufen und hart beendet, also weder Bedienun
   lässt sich eine offene Datei nicht löschen (Fehler 32). **Behoben** mit `drop(cap)` vor `remove_dir_all`.
 - Aus demselben Grund lassen weitere Tests ihre Ordner in `%TEMP%` liegen, ohne zu scheitern, weil sie mit `let _ =` aufräumen
   (`openpacketmon-test-*` aus `engine::tests`, `openpacketmon-gui-*`, `openpacketmon-mcp-*`, `openpacketmon-mcp-tools-*`); nach dem
-  Lauf lassen sie sich löschen. **Ursache gefunden (2026-11-02), offen:** Es liegt nicht an den Tests, sondern an der
-  Handle-Vererbung an den Mitschnitt-Helfer (Punkt „Helfer erbt offene Dateien“ in Abschnitt 4). Nebenbei gefunden: Die GUI-Tests
-  löschen ihren Ordner `openpacketmon-gui-<pid>` nie (auch unter Linux nicht), und `engine::tests::pcap_import_fills_the_state` und
-  `engine::packets::tests::packets_are_written_as_pcap` benutzen denselben Ordner `openpacketmon-test-<pid>`, obwohl sie gleichzeitig
-  laufen können. Ein Versuch mit einem gemeinsamen Aufräum-Helfer (`remove_test_dir`, löscht mit Wiederholung bis 10 s und meldet
-  übrig gebliebene Ordner als Fehler) ließ unter Windows 21 Tests scheitern, solange die Ursache besteht; zurückgenommen.
+  Lauf lassen sie sich löschen. **Ursache:** die Handle-Vererbung an den Mitschnitt-Helfer (Punkt „Helfer erbt offene Dateien“ in
+  Abschnitt 4). Nebenbei gefunden: Die GUI-Tests löschten ihren Ordner `openpacketmon-gui-<pid>` nie (auch unter Linux nicht), und
+  `engine::tests::pcap_import_fills_the_state` und `engine::packets::tests::packets_are_written_as_pcap` benutzten denselben Ordner
+  `openpacketmon-test-<pid>`, obwohl sie gleichzeitig laufen können. **Behoben (2026-11-02):** Alle Tests räumen mit
+  `engine::tests::remove_test_dir` auf (Wiederholung bis 10 s, sonst Fehler), jeder hat einen eigenen Ordner, und in Unit-Tests starten
+  keine echten Helfer mehr (`capture_helper::tests::REAL_HELPERS`). Danach bleiben keine Ordner mehr in `%TEMP%`.
 - Im zweiten Lauf zeigte sich `mcp::access::tests::turning_the_access_off_and_on_during_questions` (4 von 5 Läufen rot): Unter
   Windows wird eine Verbindung auf einen gerade geschlossenen Port von `127.0.0.1` nicht sofort abgewiesen, sondern hängt bis
   `CONNECT_TIMEOUT` (2 s); der Test wartete nach dem Umschalten nur 200 ms. **Behoben:** Er wartet jetzt bis zur ersten Antwort,
   höchstens 10 s. Im Programm heißt das nur: Nach dem Schließen des Fensters bekommt ein Assistent die Absage unter Windows 2 s später.
 - Danach `cargo test --workspace` **grün** (386 bestanden, 5 übersprungen).
+- `mcp::access::tests::a_flood_of_connections_passes_and_the_door_answers_again` scheiterte unter Windows in 2 von 8 Läufen mit
+  `NotAvailable`: Windows weist bei voller Warteschlange sofort ab, statt die Verbindung warten zu lassen. Der Test lässt diese
+  Antwort unter Windows zu (2026-11-02); geprüft wird weiter, dass die Tür danach wieder antwortet.
+- Stand 2026-11-02 abends: 388 bestanden, 6 übersprungen, keine Testordner übrig.
 
 **Smart App Control** (auf diesem Rechner an) blockiert ab und zu frisch gebaute, unsignierte Dateien aus `target\`, auch Testdateien
 und Build-Skripte von Abhängigkeiten (beim ersten Release-Build `crc32fast`; Abhilfe: dessen Ordner unter `target\release\build\` löschen)
@@ -89,7 +96,9 @@ SDK 1.17. Git, GitHub CLI, Python 3.12 und Visual Studio waren schon vorhanden, 
 Falls `aws-lc-sys` beim Bauen CMake oder NASM verlangt, beides nachinstallieren (`winget install Kitware.CMake`,
 `winget install NASM.NASM`).
 
-Für den Installer kommt später WiX oder Inno Setup dazu (Abschnitt 6).
+Für den Installer: **Inno Setup 6** (`winget install JRSoftware.InnoSetup --scope user`, landet in
+`%LOCALAPPDATA%\Programs\Inno Setup 6`; auf dem Rechner 6.7.3). Lizenz: freie Nutzung für jeden Zweck, kommerzielle Nutzer werden um
+einen Kauf gebeten, nicht verpflichtet.
 
 **Zum Testen sinnvoll:** eine echte Netzwerkkarte, und für den Installationstest eine zweite, saubere Windows-Umgebung
 (virtuelle Maschine), in der noch kein Npcap und kein Rust installiert ist.
@@ -139,8 +148,11 @@ dabei unverändert weiter bauen; Windows-Code kommt hinter `#[cfg(windows)]`, Li
 | `src/mmdb/geo.rs` `geo_dir` | `HOME`, `.local/share` (`HOME` fehlt unter Windows) | `%LOCALAPPDATA%\openpacketmon\geo` (**erledigt** 2026-11-02) |
 | `src/mmdb/geo.rs` `geoipupdate_file` | `/var/lib/GeoIP/…` | unter Windows weglassen oder den Ordner von `geoipupdate` nehmen, Test anpassen |
 | `src/networking/traffic_preview.rs`, `capture_context.rs` | aus Sniffnet, schon für Windows vorbereitet | prüfen |
-| `capture/src/main.rs` (Helfer) | unter Linux nicht blockierender Adapter mit eigenem `poll`, Rechteabgabe, größere Pipe | außerhalb von Linux liest er blockierend mit dem Timeout von libpcap, die drei Funktionen `drop_rights`, `enlarge_pipe`, `wait_for_packets` tun dort nichts. Prüfen: Kommt unter Npcap der Timeout auch ohne Pakete? Sonst bleibt eine pausierte Aufzeichnung stehen (siehe `open` in der Datei). Pfad mit `.exe` löst `helper_path` schon auf |
-| Adapterliste, `--adapter`, Aufzeichnungsseite | Namen wie `enp0s31f6` | unter Windows heißen sie `\Device\NPF_{GUID}`: überall die Beschreibung zeigen (`get_desc`), den Namen nur intern verwenden |
+| `capture/src/main.rs` (Helfer) | unter Linux nicht blockierender Adapter mit eigenem `poll`, Rechteabgabe, größere Pipe | außerhalb von Linux liest er blockierend mit dem Timeout von libpcap, die drei Funktionen `drop_rights`, `enlarge_pipe`, `wait_for_packets` tun dort nichts. **Geprüft** (2026-11-02, `captures_on_the_npcap_loopback_adapter` in `capture/tests/live.rs`): Unter Npcap kommt der Timeout auch ohne Pakete, eine Pause bleibt also nicht hängen. Pfad mit `.exe` löst `helper_path` schon auf |
+| Adapterliste, `--adapter`, Aufzeichnungsseite | Namen wie `enp0s31f6` | **erledigt** (2026-11-02): Unter Windows heißen sie `\Device\NPF_{GUID}`. `MyDevice::display_name` zeigt dort die Beschreibung (Adapterliste, Übersicht, laufende Aufzeichnung, MCP `source_name`), intern bleibt der Name. `--adapter` und gespeicherte Einstellungen finden einen Adapter auch über seine Beschreibung (`MyDevice::is_called`, ohne Groß-/Kleinschreibung) |
+| Start ohne Npcap | `wpcap.dll` wurde beim Laden gebraucht, ohne Npcap startete das Programm gar nicht | **erledigt** (2026-11-02): `build.rs` linkt `openpacketmon.exe` mit `/DELAYLOAD:wpcap.dll` (plus `delayimp.lib`); `src/npcap.rs` prüft vor dem Fenster, ob `%SystemRoot%\System32\wpcap.dll` da ist, sonst Dialog mit Angebot, `https://npcap.com/#download` zu öffnen, und Ende. Der Helfer lädt `wpcap.dll` normal, er startet nur, wenn Npcap da ist |
+| C-Laufzeit | `VCRUNTIME140.dll` und `api-ms-win-crt-*` wurden gebraucht | **erledigt** (2026-11-02): `.cargo/config.toml` linkt sie für `x86_64-pc-windows-msvc` statisch (`+crt-static`), der Installer braucht kein Visual-C++-Paket. `dumpbin /dependents` zeigt nur noch Systembibliotheken und `wpcap.dll` |
+| Sprache beim ersten Start | `language_of` liest `LC_ALL`, `LC_MESSAGES`, `LANG` | **offen:** Unter Windows gibt es die Variablen nicht, das Programm startet also englisch, auch der Npcap-Dialog. Abhilfe z. B. mit der Crate `sys-locale` (noch nicht entschieden); bis dahin steht in `docs/windows-tester.md`, wie man umstellt |
 | Latenzmessung (`surge-ping`) | unter Linux unprivilegiert | ICMP-Sockets ohne Adminrechte gibt es unter Windows vermutlich nicht: prüfen, sonst Hinweis in der Oberfläche |
 | Programme je Verbindung (`listeners`) | hat einen Windows-Teil | prüfen, auch die Kürzung auf 15 Zeichen in unserem Code (betrifft nur Linux) |
 | Doku-Texte | „Linux“, `setcap`, `systemctl`, `/usr/share/doc/…` | Oberfläche und README prüfen |
@@ -161,7 +173,7 @@ Die Trennung der Rechte bleibt: Unter Linux hat nur der Helfer `openpacketmon-ca
 Öffnen des Adapters ab, das Programm läuft ohne. Unter Windows entscheidet die Installation von Npcap, ob normale Benutzer
 mitschneiden dürfen oder nur Administratoren. Das Programm soll nie als Administrator laufen müssen.
 
-### Helfer erbt offene Dateien (gefunden 2026-11-02, offen)
+### Helfer erbt offene Dateien (gefunden 2026-11-02, gelöst mit „Stop wartet“)
 
 libpcap öffnet PCAP-Dateien unter Windows mit `fopen` der C-Laufzeit, solche Handles sind **vererbbar**. Rust startet Kindprozesse
 unter Windows mit Handle-Vererbung (für die Pipes), also erbt jeder Helfer alle in dem Moment offenen vererbbaren Handles. Nach
@@ -172,7 +184,7 @@ Mitschnitt beginnt oder das Programm schließt; der Helfer bekommt Handles, die 
 `pcap_import_fills_the_state`: Die Datei blieb über 60 s gesperrt; 0,2 s nach dem Beenden der Helfer ließ sie sich löschen. Gleiches
 droht der beim Mitschnitt geschriebenen PCAP-Datei.
 
-Mögliche Lösungen, noch nicht entschieden (Nutzer, 2026-11-02: erst notieren):
+Mögliche Lösungen (Nutzer, 2026-11-02: erst notieren; danach entschieden: **Stop wartet**, ohne `unsafe`):
 - **Nur die Pipes vererben:** Helfer über `CreateProcessW` mit `PROC_THREAD_ATTRIBUTE_HANDLE_LIST` starten. Behebt die Ursache
   grundsätzlich, braucht aber `unsafe` (Workspace hat `unsafe_code = "forbid"`, laut `PLAN.md` auch für den Helfer), etwa in einer
   kleinen eigenen Crate nur für Windows. `windows-sys` 0.61 steckt schon im Lockfile. Rusts sichere Fassung
@@ -180,7 +192,15 @@ Mögliche Lösungen, noch nicht entschieden (Nutzer, 2026-11-02: erst notieren):
 - **Stop wartet auf den Import:** `parse_packets` bricht das Warten auf Namensauflösungen beim Stoppen ab, `Engine::stop` startet die
   Vorschau erst, wenn der Mitschnitt-Thread seine Dateien geschlossen hat. Ohne `unsafe`, deckt aber nur diesen Ablauf ab.
 
-Danach die Tests aufräumen lassen (Abschnitt oben, `remove_test_dir`).
+**Umgesetzt (2026-11-02):** `spawn_capture_thread` gibt einen `CaptureEnded`-Empfänger zurück, dessen Sender im Mitschnitt-Thread
+und im Thread von `packet_stream` lebt; er meldet sich, sobald beide beendet sind und ihre Dateien geschlossen haben. `packet_stream`
+hört nach dem Dateiende auf, und das Warten auf Namensauflösungen in `parse_packets` endet, sobald gestoppt wurde (prüft alle 100 ms).
+`Engine::stop` wartet darauf bis zu 2 s (`CAPTURE_END_TIMEOUT`), erst dann startet die Vorschau ihre Helfer. Geprüft mit dem
+ignorierten Test `engine::tests::the_imported_file_is_free_right_after_stopping` (startet echte Helfer, Stopp mitten im Lesen und nach
+dem Dateiende; allein laufen lassen: `cargo test --bin openpacketmon the_imported_file -- --ignored`): ohne die Änderung „still locked“
+(Fehler 32), mit ihr grün. Die Tests räumen jetzt auf (Abschnitt oben). **Grenze:** Andere offene vererbbare Handles (etwa eine PCAP-Datei,
+die gerade beim Mitschnitt geschrieben wird) erbt ein Helfer weiterhin, wenn er in dem Moment startet; die grundsätzliche Lösung bleibt
+die Handle-Liste mit `unsafe`, falls das einmal stört.
 
 ### Was es unter Windows nicht gibt
 
@@ -189,11 +209,13 @@ Danach die Tests aufräumen lassen (Abschnitt oben, `remove_test_dir`).
 
 ## 5. Was unter Windows getestet werden muss
 
-1. `cargo test --workspace`: **erledigt** (2026-11-02, grün, Einzelheiten oben); `capture/tests/live.rs` prüft unter Windows nichts.
-2. Start ohne Npcap: verständlicher Hinweis mit Link auf npcap.com, kein Absturz. Da `wpcap.dll` beim Laden des Programms
-   gebraucht wird, startet das Programm ohne Npcap womöglich gar nicht; dann braucht es verzögertes Laden. Der Helfer allein löst
-   das noch nicht: `openpacketmon` nutzt `pcap` weiter für die Adapterliste, für Aufnahmedateien und zum Schreiben von PCAP-Dateien.
-3. Mitschnitt auf WLAN, Ethernet und dem Npcap-Loopback-Adapter, jeweils als normaler Benutzer und als Administrator.
+1. `cargo test --workspace`: **erledigt** (2026-11-02, grün, Einzelheiten oben). `capture/tests/live.rs` prüft unter Windows den
+   Helfer auf `\Device\NPF_Loopback` (`captures_on_the_npcap_loopback_adapter`, mit Wachhund, der den Helfer nach 60 s beendet).
+2. Start ohne Npcap: **erledigt** (2026-11-02): verzögertes Laden von `wpcap.dll` und Dialog (Tabelle in Abschnitt 4). Geprüft mit
+   einem falschen `SystemRoot`: Dialog „Npcap is missing“ mit Ja/Nein, kein Fenster, keine Helfer. Ohne echtes Deinstallieren von Npcap
+   nicht geprüft; das gehört zum Test auf einem sauberen System (Punkt 8).
+3. Mitschnitt auf WLAN, Ethernet und dem Npcap-Loopback-Adapter, jeweils als normaler Benutzer und als Administrator. Der Helfer
+   allein ist auf dem Loopback-Adapter geprüft (Punkt 1, Link-Typ 0 = Null/Loopback); im Fenster noch nicht.
 4. Zerleger und Paketliste: Link-Typen unter Windows (kein „Linux cooked capture“), TCP-Analyse mit Offloading (große
    Segmente).
 5. Programme je Verbindung, Latenzmessung, Geodaten-Download, Benachrichtigungen mit Ton, PCAP-Download und -Import.
@@ -210,8 +232,24 @@ Danach die Tests aufräumen lassen (Abschnitt oben, `remove_test_dir`).
 dann; „Weitere Informationen → Trotzdem ausführen“). Solange der Haltepunkt aus `PLAN.md` 4.10 gilt, bekommen Tester nur
 die Installer-Datei, keinen Zugang zum Repo und keine Release-Seite: Der Code zeigt die an Sniffnet gemeldete Lücke. Der
 Installer nennt Npcap und dessen Download, enthält es aber nicht. Die kostenlose Npcap-Lizenz erlaubt den privaten Einsatz
-auf bis zu fünf Rechnern; beim Weitergeben an Tester darauf hinweisen. Werkzeug: WiX (MSI, wie Sniffnet, mit `cargo wix`)
-oder Inno Setup (einfacher, eine `.exe`); die Wahl auf dem Windows-Rechner treffen und hier eintragen.
+auf bis zu fünf Rechnern; beim Weitergeben an Tester darauf hinweisen.
+
+**Gewählt (Nutzer, 2026-11-02): Inno Setup** (eine `.exe`, einfacher als WiX). Umgesetzt:
+- `resources/packaging/windows/openpacketmon.iss`: feste `AppId`, Deutsch und Englisch, **standardmäßig nur für den aktuellen
+  Benutzer** ohne Administratorrechte (`PrivilegesRequired=lowest`), wahlweise für alle (Frage am Anfang). Installiert beide `.exe`,
+  `LICENSE-MIT.txt`, `LICENSE-APACHE.txt`, `NOTICE.txt` und `THIRD-PARTY-LICENSES.txt`, legt einen Startmenü-Eintrag an und auf Wunsch ein
+  Desktop-Symbol. Fehlt `{sys}\wpcap.dll`, zeigt eine eigene Seite den Hinweis auf Npcap mit einem Knopf zur Downloadseite, und der
+  Haken „openpacketmon starten“ entfällt. Beim Deinstallieren bleiben die Einstellungen in `%APPDATA%\openpacketmon`.
+- `dev/build-installer.ps1`: liest die Version aus `Cargo.toml` (muss gleich `capture/Cargo.toml` sein), baut mit
+  `cargo build --release --locked --workspace`, prüft `THIRD-PARTY-LICENSES.txt`, ruft `ISCC.exe` und gibt Pfad und SHA-256 von
+  `target\installer\openpacketmon-<version>-setup.exe` aus. Aufruf: `powershell -ExecutionPolicy Bypass -File dev\build-installer.ps1`.
+  Die Version nennt der Nutzer, wie beim `.deb`.
+- Lokal geprüft (2026-11-02, Installer mit der unveränderten Version 0.3.10, nur zum Testen): stille Installation mit `/CURRENTUSER`
+  in einen Testordner, Dateien, Startmenü-Eintrag und Eintrag unter „Installierte Apps“ (openpacketmon 0.3.10) da, Programm startet
+  aus dem Installationsordner; stille Deinstallation entfernt Ordner, Eintrag und Startmenü, die Einstellungen bleiben.
+  **Noch nicht** auf einem sauberen System (Abschnitt 5 Punkt 8, z. B. Windows-Sandbox) und nicht von Hand durchgeklickt.
+- `docs/windows-tester.md`: Anleitung für Tester (Npcap mit WinPcap-Modus, Smart App Control, SmartScreen, was ausprobieren,
+  Rückmeldung, Deinstallation).
 
 - Sniffnet baute ein MSI mit WiX: `resources/packaging/windows/setup.wxs`, `EULA.rtf` und Grafiken im Original bei Commit
   `ab4bf739d464` (bei uns entfernt, siehe `PLAN.md` Phase 2). Wird davon etwas übernommen, gilt die Kennzeichnungspflicht aus
@@ -221,7 +259,7 @@ oder Inno Setup (einfacher, eine `.exe`); die Wahl auf dem Windows-Rechner treff
   SmartScreen. Die Wege stehen in Abschnitt 6.1.
 - `dev/release.sh` kennt nur das `.deb`. Es braucht eine Erweiterung oder einen Schritt in GitHub Actions.
 - Die Update-Prüfung vergleicht nur Versionsnummern. Der Hinweis muss unter Windows auf den Installer zeigen.
-- `THIRD-PARTY-LICENSES.txt` muss die Windows-Crates enthalten, siehe Abschnitt 7.
+- `THIRD-PARTY-LICENSES.txt` enthält jetzt auch die Windows-Crates, siehe Abschnitt 7.
 
 ### 6.1 Code-Signatur
 
@@ -251,11 +289,12 @@ Was SignPath verlangt und was das für uns heißt:
 
 ## 7. Prüfwerkzeuge und CI
 
-- `deny.toml`: `targets` um `x86_64-pc-windows-msvc` ergänzen.
-- `dev/third-party-licenses.py`: läuft auch unter Windows und schreibt dort dieselbe Datei (Pfade mit `/`, Zeilenenden LF, seit
-  2026-11-02). `winresource` steht nicht darin: Es ist nur Build-Abhängigkeit unter Windows und wird nicht ins Programm übersetzt.
-  `TARGET` gilt nur für Linux. Es kommen z. B. die `windows-*`-Crates dazu,
-  die Windows-Lizenzliste kann also größer werden. Am besten erzeugt das Skript eine gemeinsame Liste für beide Plattformen.
+- `deny.toml`: **erledigt** (2026-11-02): `targets` um `x86_64-pc-windows-msvc` ergänzt, `BSL-1.0` erlaubt (nur `clipboard-win` und
+  `error-code`, die Zwischenablage von egui unter Windows).
+- `dev/third-party-licenses.py`: läuft auch unter Windows und schreibt dort dieselbe Datei (Pfade mit `/`, Zeilenenden LF).
+  **Erledigt** (2026-11-02): **eine gemeinsame Liste** für Linux und Windows (`TARGETS`, Vereinigung beider Abhängigkeitsbäume, 482
+  statt 452 Crates), mit Hinweisen, dass Npcap nicht beiliegt und die C-Laufzeit von Microsoft unter Windows statisch gelinkt ist.
+  `winresource` steht nicht darin: Es ist nur Build-Abhängigkeit unter Windows und wird nicht ins Programm übersetzt.
 - `dev/*.sh` laufen in Git Bash. `dev/build-deb.sh` und `dev/release.sh` sind nur für Linux gedacht.
 - `.github/workflows/ci.yml`: einen Job auf `windows-latest` ergänzen, mit Npcap SDK (Sniffnet lädt `npcap-sdk-1.16.zip` von
   npcap.com und setzt `LIB`). Die Sniffnet-CI installiert Npcap per OEM-Installer über ein Secret, das wir nicht haben, und
@@ -266,11 +305,12 @@ Was SignPath verlangt und was das für uns heißt:
 
 1. Einrichten (Abschnitt 1 bis 3), `cargo check --workspace` und die echte Fehlerliste mit Abschnitt 4 abgleichen. **Erledigt** (2026-11-02).
 2. Programm bauen und starten, ein Mitschnitt mit Npcap. **Teilweise:** Debug- und Release-Fassung bauen, das Fenster startet ohne
-   Konsole und mit Icon; der Mitschnitt fehlt noch.
-3. `cargo test`, Pfade und Rechte. **Tests grün** (2026-11-02); Rechte von `mcp-access.json` und Helfer erbt offene Dateien offen.
-4. Windows-Eigenheiten aus Abschnitt 5.
-5. CI, Lizenzliste, `deny.toml`.
-6. Installer (unsigniert), Test auf sauberem System, README; dann **Weitergabe an die Tester** als Datei (Abschnitt 6).
+   Konsole und mit Icon, der Helfer schneidet im Test mit; der Mitschnitt im Fenster fehlt noch (braucht den Nutzer).
+3. `cargo test`, Pfade und Rechte. **Tests grün** (2026-11-02), Helfer erbt offene Dateien gelöst; Rechte von `mcp-access.json` offen.
+4. Windows-Eigenheiten aus Abschnitt 5. **Teilweise:** Adapternamen, Start ohne Npcap, C-Laufzeit, Npcap-Timeout erledigt.
+5. CI, Lizenzliste, `deny.toml`. **Lizenzliste und `deny.toml` erledigt**, CI-Job für Windows offen.
+6. Installer (unsigniert), Test auf sauberem System, README; dann **Weitergabe an die Tester** als Datei (Abschnitt 6). **Installer
+   und Tester-Anleitung erledigt**; offen: Test auf sauberem System, README, Version für die Tester-Fassung (nennt der Nutzer).
    Ein Windows-Release auf GitHub erst mit dem ersten Release nach dem Haltepunkt.
 7. Signatur beantragen (Abschnitt 6.1), danach signierte Installer.
 

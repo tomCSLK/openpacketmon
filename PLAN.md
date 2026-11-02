@@ -1220,9 +1220,9 @@ Langzeitspeicherung (SQLite) und Berichte; Gerätenamen aus AdGuard/Omada; Warnu
 
 Alles, was für die Fortsetzung auf einem Windows-Rechner nötig ist, steht in **`docs/windows.md`** (2026-10-30): Software,
 Zugänge, Einrichten, die Linux-Bindungen im Code mit ihrer Lösung, Tests, Installer, CI und Reihenfolge. Npcap wird nie mitgeliefert.
-**Stand 2026-11-02:** Debug- und Release-Fassung bauen, Tests grün, Fenster startet. Release-Fassung ohne Konsolenfenster (auch
-für die Helfer), mit Icon und Versionsangaben; `openpacketmon.exe mcp` antwortet über Pipes. Kein Installer, Mitschnitt nicht
-ausprobiert. Eine Fassung für Tester gibt es noch nicht.
+**Stand 2026-11-02 (abends):** Debug- und Release-Fassung bauen, Tests grün, Fenster startet. Release-Fassung ohne Konsolenfenster (auch
+für die Helfer), mit Icon und Versionsangaben; `openpacketmon.exe mcp` antwortet über Pipes. Installer (Inno Setup) und
+Tester-Anleitung da (Absatz „Stufe A und Installer“ unten); Mitschnitt im Fenster noch nicht ausprobiert, noch nichts weitergegeben.
 
 **Vorgezogen (Nutzer, 2026-11-02):** Die Windows-Version kommt **vor** dem ersten Release, weil andere Tester eine
 Windows-Fassung zum Testen brauchen. Sie enthält MCP (5.4). Der Haltepunkt aus 4.10 gilt weiter: Repo privat, nichts
@@ -1239,13 +1239,26 @@ nur ein Fehler (`libc::timeval` in `capture_helper.rs`, behoben mit `as _`), dan
 Windows 2 s); alle drei behoben, jetzt **grün** (386 bestanden). `geo_dir` nimmt unter Windows `%LOCALAPPDATA%\openpacketmon\geo`.
 `cargo clippy -- -D warnings` unter Windows grün (Warnungen über Linux-Code behoben). Offen: Testordner bleiben in `%TEMP%` liegen. Ursache ist kein Testfehler: Die Mitschnitt-Helfer der Adapter-Vorschau erben unter
 Windows das Handle der von libpcap geöffneten PCAP-Datei, nach dem Stoppen eines Imports bleibt sie gesperrt (`docs/windows.md` 4
-„Helfer erbt offene Dateien“; Lösung offen, eine braucht `unsafe`, Nutzer 2026-11-02: erst notieren). Außerdem: Smart App Control blockiert ab und zu frisch gebaute Dateien (`docs/windows.md` oben).
+„Helfer erbt offene Dateien“; inzwischen gelöst mit „Stop wartet“, siehe unten). Außerdem: Smart App Control blockiert ab und zu frisch gebaute Dateien (`docs/windows.md` oben).
 Das Fenster startet (kurzer Start der Debug-Fassung: Titel stimmt, 9 Helfer für die Vorschau, nach dem Beenden keine übrig);
 Bedienung und Mitschnitt noch nicht ausprobiert. **Release-Fassung (2026-11-02, vom Nutzer freigegeben):** ungenutzte
 `redirect_stdout_stderr_to_file` entfernt (brauchte die fehlende Crate `gag`); `windows_subsystem = "windows"` nur im Release, Helfer
 mit `CREATE_NO_WINDOW`; Icon `resources/packaging/windows/openpacketmon.ico` aus `dev/make-ico.py`, eingebettet von `build.rs` mit
 `winresource` (nur Build-Abhängigkeit unter Windows). Folge: Kommandozeilen-Ausgaben der Release-Fassung nur mit umgeleiteter
 Ausgabe sichtbar (`| Out-Host`). `dev/third-party-licenses.py` schreibt unter Windows jetzt dieselbe Datei wie unter Linux.
+**Stufe A und Installer (2026-11-02, vom Nutzer freigegeben; nicht committet):** Entschieden: Inno Setup, Installation standardmäßig
+nur für den Benutzer (wahlweise für alle), gesperrte Datei per „Stop wartet“ ohne `unsafe`, eine gemeinsame Lizenzliste für beide
+Plattformen. Umgesetzt (Einzelheiten `docs/windows.md` 4, 6, 7): Adapter mit ihrer Beschreibung statt `\Device\NPF_{…}`
+(`MyDevice::display_name`/`is_called`, `--adapter` nimmt auch die Beschreibung); `Engine::stop` wartet, bis der Mitschnitt seine Dateien
+geschlossen hat (`CaptureEnded`), eine importierte PCAP-Datei ist danach sofort frei, die Tests räumen ihre Ordner auf und starten keine
+echten Helfer mehr; `wpcap.dll` wird verzögert geladen, ohne Npcap erscheint ein Dialog mit Link auf npcap.com (`src/npcap.rs`, neue
+Abhängigkeit `webbrowser` nur unter Windows); C-Laufzeit statisch (`.cargo/config.toml`); Live-Test des Helfers auf dem Npcap-Loopback
+(Timeout kommt auch ohne Pakete); `resources/packaging/windows/openpacketmon.iss` und `dev/build-installer.ps1` (lokal installiert und
+deinstalliert, mit 0.3.10 nur zum Testen); `deny.toml` mit Windows-Ziel und `BSL-1.0`; `THIRD-PARTY-LICENSES.txt` für beide Plattformen
+(482 Crates); Tester-Anleitung `docs/windows-tester.md`. Geprüft: `cargo test --workspace` (388 bestanden), Clippy, fmt, `cargo deny`,
+`dev/check-notices.sh`. **Offen:** Bedienung und Mitschnitt im Fenster (Nutzer), Test auf sauberem System (Windows-Sandbox), Version
+der Tester-Fassung (nennt der Nutzer), Systemsprache unter Windows (startet englisch), Rechte von `mcp-access.json`, CI-Job, Linux-Build
+nur über die CI geprüft.
 Früher entschieden (2026-10-30/31): Beginn erst nach dem ersten Release und nach MCP; der Installer soll, **wenn möglich, eine Code-Signatur**
 bekommen. Weg (`docs/windows.md` 6.1): zuerst kostenlos über die SignPath Foundation, das setzt ein unsigniertes Windows-Release und
 einen Build in GitHub Actions voraus, und die Zusage ist nicht sicher, weil deren Regel „No hacking tools“ ein

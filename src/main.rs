@@ -32,6 +32,8 @@ mod mcp;
 mod mmdb;
 mod networking;
 mod notifications;
+#[cfg(windows)]
+mod npcap;
 mod report;
 mod utils;
 mod view;
@@ -47,6 +49,13 @@ fn main() {
     // an assistant starts this next to the window: it must not read or restore the settings
     if std::env::args_os().nth(1).is_some_and(|arg| arg == "mcp") {
         std::process::exit(mcp::server::run());
+    }
+
+    // before anything uses pcap, the settings already do (they look up the default adapter)
+    #[cfg(windows)]
+    if !npcap::installed() {
+        npcap::explain_missing(gui::language_of(""));
+        std::process::exit(1);
     }
 
     let conf = CONF.clone();

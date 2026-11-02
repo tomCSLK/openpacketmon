@@ -379,7 +379,7 @@ mod tests {
     impl Drop for Fixture {
         fn drop(&mut self) {
             self.access.apply(false);
-            let _ = fs::remove_dir_all(&self.dir);
+            crate::engine::tests::remove_test_dir(&self.dir);
         }
     }
 
@@ -642,9 +642,16 @@ mod tests {
                 })
             })
             .collect();
-        // questions in between get an answer or are turned away, nothing else
+        // questions in between get an answer or are turned away, nothing else; Windows refuses a
+        // connection right away while the queue of the port is full, which the asker cannot tell
+        // from a closed port
         for _ in 0..20 {
-            assert!(matches!(fixture.status(), Ok(_) | Err(AskError::NoAnswer)));
+            let status = fixture.status();
+            assert!(
+                matches!(status, Ok(_) | Err(AskError::NoAnswer))
+                    || cfg!(windows) && status == Err(AskError::NotAvailable),
+                "{status:?}"
+            );
         }
         for thread in flood {
             thread.join().unwrap();

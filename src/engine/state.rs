@@ -24,7 +24,7 @@ use crate::filter::{self, Filter};
 use crate::location;
 use crate::mmdb::geo::{self, GeoKind};
 use crate::mmdb::types::mmdb_reader::{MmdbReaders, SharedReader};
-use crate::networking::capture::{BackendTrafficMessage, spawn_capture_thread};
+use crate::networking::capture::{BackendTrafficMessage, CaptureEnded, spawn_capture_thread};
 use crate::networking::manage_packets::get_address_to_lookup;
 use crate::networking::traffic_preview::TrafficPreview;
 use crate::networking::types::address_port_pair::AddressPortPair;
@@ -85,6 +85,8 @@ pub struct EngineState {
     /// Whether the current capture is paused
     pub frozen: bool,
     freeze_tx: Option<tokio::sync::broadcast::Sender<()>>,
+    /// Ends when the threads of the last capture have ended, see [`Self::take_capture_ended`]
+    capture_ended: Option<CaptureEnded>,
     /// Program lookup, if supported by the capture source
     pub program_lookup: Option<ProgramLookup>,
     /// Packets of the current capture, if they are kept (not for IPFIX)
@@ -127,10 +129,16 @@ impl EngineState {
             latency_statuses: HashMap::new(),
             frozen: false,
             freeze_tx: None,
+            capture_ended: None,
             program_lookup: None,
             packets: None,
             update_status: UpdateStatus::default(),
         }
+    }
+
+    /// What disconnects when the threads of the last capture have ended and closed its files
+    pub fn take_capture_ended(&mut self) -> Option<CaptureEnded> {
+        self.capture_ended.take()
     }
 
     // capture source --------------------------------------------------------------------------
@@ -151,12 +159,21 @@ impl EngineState {
         }
     }
 
-    /// Selects a network adapter by name; returns `false` if no such adapter is known
+    /// Selects a network adapter by name (under Windows also by description); returns `false` if
+    /// no such adapter is known
     pub fn select_device(&mut self, name: &str) -> bool {
-        let Some(preview) = self.previews.iter().find(|p| p.device.get_name().eq(name)) else {
+        let found = self
+            .previews
+            .iter()
+            .find(|p| p.device.get_name() == name)
+            .or_else(|| self.previews.iter().find(|p| p.device.is_called(name)));
+        let Some(preview) = found else {
             return false;
         };
-        self.conf.device.device_name = name.to_string();
+        self.conf
+            .device
+            .device_name
+            .clone_from(preview.device.get_name());
         self.capture_source = CaptureSource::Device(preview.device.clone());
         true
     }
@@ -312,7 +329,7 @@ impl EngineState {
         let (tx, rx) = async_channel::unbounded();
         let (freeze_tx, freeze_rx) = tokio::sync::broadcast::channel(1_048_575);
         let freeze_rx2 = freeze_tx.subscribe();
-        spawn_capture_thread(
+        self.capture_ended = Some(spawn_capture_thread(
             self.capture_id,
             self.capture_source.clone(),
             capture_context,
@@ -320,7 +337,7 @@ impl EngineState {
             tx,
             (freeze_rx, freeze_rx2),
             self.packets.clone(),
-        );
+        ));
         self.capture_rx = Some(rx.clone());
         self.freeze_tx = Some(freeze_tx);
 

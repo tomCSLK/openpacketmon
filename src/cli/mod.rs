@@ -15,7 +15,7 @@ use clap::Parser;
     after_help = "Commands:\n  mcp  Answer an AI assistant on the standard streams; the assistant starts this itself"
 )]
 pub(crate) struct Args {
-    /// Start capturing from this network adapter right away
+    /// Start capturing from this network adapter right away (on Windows also its description)
     #[arg(short, long, value_name = "NAME", default_missing_value = CONF.device.device_name.as_str(), num_args = 0..=1)]
     pub adapter: Option<String>,
     /// Analyze the packets of this PCAP file right away

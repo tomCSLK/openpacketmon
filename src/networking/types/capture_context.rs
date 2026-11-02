@@ -321,15 +321,12 @@ impl CaptureSource {
         }
     }
 
-    #[cfg(target_os = "windows")]
-    #[allow(
-        dead_code,
-        reason = "for showing adapters by their description instead of \\Device\\NPF_{GUID}, see docs/windows.md 4"
-    )]
-    pub fn get_desc(&self) -> Option<String> {
+    /// The name shown to the user (under Windows the description of an adapter, see
+    /// [`MyDevice::display_name`])
+    pub fn display_name(&self) -> String {
         match self {
-            Self::Device(device) => device.get_desc().cloned(),
-            Self::File(_) | Self::Ipfix(_) => None,
+            Self::Device(device) => device.display_name(),
+            Self::File(_) | Self::Ipfix(_) => self.get_name(),
         }
     }
 

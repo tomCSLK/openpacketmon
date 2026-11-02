@@ -25,6 +25,19 @@ fn main() {
 
     #[cfg(windows)]
     windows_resources();
+    delay_load_npcap();
+}
+
+/// Without Npcap, Windows would refuse to start openpacketmon.exe with a message about a missing
+/// DLL. Loaded on first use instead, the program can check for Npcap and explain what is missing
+/// (`src/npcap.rs`). Only for the program, the tests load it as usual.
+fn delay_load_npcap() {
+    if env::var("CARGO_CFG_TARGET_OS").as_deref() == Ok("windows")
+        && env::var("CARGO_CFG_TARGET_ENV").as_deref() == Ok("msvc")
+    {
+        println!("cargo:rustc-link-arg-bins=/DELAYLOAD:wpcap.dll");
+        println!("cargo:rustc-link-arg-bins=delayimp.lib");
+    }
 }
 
 /// Embeds the icon and the version information into openpacketmon.exe

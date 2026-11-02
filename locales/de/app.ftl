@@ -44,6 +44,13 @@ flash-settings-saved = Einstellungen gespeichert.
 flash-geo-downloaded = Geodatenbanken heruntergeladen. Sie gelten für Adressen, die ab jetzt erkannt werden; für die bisherigen die Aufzeichnung neu starten.
 
 
+## Npcap (nur Windows, vor dem Fenster)
+npcap-missing-title = Npcap fehlt
+npcap-missing-text =
+    openpacketmon braucht Npcap, um Netzwerkverkehr mitzuschneiden und Aufzeichnungsdateien zu lesen. Npcap gehört nicht zu openpacketmon und muss selbst installiert werden.
+    Beim Installieren „Install Npcap in WinPcap API-compatible Mode“ angehakt lassen, danach openpacketmon neu starten.
+    Downloadseite von Npcap jetzt öffnen?
+
 ## Aufzeichnung
 capture-title = Aufzeichnung
 capture-subtitle = Wähle aus, welcher Verkehr untersucht wird.

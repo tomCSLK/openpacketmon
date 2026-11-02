@@ -24,6 +24,7 @@ const MAX_BPF_BYTES: usize = 4096;
 /// How often the counters are reported while packets keep arriving
 const STATS_EVERY: Duration = Duration::from_millis(500);
 /// Bytes kept in the pipe to openpacketmon, to survive short delays of the reader
+#[cfg(target_os = "linux")]
 const PIPE_BYTES: usize = 1024 * 1024;
 
 /// Set by the thread reading standard input, applied by the capture loop
@@ -112,7 +113,7 @@ fn open(options: &Options) -> Result<Capture<Active>, String> {
         .into_iter()
         .find(|d| d.name == options.device)
         .ok_or_else(|| format!("unknown adapter {}", options.device))?;
-    let mut cap = Capture::from_device(device)
+    let cap = Capture::from_device(device)
         .map_err(|e| e.to_string())?
         .promisc(false)
         .buffer_size(options.buffer)
@@ -124,9 +125,7 @@ fn open(options: &Options) -> Result<Capture<Active>, String> {
     // with no matching packets a blocking read may never return: libpcap leaves the timeout to the
     // kernel, which does not hand over an empty block. A paused capture would stay paused for good.
     #[cfg(target_os = "linux")]
-    {
-        cap = cap.setnonblock().map_err(|e| e.to_string())?;
-    }
+    let cap = cap.setnonblock().map_err(|e| e.to_string())?;
     Ok(cap)
 }
 
@@ -151,6 +150,10 @@ fn drop_rights() -> Result<(), String> {
 
 /// Other systems grant the capture through their driver, there is nothing to give up
 #[cfg(not(target_os = "linux"))]
+#[allow(
+    clippy::unnecessary_wraps,
+    reason = "the same signature as under Linux, where giving up the rights can fail"
+)]
 fn drop_rights() -> Result<(), String> {
     Ok(())
 }

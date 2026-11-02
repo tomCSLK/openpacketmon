@@ -322,6 +322,10 @@ impl CaptureSource {
     }
 
     #[cfg(target_os = "windows")]
+    #[allow(
+        dead_code,
+        reason = "for showing adapters by their description instead of \\Device\\NPF_{GUID}, see docs/windows.md 4"
+    )]
     pub fn get_desc(&self) -> Option<String> {
         match self {
             Self::Device(device) => device.get_desc().cloned(),

@@ -1235,7 +1235,7 @@ nur ein Fehler (`libc::timeval` in `capture_helper.rs`, behoben mit `as _`), dan
 (Einzelheiten `docs/windows.md` oben). `cargo build --workspace` linkt, beide Programme starten. `cargo test --workspace` zuerst mit 2 Fehlschlägen (`geo_dir` ohne
 `HOME`; ein Test löscht eine noch offene PCAP-Datei), danach ein zeitabhängiger MCP-Test (Verbindung auf geschlossenen Port hängt unter
 Windows 2 s); alle drei behoben, jetzt **grün** (386 bestanden). `geo_dir` nimmt unter Windows `%LOCALAPPDATA%\openpacketmon\geo`.
-Offen: Testordner bleiben in `%TEMP%` liegen; Smart App Control blockiert ab und zu frisch gebaute Dateien (`docs/windows.md` oben).
+`cargo clippy -- -D warnings` unter Windows grün (Warnungen über Linux-Code behoben). Offen: Testordner bleiben in `%TEMP%` liegen; Smart App Control blockiert ab und zu frisch gebaute Dateien (`docs/windows.md` oben).
 Fenster und Mitschnitt noch nicht ausprobiert.
 Früher entschieden (2026-10-30/31): Beginn erst nach dem ersten Release und nach MCP; der Installer soll, **wenn möglich, eine Code-Signatur**
 bekommen. Weg (`docs/windows.md` 6.1): zuerst kostenlos über die SignPath Foundation, das setzt ein unsigniertes Windows-Release und

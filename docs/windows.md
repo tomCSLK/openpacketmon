@@ -12,8 +12,10 @@ der Fehler liefert also erst der erste `cargo check` unter Windows.
 `ring` und `pcap` ohne CMake und NASM. Einziger Fehler war `libc::timeval` in `src/networking/types/capture_helper.rs`
 (`suseconds_t` fehlt, Felder unter Windows 32-Bit `c_long`); behoben mit `as _`, danach grün. Übrig sind Warnungen über Code,
 der nur unter Linux genutzt wird: `PIPE_BYTES`, `let mut cap` und (Clippy) ein unnötiger Rückgabewert in `capture/src/main.rs`,
-`get_desc` in `src/networking/types/capture_context.rs`; sie kommen beim Portieren hinter `#[cfg(unix)]` oder bekommen eine
-Windows-Fassung. `cargo build --workspace` linkt danach ohne weitere Fehler gegen `wpcap.lib`; `openpacketmon.exe --version`
+`get_desc` in `src/networking/types/capture_context.rs`. **Behoben** (2026-11-02): `PIPE_BYTES` und das `mut` nur noch unter Linux,
+`drop_rights` ohne Linux mit begründetem `allow(clippy::unnecessary_wraps)`, `get_desc` mit begründetem `allow(dead_code)`, bis die
+Adapter unter Windows mit ihrer Beschreibung erscheinen (Tabelle in Abschnitt 4). `cargo clippy -- -D warnings` ist unter Windows grün,
+der Helfer auch gegen `--target x86_64-unknown-linux-gnu` (mit `LIBPCAP_VER` gesetzt, nur Prüfung ohne Linken). `cargo build --workspace` linkt danach ohne weitere Fehler gegen `wpcap.lib`; `openpacketmon.exe --version`
 läuft, `openpacketmon-capture.exe` startet (findet also `wpcap.dll`). Getestet ist noch nichts; dass sich etwas bauen lässt, heißt
 nicht, dass es unter Windows richtig läuft (Abschnitt 4).
 

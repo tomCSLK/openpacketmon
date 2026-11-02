@@ -29,7 +29,12 @@ nicht, dass es unter Windows richtig läuft (Abschnitt 4).
   lässt sich eine offene Datei nicht löschen (Fehler 32). **Behoben** mit `drop(cap)` vor `remove_dir_all`.
 - Aus demselben Grund lassen weitere Tests ihre Ordner in `%TEMP%` liegen, ohne zu scheitern, weil sie mit `let _ =` aufräumen
   (`openpacketmon-test-*` aus `engine::tests`, `openpacketmon-gui-*`, `openpacketmon-mcp-*`, `openpacketmon-mcp-tools-*`); nach dem
-  Lauf lassen sie sich löschen. Beim Anpassen der Tests mit erledigen.
+  Lauf lassen sie sich löschen. **Ursache gefunden (2026-11-02), offen:** Es liegt nicht an den Tests, sondern an der
+  Handle-Vererbung an den Mitschnitt-Helfer (Punkt „Helfer erbt offene Dateien“ in Abschnitt 4). Nebenbei gefunden: Die GUI-Tests
+  löschen ihren Ordner `openpacketmon-gui-<pid>` nie (auch unter Linux nicht), und `engine::tests::pcap_import_fills_the_state` und
+  `engine::packets::tests::packets_are_written_as_pcap` benutzen denselben Ordner `openpacketmon-test-<pid>`, obwohl sie gleichzeitig
+  laufen können. Ein Versuch mit einem gemeinsamen Aufräum-Helfer (`remove_test_dir`, löscht mit Wiederholung bis 10 s und meldet
+  übrig gebliebene Ordner als Fehler) ließ unter Windows 21 Tests scheitern, solange die Ursache besteht; zurückgenommen.
 - Im zweiten Lauf zeigte sich `mcp::access::tests::turning_the_access_off_and_on_during_questions` (4 von 5 Läufen rot): Unter
   Windows wird eine Verbindung auf einen gerade geschlossenen Port von `127.0.0.1` nicht sofort abgewiesen, sondern hängt bis
   `CONNECT_TIMEOUT` (2 s); der Test wartete nach dem Umschalten nur 200 ms. **Behoben:** Er wartet jetzt bis zur ersten Antwort,
@@ -139,6 +144,27 @@ egui, wgpu und `rfd` laufen unter Windows, der Code dort ist bisher aber nur unt
 Die Trennung der Rechte bleibt: Unter Linux hat nur der Helfer `openpacketmon-capture` die Mitschnittrechte und gibt sie nach dem
 Öffnen des Adapters ab, das Programm läuft ohne. Unter Windows entscheidet die Installation von Npcap, ob normale Benutzer
 mitschneiden dürfen oder nur Administratoren. Das Programm soll nie als Administrator laufen müssen.
+
+### Helfer erbt offene Dateien (gefunden 2026-11-02, offen)
+
+libpcap öffnet PCAP-Dateien unter Windows mit `fopen` der C-Laufzeit, solche Handles sind **vererbbar**. Rust startet Kindprozesse
+unter Windows mit Handle-Vererbung (für die Pipes), also erbt jeder Helfer alle in dem Moment offenen vererbbaren Handles. Nach
+`Engine::stop` startet die Adapter-Vorschau sofort einen `openpacketmon-capture.exe` je Adapter, während der Import-Thread die Datei
+noch offen hält (`parse_packets` wartet nach dem Dateiende einige Sekunden auf Namensauflösungen und prüft dabei nicht, ob gestoppt
+wurde). Folge: **Nach dem Stoppen eines PCAP-Imports bleibt die Datei gesperrt** (Löschen, Umbenennen, Überschreiben), bis ein neuer
+Mitschnitt beginnt oder das Programm schließt; der Helfer bekommt Handles, die ihn nichts angehen. Nachgewiesen mit
+`pcap_import_fills_the_state`: Die Datei blieb über 60 s gesperrt; 0,2 s nach dem Beenden der Helfer ließ sie sich löschen. Gleiches
+droht der beim Mitschnitt geschriebenen PCAP-Datei.
+
+Mögliche Lösungen, noch nicht entschieden (Nutzer, 2026-11-02: erst notieren):
+- **Nur die Pipes vererben:** Helfer über `CreateProcessW` mit `PROC_THREAD_ATTRIBUTE_HANDLE_LIST` starten. Behebt die Ursache
+  grundsätzlich, braucht aber `unsafe` (Workspace hat `unsafe_code = "forbid"`, laut `PLAN.md` auch für den Helfer), etwa in einer
+  kleinen eigenen Crate nur für Windows. `windows-sys` 0.61 steckt schon im Lockfile. Rusts sichere Fassung
+  (`CommandExt::spawn_with_attributes`) ist in 1.99 noch unstabil (`windows_process_extensions_raw_attribute`).
+- **Stop wartet auf den Import:** `parse_packets` bricht das Warten auf Namensauflösungen beim Stoppen ab, `Engine::stop` startet die
+  Vorschau erst, wenn der Mitschnitt-Thread seine Dateien geschlossen hat. Ohne `unsafe`, deckt aber nur diesen Ablauf ab.
+
+Danach die Tests aufräumen lassen (Abschnitt oben, `remove_test_dir`).
 
 ### Was es unter Windows nicht gibt
 

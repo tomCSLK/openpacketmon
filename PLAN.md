@@ -995,11 +995,12 @@ Noch offen, in dieser Reihenfolge:
    `CHANGELOG.md` `## [Unreleased]` zu `## [X.Y.Z] - Datum`; Release-Hinweise (Englisch) als Datei; committen, pushen, CI grün.
 4. Installationstest mit Fenster und Mitschnitt auf einem sauberen Ubuntu 24.04 und Debian 13 (VM oder anderer Rechner);
    der Test im Container (siehe oben) prüft nur Abhängigkeiten, Installation, Rechte und Entfernen.
-5. Repo-Einstellungen: Themen (`network-monitor`, `packet-capture`, `rust`, `linux`), Force-Push auf `main` sperren.
-   Beschreibung gesetzt, Wiki/Projects aus.
-6. Sichtbarkeit auf **öffentlich** (macht der Nutzer oder nach ausdrücklicher Freigabe per `gh repo edit
-   --visibility public --accept-visibility-change-consequences`). Direkt danach „Private vulnerability reporting“ an: Die API
-   antwortet beim privaten Repo mit 404, und `SECURITY.md` verweist darauf.
+5. ~~Repo-Einstellungen~~ erledigt 2026-11-02: Beschreibung „Network traffic monitor for Linux and Windows, based on
+   Sniffnet“, Themen `linux`, `network-monitor`, `packet-capture`, `rust`, `windows`, Wiki/Projects aus, Ruleset
+   „protect main“ (kein Force-Push, kein Löschen von `main`).
+6. ~~Sichtbarkeit auf öffentlich~~ erledigt 2026-11-02 (Nutzer): per `gh api -X PATCH repos/tomCSLK/openpacketmon -f
+   visibility=public` (das installierte `gh` kennt `--accept-visibility-change-consequences` nicht), danach „Private
+   vulnerability reporting“ an (`enabled: true`). `tomCSLK/openpacketmon-old` bleibt privat.
 7. Release: `dev/release.sh --publish --notes <datei>`, danach
    `cargo test test_fetch_latest_release_from_github -- --ignored` (geht erst mit einem Release).
 8. Doku nachziehen: `CLAUDE.md`, `PLAN.md`, Übersicht `~/Claude/Projekte/CLAUDE.md`; Haltepunkt aus den Notizen entfernen.

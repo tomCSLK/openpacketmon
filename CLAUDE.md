@@ -90,7 +90,8 @@ Netzwerkverkehrs-Monitor in Rust (iced-GUI, libpcap). Maßgeblich für Stand, Li
   altes Repo privat als `tomCSLK/openpacketmon-old`, neues privates `tomCSLK/openpacketmon` mit einem Anfangs-Commit;
   Tag `upstream-base` nur noch im Bundle, Zweig `design-muster` nur lokal. Details `PLAN.md` 4.9.
 - **4.10 vorbereitet, Haltepunkt** (2026-10-30, `PLAN.md` 4.10): Ein Befund aus 4.8 wurde an Sniffnet gemeldet, das Repo
-  blieb deshalb privat. **Haltepunkt am 2026-11-02 vom Nutzer aufgehoben, Repo öffentlich** (Sniffnet vorher benachrichtigt).
+  blieb deshalb privat. **Haltepunkt am 2026-11-02 vom Nutzer aufgehoben, Repo öffentlich** (Sniffnet vorher benachrichtigt;
+  Themen, Ruleset „protect main“ und Private vulnerability reporting gesetzt, `PLAN.md` 4.10 Punkte 5 und 6).
   `.deb` mit `depends = "$auto, libcap2-bin"`, neues `dev/release.sh` (Release-Titel `vX.Y.Z`, sonst bleibt die
   Update-Prüfung stumm; noch nicht ausgeführt), README und CHANGELOG für das erste Release überarbeitet.
   Commit `55f5213`, CI grün; Test-Paket **0.2.7** (nur die korrigierten Abhängigkeiten dazu). Entschieden: nach der Antwort

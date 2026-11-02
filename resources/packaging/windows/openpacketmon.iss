@@ -35,6 +35,11 @@ UninstallDisplayName=openpacketmon
 WizardStyle=modern
 Compression=lzma2
 SolidCompression=yes
+#ifdef Sign
+; installer and uninstaller are signed with the command dev\build-installer.ps1 passes as /Sopenpacketmon=...
+SignTool=openpacketmon
+SignedUninstaller=yes
+#endif
 
 [Languages]
 Name: "de"; MessagesFile: "compiler:Languages\German.isl"

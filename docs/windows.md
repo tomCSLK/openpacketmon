@@ -306,9 +306,26 @@ Smart App Control bei den Testern auszuschalten, ist kein Ausweg: Seit dem April
 Windows wieder einschalten, nach KB5127648 (Oktober 2026) bleibt der Schalter bei manchen aber ausgegraut; und wieder
 eingeschaltet blockiert es das Programm trotzdem.
 
-Beim Umsetzen signieren: `openpacketmon.exe`, `openpacketmon-capture.exe`, Installer und Deinstaller (Inno Setup `SignTool` und
-`SignedUninstaller=yes`), jeweils mit Zeitstempel, in `dev/build-installer.ps1`; ohne Zertifikat weiter unsigniert mit Hinweis.
-Prüfen, ob Smart App Control auch die Datei durchlässt, die der Inno-Installer beim Start in den Temp-Ordner entpackt.
+**Signieren im Skript (vorbereitet 2026-11-02, noch ungetestet, kein Zertifikat da):** `dev\build-installer.ps1 -CertSha1 <Fingerabdruck>`
+(oder Variable `OPENPACKETMON_SIGN_SHA1`) signiert `openpacketmon.exe` und `openpacketmon-capture.exe` vor dem Verpacken, Inno Setup
+signiert Installer und Deinstaller (`#ifdef Sign` in `openpacketmon.iss`: `SignTool=openpacketmon`, `SignedUninstaller=yes`, der
+Befehl kommt als `/Sopenpacketmon=…` von ISCC). Befehl wie in Certums Anleitung „Code Signing in the Cloud – Using Signtool“:
+`signtool sign /sha1 <Fingerabdruck> /tr http://time.certum.pl /td sha256 /fd sha256`; danach `signtool verify /pa /all` für alle drei
+Dateien. Das Skript sucht `signtool.exe` im `PATH` oder im neuesten Windows SDK (`%ProgramFiles(x86)%\Windows Kits\10\bin\<Version>\x64`)
+und hält an, wenn das Zertifikat nicht im Speicher des Benutzers (`Cert:\CurrentUser\My`) liegt oder abgelaufen ist. Ohne
+Fingerabdruck bleibt alles unsigniert, mit Hinweis am Ende.
+
+Einrichten auf dem Windows-Rechner, sobald das Zertifikat ausgestellt ist (laut Certum, beim ersten Mal prüfen und hier nachtragen):
+1. SimplySign-App auf dem Handy einrichten (bei der Aktivierung), SimplySign Desktop auf dem Windows-Rechner installieren und mit
+   einem Code aus der App anmelden. Das Zertifikat erscheint dann im Zertifikatspeicher des Benutzers.
+2. Fingerabdruck ablesen: `Get-ChildItem Cert:\CurrentUser\My | Where-Object Subject -like '*Open Source Developer*' | Format-List Subject, Thumbprint, NotAfter`.
+3. `signtool` vorhanden? Kommt mit dem Windows SDK (Visual Studio „Desktopentwicklung mit C++“), sonst
+   `winget install Microsoft.WindowsSDK.10.0.26100`.
+4. `powershell -ExecutionPolicy Bypass -File dev\build-installer.ps1 -CertSha1 <Fingerabdruck>`; SimplySign Desktop muss dabei
+   angemeldet sein.
+5. Prüfen: Eigenschaften → Digitale Signaturen beim Installer, beim installierten `openpacketmon.exe` und beim Deinstaller; dann
+   bei einem Tester mit Smart App Control installieren. Dabei auch prüfen, ob Smart App Control die Datei durchlässt, die der
+   Inno-Installer beim Start in den Temp-Ordner entpackt.
 
 Was SignPath verlangt und was das für uns heißt:
 

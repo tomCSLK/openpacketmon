@@ -1297,6 +1297,12 @@ Installers auf dem Windows-Rechner; SignPath bleibt möglich, braucht aber erst 
 Windows-Build in GitHub Actions.
 **Certum (Nutzer, 2026-11-02):** Konto im Certum-Shop angelegt. Noch offen: Produkt kaufen, aktivieren, Identität prüfen lassen,
 Versorgerrechnung und Projektadresse hochladen (`docs/windows.md` 6.1).
+**Signieren im Skript vorbereitet (2026-11-02, vom Nutzer freigegeben, ungetestet):** `dev\build-installer.ps1 -CertSha1 <Fingerabdruck>`
+signiert beide Programme, Installer und Deinstaller mit Zeitstempel von Certum und prüft die Signaturen; ohne Fingerabdruck wie bisher
+unsigniert. Einrichtung von SimplySign Desktop und Ablauf in `docs/windows.md` 6.1. Testen erst mit dem Zertifikat auf dem Windows-Rechner.
+**Certum-Stand (2026-11-02 abends):** „Open Source Code Signing in the Cloud“ (365 Tage) gekauft, Daten eingegeben, automatische
+Identitätsprüfung (IDnow) abgeschlossen, ein Dokument hochgeladen; Vorprüfung „Waiting for verification“, Zertifikat „Under
+verification“. Warten auf Certum. Die Projektadresse war auf der Vorprüfungsseite nicht zu sehen; fragt Certum danach, nachreichen.
 
 #### 5.4 MCP-Anbindung (Idee des Nutzers, 2026-10-31; neu gefasst und begonnen 2026-11-02, vom Nutzer freigegeben; Stufen 1 bis 3 erledigt)
 

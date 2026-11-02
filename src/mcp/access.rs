@@ -704,17 +704,20 @@ mod tests {
         fixture.access.apply(true);
         let path = fixture.path();
         let stop = Arc::new(AtomicBool::new(false));
+        let answers = Arc::new(AtomicUsize::new(0));
         let askers: Vec<_> = (0..3)
             .map(|_| {
                 let path = path.clone();
                 let stop = stop.clone();
+                let answers = answers.clone();
                 thread::spawn(move || {
-                    let mut answers = 0;
                     while !stop.load(Ordering::Relaxed) {
                         // a window closing under a question is no window, or no answer; a
                         // new window can get the port of the old one, then the old token fails
                         match ask(&path, CAPTURE_STATUS, json!({})) {
-                            Ok(_) => answers += 1,
+                            Ok(_) => {
+                                answers.fetch_add(1, Ordering::Relaxed);
+                            }
                             Err(
                                 AskError::NotAvailable
                                 | AskError::NoAnswer
@@ -724,7 +727,6 @@ mod tests {
                             Err(AskError::Tool(text)) => panic!("{text}"),
                         }
                     }
-                    answers
                 })
             })
             .collect();
@@ -735,10 +737,17 @@ mod tests {
             assert!(!fixture.access.content_allowed());
             fixture.access.apply(true);
         }
-        thread::sleep(POLL * 4);
+        // the open door answers again; under Windows a question to the port of a closed door
+        // only gives up after the connect timeout (2 s) instead of at once as under Linux
+        let deadline = std::time::Instant::now() + Duration::from_secs(10);
+        while answers.load(Ordering::Relaxed) == 0 && std::time::Instant::now() < deadline {
+            thread::sleep(POLL);
+        }
         stop.store(true, Ordering::Relaxed);
-        let answers: usize = askers.into_iter().map(|t| t.join().unwrap()).sum();
-        assert!(answers > 0);
+        for asker in askers {
+            asker.join().unwrap();
+        }
+        assert!(answers.load(Ordering::Relaxed) > 0);
         assert!(!fixture.access.content_allowed());
         assert!(fixture.status().is_ok());
     }

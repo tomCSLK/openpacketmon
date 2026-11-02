@@ -333,6 +333,8 @@ mod tests {
         assert_eq!(cap.next_packet().unwrap().data.len(), 60);
         assert_eq!(cap.next_packet().unwrap().header.len, 42);
         assert!(cap.next_packet().is_err());
+        // Windows does not delete a file that is still open
+        drop(cap);
         std::fs::remove_dir_all(&dir).unwrap();
     }
 }

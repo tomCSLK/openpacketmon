@@ -112,10 +112,16 @@ impl CaptureHelper {
         loop {
             match read_frame(&mut self.output, &mut self.data) {
                 Ok(Frame::Packet { secs, usecs, len }) => {
-                    #[allow(clippy::cast_possible_truncation, clippy::unnecessary_cast)]
+                    // the field types differ: `time_t`/`suseconds_t` on Unix, 32-bit `c_long`
+                    // under Windows, as in Npcap's own `timeval`
+                    #[allow(
+                        clippy::cast_possible_truncation,
+                        clippy::cast_possible_wrap,
+                        clippy::unnecessary_cast
+                    )]
                     let ts = libc::timeval {
-                        tv_sec: secs as libc::time_t,
-                        tv_usec: usecs as libc::suseconds_t,
+                        tv_sec: secs as _,
+                        tv_usec: usecs as _,
                     };
                     self.header = PacketHeader {
                         ts,

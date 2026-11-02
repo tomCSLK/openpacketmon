@@ -1,12 +1,44 @@
 # Windows-Version von openpacketmon
 
-Stand: 2026-10-30, ergänzt 2026-11-02 (MCP, Mitschnitt-Helfer, vorgezogener Beginn, Installer für Tester). Diese Datei beschreibt, was nötig ist, um das Projekt auf einem Windows-Rechner fortzusetzen und dort eine
+Stand: 2026-10-30, ergänzt 2026-11-02 (MCP, Mitschnitt-Helfer, vorgezogener Beginn, Installer für Tester, Erfahrungen beim Einrichten des Windows-Rechners). Diese Datei beschreibt, was nötig ist, um das Projekt auf einem Windows-Rechner fortzusetzen und dort eine
 Windows-Version zu bauen und zu testen.
 
 **Heutiger Stand:** openpacketmon läuft nur unter Linux und **baut unter Windows noch nicht**. Es ist nichts davon umgesetzt.
 Die Punkte in Abschnitt 4 stammen aus einer Durchsicht des Codes; ein Build für Windows war auf dem Linux-Rechner nicht
 möglich (die Abhängigkeiten `ring` und `aws-lc-sys` brauchen einen C-Compiler für Windows). Die vollständige Liste
 der Fehler liefert also erst der erste `cargo check` unter Windows.
+
+**Erster `cargo check --workspace` unter Windows (2026-11-02, Zweig `windows`):** Die Abhängigkeiten bauen, auch `aws-lc-sys`,
+`ring` und `pcap` ohne CMake und NASM. Einziger Fehler war `libc::timeval` in `src/networking/types/capture_helper.rs`
+(`suseconds_t` fehlt, Felder unter Windows 32-Bit `c_long`); behoben mit `as _`, danach grün. Übrig sind Warnungen über Code,
+der nur unter Linux genutzt wird: `PIPE_BYTES`, `let mut cap` und (Clippy) ein unnötiger Rückgabewert in `capture/src/main.rs`,
+`get_desc` in `src/networking/types/capture_context.rs`; sie kommen beim Portieren hinter `#[cfg(unix)]` oder bekommen eine
+Windows-Fassung. `cargo build --workspace` linkt danach ohne weitere Fehler gegen `wpcap.lib`; `openpacketmon.exe --version`
+läuft, `openpacketmon-capture.exe` startet (findet also `wpcap.dll`). Getestet ist noch nichts; dass sich etwas bauen lässt, heißt
+nicht, dass es unter Windows richtig läuft (Abschnitt 4).
+
+**Erster `cargo test --workspace` (2026-11-02):** 384 Tests bestanden, 2 gescheitert, 5 übersprungen (die schon unter Linux
+übersprungenen; `capture/tests/live.rs` besteht nur, weil es ohne `unshare` gleich aufhört, prüft unter Windows also nichts).
+- `mmdb::geo::tests::the_file_of_the_settings_comes_first`: `geo_dir` braucht `HOME`, das es unter PowerShell nicht gibt; erwartet,
+  siehe `geo_dir` in Abschnitt 4. **Behoben:** `geo_dir` nimmt unter Windows `%LOCALAPPDATA%\openpacketmon\geo`. Die Pfade von
+  `geoipupdate` (`/var/lib/GeoIP`) bleiben vorerst auch unter Windows in der Liste, ebenso der Hinweistext `settings-mmdb-hint`, der sie
+  nennt; beides noch zu entscheiden (Abschnitt 4).
+- `engine::packets::tests::packets_are_written_as_pcap`: löscht den Ordner, während `cap` die Datei noch offen hält; unter Windows
+  lässt sich eine offene Datei nicht löschen (Fehler 32). **Behoben** mit `drop(cap)` vor `remove_dir_all`.
+- Aus demselben Grund lassen weitere Tests ihre Ordner in `%TEMP%` liegen, ohne zu scheitern, weil sie mit `let _ =` aufräumen
+  (`openpacketmon-test-*` aus `engine::tests`, `openpacketmon-gui-*`, `openpacketmon-mcp-*`, `openpacketmon-mcp-tools-*`); nach dem
+  Lauf lassen sie sich löschen. Beim Anpassen der Tests mit erledigen.
+- Im zweiten Lauf zeigte sich `mcp::access::tests::turning_the_access_off_and_on_during_questions` (4 von 5 Läufen rot): Unter
+  Windows wird eine Verbindung auf einen gerade geschlossenen Port von `127.0.0.1` nicht sofort abgewiesen, sondern hängt bis
+  `CONNECT_TIMEOUT` (2 s); der Test wartete nach dem Umschalten nur 200 ms. **Behoben:** Er wartet jetzt bis zur ersten Antwort,
+  höchstens 10 s. Im Programm heißt das nur: Nach dem Schließen des Fensters bekommt ein Assistent die Absage unter Windows 2 s später.
+- Danach `cargo test --workspace` **grün** (386 bestanden, 5 übersprungen).
+
+**Smart App Control** (auf diesem Rechner an) blockiert ab und zu frisch gebaute, unsignierte Dateien aus `target\`, auch Testdateien
+(„Eine Anwendungssteuerungsrichtlinie hat diese Datei blockiert“, Fehler 4551; Einträge im Ereignisprotokoll
+`Microsoft-Windows-CodeIntegrity/Operational`, IDs 3033/3077). Es bewertet jede Datei einzeln; neu linken hilft (z. B. Zeitstempel von
+`src/main.rs` setzen, dann erneut `cargo test`). Für den Installer heißt das: Bei Testern mit Smart App Control kann ein unsigniertes
+Programm ganz blockiert sein, nicht nur von SmartScreen gewarnt (Abschnitt 6).
 
 **Feste Vorgaben:** Npcap wird **nie mitgeliefert**, der Nutzer installiert es selbst (proprietäre Lizenz). Wireshark-Code
 bleibt tabu. Die Arbeitsregeln in `CLAUDE.md` gelten unverändert. Die Arbeit beginnt **vor dem ersten Release** (vorgezogen
@@ -16,18 +48,20 @@ werden (Nutzer, 2026-10-30/31).
 
 ## 1. Was auf dem Windows-Rechner installiert sein muss
 
-Vorgesehen sind Windows 10/11 x64. Die `winget`-Befehle sind Vorschläge und noch nicht ausprobiert.
+Vorgesehen sind Windows 10/11 x64. Auf dem eigenen Windows-Rechner (Windows 11 Pro) am 2026-11-02 eingerichtet; dort
+ausprobiert sind `winget install Rustlang.Rustup` (rustup 1.29.2, rustc 1.99.1), `cargo install cargo-deny` und Npcap 1.90 mit
+SDK 1.17. Git, GitHub CLI, Python 3.12 und Visual Studio waren schon vorhanden, die übrigen `winget`-Befehle sind also weiter Vorschläge.
 
 | Was | Wofür | Installation |
 |---|---|---|
 | Git für Windows | Repo, außerdem Git Bash für `dev/*.sh` | `winget install Git.Git` |
-| Visual Studio Build Tools mit „Desktop development with C++“ und Windows SDK | Linker und C-Compiler für Rust | `winget install Microsoft.VisualStudio.2022.BuildTools`, danach die Komponente im Visual Studio Installer wählen |
-| Rust (rustup, Toolchain `stable-x86_64-pc-windows-msvc`) | Bauen | `winget install Rustlang.Rustup` |
-| Npcap | Mitschnitt zur Laufzeit, die Tests und der Build von `pcap` brauchen `wpcap.dll` | https://npcap.com/#download |
-| Npcap SDK | Linken gegen `wpcap.lib` | https://npcap.com/#download, entpacken, `Lib\x64` in die Umgebungsvariable `LIB` |
+| Visual Studio Build Tools mit „Desktop development with C++“ und Windows SDK | Linker und C-Compiler für Rust | `winget install Microsoft.VisualStudio.2022.BuildTools`, danach die Komponente im Visual Studio Installer wählen. Ein vorhandenes Visual Studio mit C++-Werkzeugen und Windows SDK genügt (auf dem Rechner: Visual Studio Community 2026, SDK 10.0.26100), dann keine Build Tools dazu |
+| Rust (rustup, Toolchain `stable-x86_64-pc-windows-msvc`) | Bauen | `winget install Rustlang.Rustup`; legt die Toolchain gleich mit an. `%USERPROFILE%\.cargo\bin` steht erst in einem **neuen** Terminal im Pfad |
+| Npcap | Mitschnitt zur Laufzeit, die Tests und der Build von `pcap` brauchen `wpcap.dll` | https://npcap.com/#download (`npcap-<version>.exe`, signiert von Nmap Software LLC). **Nicht über winget** zu haben, und die freie Ausgabe lässt sich nicht still installieren (`/S` nur bei Npcap OEM): Installer von Hand mit Administratorrechten durchklicken und **„Install Npcap in WinPcap API-compatible Mode“ anhaken**, sonst liegt `wpcap.dll` nur in `System32\Npcap` und nicht im Suchpfad. Prüfen: `Test-Path C:\Windows\System32\wpcap.dll` und `Get-Service npcap` |
+| Npcap SDK | Linken gegen `wpcap.lib` | https://npcap.com/#download (`npcap-sdk-<version>.zip`, ohne veröffentlichte Prüfsumme), entpacken (auf dem Rechner nach `%USERPROFILE%\npcap-sdk`, braucht keine Administratorrechte), `Lib\x64` in die Benutzervariable `LIB` (Befehl in Abschnitt 3) |
 | Python 3 | `dev/third-party-licenses.py`, `dev/update-services.py` | `winget install Python.Python.3.12` |
 | GitHub CLI | Anmeldung, Repo, später Releases | `winget install GitHub.cli` |
-| cargo-deny 0.20.2 | Lizenz- und Sicherheitsprüfung | `cargo install cargo-deny --locked --version 0.20.2` |
+| cargo-deny 0.20.2 | Lizenz- und Sicherheitsprüfung | `cargo install cargo-deny --locked --version 0.20.2` (baut einige Minuten) |
 | Claude Code | Weiterarbeit | wie gewohnt |
 
 Falls `aws-lc-sys` beim Bauen CMake oder NASM verlangt, beides nachinstallieren (`winget install Kitware.CMake`,
@@ -60,8 +94,8 @@ In PowerShell, nach dem Installieren von Abschnitt 1:
 gh auth login
 gh repo clone tomCSLK/openpacketmon
 cd openpacketmon
-# der Pfad ist ein Beispiel: dorthin, wo das Npcap SDK entpackt wurde
-[Environment]::SetEnvironmentVariable("LIB", "C:\npcap-sdk\Lib\x64;" + [Environment]::GetEnvironmentVariable("LIB", "User"), "User")
+# dorthin, wo das Npcap SDK entpackt wurde (auf dem eigenen Rechner %USERPROFILE%\npcap-sdk)
+[Environment]::SetEnvironmentVariable("LIB", "$env:USERPROFILE\npcap-sdk\Lib\x64;" + [Environment]::GetEnvironmentVariable("LIB", "User"), "User")
 # neues Terminal öffnen, dann:
 cargo check --workspace
 ```
@@ -78,7 +112,7 @@ dabei unverändert weiter bauen; Windows-Code kommt hinter `#[cfg(windows)]`, Li
 | Stelle | Heute | Für Windows |
 |---|---|---|
 | `src/utils/formatted_strings.rs` `redirect_stdout_stderr_to_file` | nutzt die Crate `gag`, die nicht mehr in `Cargo.toml` steht, **baut im Release nicht** | Funktion entfernen oder `gag` wieder aufnehmen; Log-Datei wird gebraucht, wenn es kein Konsolenfenster gibt |
-| `src/mmdb/geo.rs` `geo_dir` | `HOME`, `.local/share` (`HOME` fehlt unter Windows) | `%LOCALAPPDATA%\openpacketmon\geo` |
+| `src/mmdb/geo.rs` `geo_dir` | `HOME`, `.local/share` (`HOME` fehlt unter Windows) | `%LOCALAPPDATA%\openpacketmon\geo` (**erledigt** 2026-11-02) |
 | `src/mmdb/geo.rs` `geoipupdate_file` | `/var/lib/GeoIP/…` | unter Windows weglassen oder den Ordner von `geoipupdate` nehmen, Test anpassen |
 | `src/networking/traffic_preview.rs`, `capture_context.rs` | aus Sniffnet, schon für Windows vorbereitet | prüfen |
 | `capture/src/main.rs` (Helfer) | unter Linux nicht blockierender Adapter mit eigenem `poll`, Rechteabgabe, größere Pipe | außerhalb von Linux liest er blockierend mit dem Timeout von libpcap, die drei Funktionen `drop_rights`, `enlarge_pipe`, `wait_for_packets` tun dort nichts. Prüfen: Kommt unter Npcap der Timeout auch ohne Pakete? Sonst bleibt eine pausierte Aufzeichnung stehen (siehe `open` in der Datei). Pfad mit `.exe` löst `helper_path` schon auf |

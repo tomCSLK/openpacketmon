@@ -50,12 +50,22 @@ impl GeoKind {
 
 /// Folder of the downloaded databases: `$XDG_DATA_HOME/openpacketmon/geo`, by default
 /// `~/.local/share/openpacketmon/geo`
+#[cfg(not(windows))]
 pub fn geo_dir() -> Option<PathBuf> {
     let base = match std::env::var_os("XDG_DATA_HOME").map(PathBuf::from) {
         Some(dir) if dir.is_absolute() => dir,
         _ => PathBuf::from(std::env::var_os("HOME")?).join(".local/share"),
     };
     Some(base.join("openpacketmon/geo"))
+}
+
+/// Folder of the downloaded databases: `%LOCALAPPDATA%\openpacketmon\geo` (there is no `HOME`
+/// under Windows)
+#[cfg(windows)]
+pub fn geo_dir() -> Option<PathBuf> {
+    let base = PathBuf::from(std::env::var_os("LOCALAPPDATA")?);
+    base.is_absolute()
+        .then(|| base.join("openpacketmon").join("geo"))
 }
 
 /// The files tried, in this order

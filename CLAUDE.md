@@ -115,7 +115,8 @@ Netzwerkverkehrs-Monitor in Rust (iced-GUI, libpcap). Maßgeblich für Stand, Li
   **erstes Release 0.4.0 oder 0.5.0** statt 0.3.0; der Haltepunkt gilt unverändert. Ebenfalls entschieden: **Plan B** mit kleinem
   Mitschnitt-Helfer und egui-Programm ohne Rechte, ohne Webschicht; Paketspeicher bleibt im RAM mit wählbarer Grenze. Probebau im Scratchpad bestanden (flüssig mit 2 Millionen
   Zeilen, 0,4 % CPU im Leerlauf, Ergebnis in `PLAN.md` 5.5): wgpu und eingebaute Schrift Inter; Bedienung von Hand steht noch aus.
-- **Reihenfolge** (Nutzer, 2026-10-31, geändert 2026-11-02): MCP-Anbindung, weil das Release am Haltepunkt wartet → erstes Release (0.4.0 oder 0.5.0) → Windows-Version.
+- **Reihenfolge** (Nutzer, 2026-10-31, zweimal geändert 2026-11-02): MCP-Anbindung (erledigt) → **Windows-Version** (vorgezogen, weil andere Tester sie brauchen; `PLAN.md` 5.3, `docs/windows.md`) → erstes Release (0.4.0 oder 0.5.0, wartet am Haltepunkt). Der Haltepunkt gilt auch für Windows.
+- **Nutzertest 0.3.10** (2026-11-02): Bedienung über längere Zeit, Mitschnitt mit BPF-Filter, Ton, Dateidialoge, Skalierung, Geo-Download und die grauen Adapter ohne Befund. README beschreibt jetzt, wie man den Mitschnitt-Helfer auf eine Gruppe beschränkt (im Container geprüft).
 - **MCP-Anbindung** (`PLAN.md` 5.4): Claude soll den Mitschnitt abfragen können, etwa beim Untersuchen von Geräten im Heimnetz.
   Paketinhalte sind dabei ungeprüfte Eingaben für das Sprachmodell. Von Anfang an plattformneutral schreiben, damit sie unter
   Windows ohne Umbau läuft.

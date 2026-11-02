@@ -1,6 +1,6 @@
 # Windows-Version von openpacketmon
 
-Stand: 2026-10-30. Diese Datei beschreibt, was nötig ist, um das Projekt auf einem Windows-Rechner fortzusetzen und dort eine
+Stand: 2026-10-30, ergänzt 2026-11-02 (MCP, Mitschnitt-Helfer, vorgezogener Beginn, Installer für Tester). Diese Datei beschreibt, was nötig ist, um das Projekt auf einem Windows-Rechner fortzusetzen und dort eine
 Windows-Version zu bauen und zu testen.
 
 **Heutiger Stand:** openpacketmon läuft nur unter Linux und **baut unter Windows noch nicht**. Es ist nichts davon umgesetzt.
@@ -9,8 +9,8 @@ möglich (die Abhängigkeiten `ring` und `aws-lc-sys` brauchen einen C-Compiler 
 der Fehler liefert also erst der erste `cargo check` unter Windows.
 
 **Feste Vorgaben:** Npcap wird **nie mitgeliefert**, der Nutzer installiert es selbst (proprietäre Lizenz). Wireshark-Code
-bleibt tabu. Die Arbeitsregeln in `CLAUDE.md` gelten unverändert. Die Arbeit beginnt **erst nach dem ersten Release (0.4.0 oder
-0.5.0) und nach der MCP-Anbindung** (`PLAN.md` 5.4), die Windows-Version enthält MCP also schon. Seit der Umstellung auf egui
+bleibt tabu. Die Arbeitsregeln in `CLAUDE.md` gelten unverändert. Die Arbeit beginnt **vor dem ersten Release** (vorgezogen
+2026-11-02, siehe Abschnitt 8); die MCP-Anbindung (`PLAN.md` 5.4) ist fertig, die Windows-Version enthält sie also. Seit der Umstellung auf egui
 (`PLAN.md` 5.5) gibt es keinen Webserver und kein Webview mehr. Der Installer soll, wenn möglich, signiert
 werden (Nutzer, 2026-10-30/31).
 
@@ -86,6 +86,10 @@ dabei unverändert weiter bauen; Windows-Code kommt hinter `#[cfg(windows)]`, Li
 | Latenzmessung (`surge-ping`) | unter Linux unprivilegiert | ICMP-Sockets ohne Adminrechte gibt es unter Windows vermutlich nicht: prüfen, sonst Hinweis in der Oberfläche |
 | Programme je Verbindung (`listeners`) | hat einen Windows-Teil | prüfen, auch die Kürzung auf 15 Zeichen in unserem Code (betrifft nur Linux) |
 | Doku-Texte | „Linux“, `setcap`, `systemctl`, `/usr/share/doc/…` | Oberfläche und README prüfen |
+| `src/config/export_pcap.rs` | Standardordner aus `HOME` | `HOME` fehlt unter Windows: `USERPROFILE` bzw. den Dokumente-Ordner nehmen |
+| `src/mcp/access.rs` `access_path`, Schreiben von `mcp-access.json` | Rechte `0600` nur unter `#[cfg(unix)]` | Unter Windows erben Dateien in `%APPDATA%` normalerweise die Rechte des Benutzerprofils (Benutzer, SYSTEM, Administratoren). Prüfen mit `icacls`; falls andere Benutzer lesen können, die Rechte beim Anlegen einschränken. Der gegenseitige Nachweis (HMAC, `src/mcp/protocol.rs`) schützt zusätzlich, der Token geht nie über die Leitung |
+| `src/mcp/` Tür auf `127.0.0.1` | unter Linux erreichbar für alle lokalen Benutzer, abgesichert durch den Nachweis | gleich; prüfen, ob die Windows-Firewall beim Lauschen auf `127.0.0.1` nachfragt (sollte sie nicht) |
+| Adapter ohne IP-Verkehr (`TrafficPreview::no_ip`, `CaptureError::NoIp`, 2026-11-02) | Bluetooth, NFLOG, NFQUEUE grau | unter Npcap prüfen, welche Adapter einen nicht unterstützten Link-Typ melden (z. B. Bluetooth, WAN Miniport) |
 
 Der Build von Windows braucht in `build.rs` zusätzlich das Programm-Icon: Sniffnet nutzte dafür `winresource`. Bei uns wurde das
 entfernt, es kommt für `openpacketmon.exe` mit einem eigenen `.ico` wieder dazu (aus
@@ -123,6 +127,13 @@ mitschneiden dürfen oder nur Administratoren. Das Programm soll nie als Adminis
    Ordner der Einstellungen lesen kann: Die Rechte `0600` setzt der Code nur unter Unix.
 
 ## 6. Installer und Release
+
+**Entschieden (Nutzer, 2026-11-02):** Die Tester bekommen **gleich einen Installer**, zunächst **unsigniert** (SmartScreen warnt
+dann; „Weitere Informationen → Trotzdem ausführen“). Solange der Haltepunkt aus `PLAN.md` 4.10 gilt, bekommen Tester nur
+die Installer-Datei, keinen Zugang zum Repo und keine Release-Seite: Der Code zeigt die an Sniffnet gemeldete Lücke. Der
+Installer nennt Npcap und dessen Download, enthält es aber nicht. Die kostenlose Npcap-Lizenz erlaubt den privaten Einsatz
+auf bis zu fünf Rechnern; beim Weitergeben an Tester darauf hinweisen. Werkzeug: WiX (MSI, wie Sniffnet, mit `cargo wix`)
+oder Inno Setup (einfacher, eine `.exe`); die Wahl auf dem Windows-Rechner treffen und hier eintragen.
 
 - Sniffnet baute ein MSI mit WiX: `resources/packaging/windows/setup.wxs`, `EULA.rtf` und Grafiken im Original bei Commit
   `ab4bf739d464` (bei uns entfernt, siehe `PLAN.md` Phase 2). Wird davon etwas übernommen, gilt die Kennzeichnungspflicht aus
@@ -178,9 +189,10 @@ Was SignPath verlangt und was das für uns heißt:
 3. `cargo test`, Pfade und Rechte.
 4. Windows-Eigenheiten aus Abschnitt 5.
 5. CI, Lizenzliste, `deny.toml`.
-6. Installer, Test auf sauberem System, README, erstes Windows-Release, zunächst unsigniert.
+6. Installer (unsigniert), Test auf sauberem System, README; dann **Weitergabe an die Tester** als Datei (Abschnitt 6).
+   Ein Windows-Release auf GitHub erst mit dem ersten Release nach dem Haltepunkt.
 7. Signatur beantragen (Abschnitt 6.1), danach signierte Installer.
 
-**Beginn (Nutzer, 2026-10-30/31, geändert 2026-11-02):** Reihenfolge MCP-Anbindung und erstes Release (MCP zuerst, weil das Release am Haltepunkt wartet) → Windows. Bis zum Release gilt auch auf dem Windows-Rechner
-der Haltepunkt aus `PLAN.md` 4.10. Die Abschnitte 4 und 5 stammen aus der Zeit vor MCP: Beim Beginn die Liste um das ergänzen, was
+**Beginn (Nutzer, 2026-11-02):** Windows wird **vor** dem ersten Release gemacht, weil andere Tester eine Windows-Fassung
+brauchen; MCP ist fertig. Bis zum Release gilt auch auf dem Windows-Rechner der Haltepunkt aus `PLAN.md` 4.10. Die Abschnitte 4 und 5 stammen aus der Zeit vor MCP: Beim Beginn die Liste um das ergänzen, was
 seitdem dazugekommen ist.

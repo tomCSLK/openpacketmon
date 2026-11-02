@@ -130,6 +130,19 @@ drops its rights once the adapter is open and hands the packets on without looki
 program without rights, because their content comes from other computers. Please report vulnerabilities privately, see
 [SECURITY.md](SECURITY.md).
 
+The package lets **every user of the computer** run the helper, as Sniffnet does with its program: anyone who can log in
+can capture the traffic of all adapters. On a computer you share with others, allow it only to the members of a group:
+
+```sh
+sudo groupadd --system openpacketmon
+sudo usermod -aG openpacketmon "$USER"      # for each user who may capture; takes effect at the next login
+sudo dpkg-statoverride --update --add root openpacketmon 0750 /usr/bin/openpacketmon-capture
+sudo setcap cap_net_raw,cap_net_admin=eip /usr/bin/openpacketmon-capture   # changing the group removed the rights
+```
+
+Updates of the package keep this. After removing the package, `sudo dpkg-statoverride --remove
+/usr/bin/openpacketmon-capture` deletes the setting.
+
 ## Contributing
 
 Bug reports, tests on other distributions and small pull requests are welcome; see [CONTRIBUTING.md](CONTRIBUTING.md).

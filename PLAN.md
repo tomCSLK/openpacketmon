@@ -968,10 +968,13 @@ Release wird 0.4.0 oder 0.5.0. Vor dem Release erledigt (2026-11-02, auf Ansage,
     gepackt, 256 MiB entpackt, 120 s). Protokoll Helfer → Programm mit Längengrenzen (256 KiB je Paket, 4 KiB Text). MCP: Stand
     der Prüfung aus 5.4 Stufe 4 (24 von 24 Angriffen abgewehrt), seitdem unverändert.
   - Langer Zufallstest im Release-Bau mit 300 000 Runden je Test (Zerleger, Filter, Masker, MCP-Werkzeuge) ohne Befund.
-  - Zur Entscheidung (Nutzer): Das Paket setzt die Rechte auf `/usr/bin/openpacketmon-capture` für **alle** lokalen
-    Benutzer, wie Sniffnet bei seinem Programm. Wireshark fragt bei der Installation und erlaubt es nur der Gruppe
-    `wireshark`. Möglich wäre eine Gruppe `openpacketmon` (Helfer `root:openpacketmon`, Modus `0750`, Nutzer in die
-    Gruppe aufnehmen). Für einen Laptop mit einem Benutzer ändert das nichts; nicht umgesetzt.
+  - Rechte des Helfers: Das Paket setzt sie auf `/usr/bin/openpacketmon-capture` für **alle** lokalen Benutzer, wie
+    Sniffnet bei seinem Programm; Wireshark erlaubt es nur der Gruppe `wireshark`. Entschieden (Nutzer, 2026-11-02): so
+    lassen, die README (Security) beschreibt, wie man es auf eine Gruppe `openpacketmon` beschränkt (`groupadd`, `usermod`,
+    `dpkg-statoverride root openpacketmon 0750`, danach erneut `setcap`, weil der Gruppenwechsel die Rechte löscht).
+    Im Container (Debian 13, `--cap-add NET_ADMIN,NET_RAW`) geprüft: Gruppenmitglied startet den Helfer (Antwort
+    „bereit“), ein anderer Benutzer bekommt „Permission denied“, die Einstellung übersteht `apt install --reinstall`;
+    nach `purge` bleibt der Eintrag von `dpkg-statoverride` stehen und wird mit `--remove` gelöscht (steht in der README).
 - **Trockenlauf `dev/release.sh`** (erstmals, mit vorübergehendem Abschnitt `## [0.3.9]` im CHANGELOG, danach
   zurückgesetzt): Der erste Lauf hielt an der fehlenden Kennzeichnung von `latency.rs` an (behoben), der zweite lief durch:
   Prüfungen, Release-Bau, Paket mit allen Pflichtdateien, Version und Abhängigkeiten, `SHA256SUMS`. Abhängigkeiten des
@@ -1219,8 +1222,13 @@ Alles, was für die Fortsetzung auf einem Windows-Rechner nötig ist, steht in *
 Zugänge, Einrichten, die Linux-Bindungen im Code mit ihrer Lösung, Tests, Installer, CI und Reihenfolge. Der Code baut unter
 Windows noch nicht; die größte Baustelle ist `app/src/main.rs`. Npcap wird nie mitgeliefert.
 
-Entschieden (Nutzer, 2026-10-30/31): **Beginn erst nach dem ersten Release (seit 2026-10-31 0.4.0 oder 0.5.0, siehe 5.5) und nach der MCP-Anbindung (5.4)**, die
-Windows-Version enthält MCP also schon; der Installer soll, **wenn möglich, eine Code-Signatur**
+**Vorgezogen (Nutzer, 2026-11-02):** Die Windows-Version kommt **vor** dem ersten Release, weil andere Tester eine
+Windows-Fassung zum Testen brauchen. Sie enthält MCP (5.4). Der Haltepunkt aus 4.10 gilt weiter: Repo privat, nichts
+veröffentlichen. Ebenfalls entschieden (2026-11-02): Gebaut und geprüft wird auf einem **eigenen Windows-Rechner** mit
+Claude Code (Einrichtung `docs/windows.md` 1 bis 3, nicht per GitHub Actions vom Linux-Laptop aus); die Tester bekommen **gleich
+einen Installer** (zunächst unsigniert), nur als Datei, ohne Zugang zum Repo, solange der Haltepunkt gilt. `docs/windows.md`
+ist um MCP, Helfer, `export_pcap`, Adapter ohne IP-Verkehr und den Installer ergänzt.
+Früher entschieden (2026-10-30/31): Beginn erst nach dem ersten Release und nach MCP; der Installer soll, **wenn möglich, eine Code-Signatur**
 bekommen. Weg (`docs/windows.md` 6.1): zuerst kostenlos über die SignPath Foundation, das setzt ein unsigniertes Windows-Release und
 einen Build in GitHub Actions voraus, und die Zusage ist nicht sicher, weil deren Regel „No hacking tools“ ein
 Mitschnitt-Programm treffen könnte. Sonst ein OV-Zertifikat; Azure Artifact Signing gibt es für Einzelentwickler in Deutschland nicht.
@@ -1433,7 +1441,7 @@ Stand egui (2026-11-01, Stufen 1 bis 4 freigegeben vom Nutzer, Test-Pakete **0.3
   - **Verkehrsbalken der Top-Listen** (Übersicht, Hosts, Dienste, Programme): Am Übergang Blau → Grün war eine Kerbe, die wie eine Lücke aussah, weil `widgets::share_bar` beide Teile einzeln mit runden Ecken zeichnete; kleine Teile wurden zu Punkten. Jetzt eine Form: beide Teile zusammen in der zweiten Farbe mit runden Enden, der erste darüber nur links rund. An der Naht scheint kein Hintergrund durch. Im Bildtest vergrößert geprüft, hell und dunkel.
   - **Schrift der Knöpfe auf gleicher Höhe:** „Beenden“ und „Pakete dieser Verbindung“ im Seitenkopf hatten ihre Schrift 2 px höher als die Knopfgruppe „Bytes · Bits · Pakete“ daneben (gemessen im Bildtest: Großbuchstaben bei y 27 statt 29, Kästen gleich, 32 px). Ursache: egui 0.37 setzt die Schrift eines Buttons dorthin, wohin das Layout außen herum ausrichtet (`ui.layout().align2()`): im Seitenkopf (`right_to_left(Align::Min)`) oben, in der Zeile der Gruppe (`ui.horizontal`, mittig) in die Mitte; der Innenraum ist höher als die Schrift. Am Button lässt sich das nicht einstellen, und ein passender Innenabstand ließ 1 px Rest (ganze Pixel). Jetzt zeichnet `widgets::add_button` die Schrift selbst in die Mitte des Kastens; der egui-Button behält Größe, Platz, Bedienung und Beschriftung (für Tests und Screenreader) und bekommt eine durchsichtige Schrift. Gilt für alle Knöpfe aus `button`, `small_button` und `segmented`. Gemessen in Übersicht, Stream (Seiten- und Kartenkopf) und Aufzeichnung: überall 11 px von der Oberkante bis zu den Großbuchstaben.
 - **Adapter ohne IP-Verkehr ausgegraut** (aus dem Test 2026-11-01, umgesetzt 2026-11-02 auf Ansage, Test-Paket 0.3.10): Adapter wie `bluetooth0`, `bluetooth-monitor`, `nflog`, `nfqueue` zeigten in der Vorschau „0“ und eine leere Kurve, obwohl die Vorschau sie wegen des nicht unterstützten Link-Typs gar nicht öffnet; ein Start endete in `parse_packets` ohne Meldung. Bluetooth selbst bleibt laut 5.1 außerhalb des Umfangs. Jetzt meldet die Vorschau solche Adapter (`TrafficPreview::no_ip`, `DevicePreview::no_ip`), die Seite Aufzeichnung zeigt sie grau, nicht wählbar und am Ende der Liste, mit „Kein IP-Verkehr, wird nicht ausgewertet“ statt Kurve; sie werden nicht ausgeblendet. Eine zuvor gespeicherte Wahl eines solchen Adapters wird nicht übernommen. Ein Start auf so einer Quelle (auch Datei oder `--adapter`) bricht mit `CaptureError::NoIp` und Begründung samt Link-Typ ab, statt still nichts zu zeigen. Geprüft mit Tests (Vorschau, Ablehnung beim Start, leere PCAP mit Link-Typ 201), Bildtest hell und dunkel und `--adapter bluetooth0`/`nflog` über den installierten Mitschnitt-Helfer.
-- **Nicht von Hand geprüft:** Bedienung im echten Fenster, Live-Mitschnitt in der Oberfläche, Ton, Dateidialoge, Skalierung des Bildschirms, Geo-Download, `.deb` auf anderen Systemen. Auf dem Laptop bleibt nach dem Umstieg `~/.config/autostart/openpacketmon-app.desktop` stehen und muss von Hand weg.
+- **Von Hand geprüft (Nutzer, 2026-11-02, mit 0.3.10):** Bedienung über längere Zeit, Live-Mitschnitt (auch mit BPF-Filter), Ton, Dateidialoge, Skalierung des Bildschirms und Geo-Download funktionieren ohne Probleme; die Adapter ohne IP-Verkehr sind ausgegraut und lassen sich nicht wählen. Offen bleibt nur das `.deb` mit Fenster auf anderen Systemen (4.10 Schritt 4). Die alte Datei `~/.config/autostart/openpacketmon-app.desktop` war am 2026-11-02 schon nicht mehr da.
 - Vor dem Release (erledigt 2026-11-02, Ergebnis in 4.10): `deny.toml`-Ausnahmen neu bewerten (RUSTSEC-2026-0370/0371/0372, Schriftlizenzen); `test_increments_ping_sequence` beheben; Sicherheitsdurchsicht der geänderten Teile: Webangriffe (4.8) fallen weg, neu ist, dass Paketinhalte als Text im Fenster stehen (fehlende Zeichen zeigt das Programm als Kästchen, `MissingGlyphPolicy::Tofu`). MCP (5.4) gehört in diese Durchsicht, es wird mit dem ersten Release veröffentlicht.
 
 Entschieden (Nutzer, 2026-10-31): Der Paketspeicher bleibt im RAM, die Grenze wird wählbar (bis etwa 2 GiB mit passender Paketzahl).

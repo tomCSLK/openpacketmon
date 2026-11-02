@@ -3,10 +3,12 @@
 Stand: 2026-10-30, ergänzt 2026-11-02 (MCP, Mitschnitt-Helfer, vorgezogener Beginn, Installer für Tester, Erfahrungen beim Einrichten des Windows-Rechners). Diese Datei beschreibt, was nötig ist, um das Projekt auf einem Windows-Rechner fortzusetzen und dort eine
 Windows-Version zu bauen und zu testen.
 
-**Heutiger Stand:** openpacketmon läuft nur unter Linux und **baut unter Windows noch nicht**. Es ist nichts davon umgesetzt.
-Die Punkte in Abschnitt 4 stammen aus einer Durchsicht des Codes; ein Build für Windows war auf dem Linux-Rechner nicht
-möglich (die Abhängigkeiten `ring` und `aws-lc-sys` brauchen einen C-Compiler für Windows). Die vollständige Liste
-der Fehler liefert also erst der erste `cargo check` unter Windows.
+**Heutiger Stand (2026-11-02):** Im Zweig `windows` baut die **Debug-Fassung** unter Windows, die Tests sind grün, und das Fenster
+startet (kurzer Start: Titel „openpacketmon“, je Adapter ein Helfer für die Vorschau, nach dem Beenden keine Helfer übrig). Bedient,
+mitgeschnitten und importiert wurde darin noch nichts. **Die Release-Fassung baut noch nicht** (`gag`, Abschnitt 4), es gibt kein
+Icon, keinen Installer, und es geht ein Konsolenfenster mit auf. Eine Fassung für Tester gibt es also noch nicht.
+Die Punkte in Abschnitt 4 stammen aus einer Durchsicht des Codes auf dem Linux-Rechner, ergänzt um das, was unter Windows
+aufgefallen ist.
 
 **Erster `cargo check --workspace` unter Windows (2026-11-02, Zweig `windows`):** Die Abhängigkeiten bauen, auch `aws-lc-sys`,
 `ring` und `pcap` ohne CMake und NASM. Einziger Fehler war `libc::timeval` in `src/networking/types/capture_helper.rs`
@@ -16,8 +18,13 @@ der nur unter Linux genutzt wird: `PIPE_BYTES`, `let mut cap` und (Clippy) ein u
 `drop_rights` ohne Linux mit begründetem `allow(clippy::unnecessary_wraps)`, `get_desc` mit begründetem `allow(dead_code)`, bis die
 Adapter unter Windows mit ihrer Beschreibung erscheinen (Tabelle in Abschnitt 4). `cargo clippy -- -D warnings` ist unter Windows grün,
 der Helfer auch gegen `--target x86_64-unknown-linux-gnu` (mit `LIBPCAP_VER` gesetzt, nur Prüfung ohne Linken). `cargo build --workspace` linkt danach ohne weitere Fehler gegen `wpcap.lib`; `openpacketmon.exe --version`
-läuft, `openpacketmon-capture.exe` startet (findet also `wpcap.dll`). Getestet ist noch nichts; dass sich etwas bauen lässt, heißt
-nicht, dass es unter Windows richtig läuft (Abschnitt 4).
+läuft, `openpacketmon-capture.exe` startet (findet also `wpcap.dll`). Dass sich etwas bauen lässt, heißt nicht, dass es unter
+Windows richtig läuft (Abschnitt 4). Gebaut ist bisher nur die Debug-Fassung; `cargo build --release` scheitert erwartungsgemäß an
+`redirect_stdout_stderr_to_file` (nur `cfg(all(windows, not(debug_assertions)))`, Crate `gag` fehlt in `Cargo.toml`).
+
+**Erster Start des Fensters (2026-11-02, Debug-Fassung):** `openpacketmon.exe` öffnet das Fenster „openpacketmon“ (rund 370 MB
+Arbeitsspeicher in der Debug-Fassung) und startet 9 Helfer für die Adapter-Vorschau; nach dem Beenden des Prozesses waren nach 3 s
+keine Helfer mehr übrig. Nur 8 s gelaufen und hart beendet, also weder Bedienung noch Rückfrage beim Schließen noch Mitschnitt geprüft.
 
 **Erster `cargo test --workspace` (2026-11-02):** 384 Tests bestanden, 2 gescheitert, 5 übersprungen (die schon unter Linux
 übersprungenen; `capture/tests/live.rs` besteht nur, weil es ohne `unshare` gleich aufhört, prüft unter Windows also nichts).
@@ -118,7 +125,7 @@ dabei unverändert weiter bauen; Windows-Code kommt hinter `#[cfg(windows)]`, Li
 
 | Stelle | Heute | Für Windows |
 |---|---|---|
-| `src/utils/formatted_strings.rs` `redirect_stdout_stderr_to_file` | nutzt die Crate `gag`, die nicht mehr in `Cargo.toml` steht, **baut im Release nicht** | Funktion entfernen oder `gag` wieder aufnehmen; Log-Datei wird gebraucht, wenn es kein Konsolenfenster gibt |
+| `src/utils/formatted_strings.rs` `redirect_stdout_stderr_to_file` | nutzt die Crate `gag`, die nicht mehr in `Cargo.toml` steht, **baut im Release nicht** (2026-11-02 bestätigt: `gag` fehlt) | Funktion entfernen oder `gag` wieder aufnehmen; Log-Datei wird gebraucht, wenn es kein Konsolenfenster gibt |
 | `src/mmdb/geo.rs` `geo_dir` | `HOME`, `.local/share` (`HOME` fehlt unter Windows) | `%LOCALAPPDATA%\openpacketmon\geo` (**erledigt** 2026-11-02) |
 | `src/mmdb/geo.rs` `geoipupdate_file` | `/var/lib/GeoIP/…` | unter Windows weglassen oder den Ordner von `geoipupdate` nehmen, Test anpassen |
 | `src/networking/traffic_preview.rs`, `capture_context.rs` | aus Sniffnet, schon für Windows vorbereitet | prüfen |
@@ -173,7 +180,7 @@ Danach die Tests aufräumen lassen (Abschnitt oben, `remove_test_dir`).
 
 ## 5. Was unter Windows getestet werden muss
 
-1. `cargo test --workspace`: Tests mit Pfaden (`/var/lib/GeoIP`, `/usr/bin/…`) und Rechten scheitern vermutlich zuerst.
+1. `cargo test --workspace`: **erledigt** (2026-11-02, grün, Einzelheiten oben); `capture/tests/live.rs` prüft unter Windows nichts.
 2. Start ohne Npcap: verständlicher Hinweis mit Link auf npcap.com, kein Absturz. Da `wpcap.dll` beim Laden des Programms
    gebraucht wird, startet das Programm ohne Npcap womöglich gar nicht; dann braucht es verzögertes Laden. Der Helfer allein löst
    das noch nicht: `openpacketmon` nutzt `pcap` weiter für die Adapterliste, für Aufnahmedateien und zum Schreiben von PCAP-Dateien.
@@ -246,9 +253,10 @@ Was SignPath verlangt und was das für uns heißt:
 
 ## 8. Reihenfolge
 
-1. Einrichten (Abschnitt 1 bis 3), `cargo check --workspace` und die echte Fehlerliste mit Abschnitt 4 abgleichen.
-2. Programm bauen und starten, ein Mitschnitt mit Npcap.
-3. `cargo test`, Pfade und Rechte.
+1. Einrichten (Abschnitt 1 bis 3), `cargo check --workspace` und die echte Fehlerliste mit Abschnitt 4 abgleichen. **Erledigt** (2026-11-02).
+2. Programm bauen und starten, ein Mitschnitt mit Npcap. **Teilweise:** Debug-Fassung baut und das Fenster startet; Release-Fassung
+   (`gag`) und Mitschnitt fehlen noch.
+3. `cargo test`, Pfade und Rechte. **Tests grün** (2026-11-02); Rechte von `mcp-access.json` und Helfer erbt offene Dateien offen.
 4. Windows-Eigenheiten aus Abschnitt 5.
 5. CI, Lizenzliste, `deny.toml`.
 6. Installer (unsigniert), Test auf sauberem System, README; dann **Weitergabe an die Tester** als Datei (Abschnitt 6).

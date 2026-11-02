@@ -1216,11 +1216,12 @@ Hinweis: Die Feldnamen (`ip.addr`, `tcp.port`) als Bedienkonvention sind kein Co
 
 Langzeitspeicherung (SQLite) und Berichte; Gerätenamen aus AdGuard/Omada; Warnung bei auffälligem Upload. (Fenster-Variante B ist umgesetzt, siehe „Fenster-Programm“.)
 
-#### 5.3 Windows-Version (vorgesehen, noch nicht begonnen)
+#### 5.3 Windows-Version (begonnen 2026-11-02, Zweig `windows`)
 
 Alles, was für die Fortsetzung auf einem Windows-Rechner nötig ist, steht in **`docs/windows.md`** (2026-10-30): Software,
-Zugänge, Einrichten, die Linux-Bindungen im Code mit ihrer Lösung, Tests, Installer, CI und Reihenfolge. Der Code baut unter
-Windows noch nicht; die größte Baustelle ist `app/src/main.rs`. Npcap wird nie mitgeliefert.
+Zugänge, Einrichten, die Linux-Bindungen im Code mit ihrer Lösung, Tests, Installer, CI und Reihenfolge. Npcap wird nie mitgeliefert.
+**Stand 2026-11-02:** Debug-Fassung baut, Tests grün, Fenster startet; Release-Fassung baut noch nicht (`gag`), kein Icon, kein
+Installer, Mitschnitt nicht ausprobiert. Eine Fassung für Tester gibt es noch nicht.
 
 **Vorgezogen (Nutzer, 2026-11-02):** Die Windows-Version kommt **vor** dem ersten Release, weil andere Tester eine
 Windows-Fassung zum Testen brauchen. Sie enthält MCP (5.4). Der Haltepunkt aus 4.10 gilt weiter: Repo privat, nichts
@@ -1238,7 +1239,8 @@ Windows 2 s); alle drei behoben, jetzt **grün** (386 bestanden). `geo_dir` nimm
 `cargo clippy -- -D warnings` unter Windows grün (Warnungen über Linux-Code behoben). Offen: Testordner bleiben in `%TEMP%` liegen. Ursache ist kein Testfehler: Die Mitschnitt-Helfer der Adapter-Vorschau erben unter
 Windows das Handle der von libpcap geöffneten PCAP-Datei, nach dem Stoppen eines Imports bleibt sie gesperrt (`docs/windows.md` 4
 „Helfer erbt offene Dateien“; Lösung offen, eine braucht `unsafe`, Nutzer 2026-11-02: erst notieren). Außerdem: Smart App Control blockiert ab und zu frisch gebaute Dateien (`docs/windows.md` oben).
-Fenster und Mitschnitt noch nicht ausprobiert.
+Das Fenster startet (kurzer Start der Debug-Fassung: Titel stimmt, 9 Helfer für die Vorschau, nach dem Beenden keine übrig);
+Bedienung und Mitschnitt noch nicht ausprobiert. `cargo build --release` scheitert an `redirect_stdout_stderr_to_file` (Crate `gag` fehlt).
 Früher entschieden (2026-10-30/31): Beginn erst nach dem ersten Release und nach MCP; der Installer soll, **wenn möglich, eine Code-Signatur**
 bekommen. Weg (`docs/windows.md` 6.1): zuerst kostenlos über die SignPath Foundation, das setzt ein unsigniertes Windows-Release und
 einen Build in GitHub Actions voraus, und die Zusage ist nicht sicher, weil deren Regel „No hacking tools“ ein

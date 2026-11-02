@@ -157,7 +157,7 @@ dabei unverändert weiter bauen; Windows-Code kommt hinter `#[cfg(windows)]`, Li
 | Programme je Verbindung (`listeners`) | hat einen Windows-Teil | prüfen, auch die Kürzung auf 15 Zeichen in unserem Code (betrifft nur Linux) |
 | Doku-Texte | „Linux“, `setcap`, `systemctl`, `/usr/share/doc/…` | Oberfläche und README prüfen |
 | `src/config/export_pcap.rs` | Standardordner aus `HOME` | `HOME` fehlt unter Windows: `USERPROFILE` bzw. den Dokumente-Ordner nehmen |
-| `src/mcp/access.rs` `access_path`, Schreiben von `mcp-access.json` | Rechte `0600` nur unter `#[cfg(unix)]` | Unter Windows erben Dateien in `%APPDATA%` normalerweise die Rechte des Benutzerprofils (Benutzer, SYSTEM, Administratoren). Prüfen mit `icacls`; falls andere Benutzer lesen können, die Rechte beim Anlegen einschränken. Der gegenseitige Nachweis (HMAC, `src/mcp/protocol.rs`) schützt zusätzlich, der Token geht nie über die Leitung |
+| `src/mcp/access.rs` `access_path`, Schreiben von `mcp-access.json` | Rechte `0600` nur unter `#[cfg(unix)]` | Unter Windows erben Dateien in `%APPDATA%` normalerweise die Rechte des Benutzerprofils (Benutzer, SYSTEM, Administratoren). **Geprüft** (2026-11-02, `icacls`): nur SYSTEM, Administratoren und der Benutzer, keine Änderung nötig (Abschnitt 5 Punkt 9). Der gegenseitige Nachweis (HMAC, `src/mcp/protocol.rs`) schützt zusätzlich, der Token geht nie über die Leitung |
 | `src/mcp/` Tür auf `127.0.0.1` | unter Linux erreichbar für alle lokalen Benutzer, abgesichert durch den Nachweis | gleich; prüfen, ob die Windows-Firewall beim Lauschen auf `127.0.0.1` nachfragt (sollte sie nicht) |
 | Adapter ohne IP-Verkehr (`TrafficPreview::no_ip`, `CaptureError::NoIp`, 2026-11-02) | Bluetooth, NFLOG, NFQUEUE grau | unter Npcap prüfen, welche Adapter einen nicht unterstützten Link-Typ melden (z. B. Bluetooth, WAN Miniport) |
 
@@ -230,7 +230,17 @@ die Handle-Liste mit `unsafe`, falls das einmal stört.
 7. Sicherheit: Der Sicherheitstest aus `PLAN.md` 4.8 für die geänderten Stellen, vor allem die Rechte des Helfers.
 8. Sauberes System: Installer, Deinstallation, Update über eine ältere Version.
 9. MCP-Anbindung (`PLAN.md` 5.4): `openpacketmon.exe mcp` mit Claude Code unter Windows. Dabei prüfen, dass nur der Benutzer `mcp-access.json` im
-   Ordner der Einstellungen lesen kann: Die Rechte `0600` setzt der Code nur unter Unix.
+   Ordner der Einstellungen lesen kann: Die Rechte `0600` setzt der Code nur unter Unix. **Geprüft** (2026-11-02, installierte Fassung
+   aus dem Installer, Mitschnitt auf einem USB-Ethernet-Adapter, Zugang im Fenster eingeschaltet): Über `openpacketmon.exe mcp` antworten
+   `capture_status` (Adapter mit Beschreibung), `overview` (Hosts mit Geodaten, Programme wie `chrome.exe`), `statistics` (Protokolle,
+   Befunde, TCP-Handshake-Zeiten), `connections`, `packets` mit Filtern (`dns`, `tls.sni`) und `packet_detail`; `follow_stream` und
+   `packet_bytes` lehnen ohne „Paketinhalte erlauben“ ab wie vorgesehen. `mcp-access.json` in `%APPDATA%\openpacketmon\config` erbt
+   die Rechte des Profils: nur SYSTEM, Administratoren und der Benutzer selbst (`icacls`), also wie `0600` unter Linux, wo root ebenfalls
+   lesen kann; keine Änderung nötig. **Mit „Paketinhalte erlauben“** (gleich danach): eigene HTTP-Anfrage an `example.com` mit
+   erfundenem Cookie, `Authorization: Bearer …` und Token in der URL-Query. Liste zeigt `GET /test?[hidden]`; `follow_stream` (Text und
+   Hex), `packet_detail` und `packet_bytes` liefern die Anfrage mit `x` statt der Werte (`Cookie: xxx…`, `Authorization: xxxxxx xxx…`,
+   `/test?xxx…`), die Geheimnisse kommen weder als Text noch als Hex-Bytes vor; die Antwort des Servers kommt vollständig. Mit echtem
+   Claude Code als Client unter Windows noch nicht.
 
 ## 6. Installer und Release
 

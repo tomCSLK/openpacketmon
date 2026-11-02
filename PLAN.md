@@ -1262,6 +1262,11 @@ nur über die CI geprüft.
 **Blinkendes Fenster (2026-11-02, vom Nutzer freigegeben):** Unter Windows nahm wgpu Vulkan, und das Fenster blinkte bei
 Mausbewegungen (Intel Arc); mit DirectX 12 und OpenGL nicht. `src/gui/mod.rs` gibt unter Windows jetzt DirectX 12 vor, sonst OpenGL;
 `WGPU_BACKEND` gilt weiter (`docs/windows.md` 4 „Fenster“).
+**MCP unter Windows geprüft (2026-11-02):** installierte Fassung, Mitschnitt auf USB-Ethernet; alle Lesewerkzeuge antworten über
+`openpacketmon.exe mcp`, Programme und Geodaten sind dabei, Paketinhalte bleiben ohne den Schalter gesperrt. Mit dem Schalter liefern
+`follow_stream` und `packet_bytes` die Inhalte, eine eigene HTTP-Anfrage mit erfundenen Geheimnissen (Cookie, Bearer, URL-Query) kommt
+nur mit `x` an, auch in Hex. `mcp-access.json` ist nur
+für SYSTEM, Administratoren und den Benutzer lesbar, keine Änderung nötig (`docs/windows.md` 5 Punkt 9).
 Früher entschieden (2026-10-30/31): Beginn erst nach dem ersten Release und nach MCP; der Installer soll, **wenn möglich, eine Code-Signatur**
 bekommen. Weg (`docs/windows.md` 6.1): zuerst kostenlos über die SignPath Foundation, das setzt ein unsigniertes Windows-Release und
 einen Build in GitHub Actions voraus, und die Zusage ist nicht sicher, weil deren Regel „No hacking tools“ ein

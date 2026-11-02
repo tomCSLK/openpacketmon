@@ -1222,7 +1222,8 @@ Alles, was für die Fortsetzung auf einem Windows-Rechner nötig ist, steht in *
 Zugänge, Einrichten, die Linux-Bindungen im Code mit ihrer Lösung, Tests, Installer, CI und Reihenfolge. Npcap wird nie mitgeliefert.
 **Stand 2026-11-02 (abends):** Debug- und Release-Fassung bauen, Tests grün, Fenster startet. Release-Fassung ohne Konsolenfenster (auch
 für die Helfer), mit Icon und Versionsangaben; `openpacketmon.exe mcp` antwortet über Pipes. Installer (Inno Setup) und
-Tester-Anleitung da (Absatz „Stufe A und Installer“ unten); Mitschnitt im Fenster noch nicht ausprobiert, noch nichts weitergegeben.
+Tester-Anleitung da (Absatz „Stufe A und Installer“ unten); Mitschnitt im Fenster vom Nutzer getestet, Tester-Fassung 0.3.11 gebaut,
+noch nichts weitergegeben (Smart App Control der Tester blockiert den unsignierten Installer, Signatur angehalten, siehe unten).
 
 **Vorgezogen (Nutzer, 2026-11-02):** Die Windows-Version kommt **vor** dem ersten Release, weil andere Tester eine
 Windows-Fassung zum Testen brauchen. Sie enthält MCP (5.4). Der Haltepunkt aus 4.10 gilt weiter: Repo privat, nichts
@@ -1277,6 +1278,10 @@ Früher entschieden (2026-10-30/31): Beginn erst nach dem ersten Release und nac
 bekommen. Weg (`docs/windows.md` 6.1): zuerst kostenlos über die SignPath Foundation, das setzt ein unsigniertes Windows-Release und
 einen Build in GitHub Actions voraus, und die Zusage ist nicht sicher, weil deren Regel „No hacking tools“ ein
 Mitschnitt-Programm treffen könnte. Sonst ein OV-Zertifikat; Azure Artifact Signing gibt es für Einzelentwickler in Deutschland nicht.
+**Signatur angehalten (Nutzer, 2026-11-02):** Die Tester haben Smart App Control an, das den unsignierten Installer 0.3.11 ganz
+blockiert. Die kostenlosen Wege (SignPath, Certum Open Source ab 49 €) brauchen ein öffentlich sichtbares Projekt und warten damit am
+Haltepunkt 4.10, den der Nutzer abklärt. Ein OV-Zertifikat ist dem Nutzer zu teuer und fällt weg; Smart App Control auszuschalten
+ist für Tester kein Ausweg (`docs/windows.md` 6.1, `docs/windows-tester.md`).
 
 #### 5.4 MCP-Anbindung (Idee des Nutzers, 2026-10-31; neu gefasst und begonnen 2026-11-02, vom Nutzer freigegeben; Stufen 1 bis 3 erledigt)
 

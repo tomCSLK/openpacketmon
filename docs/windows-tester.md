@@ -19,8 +19,10 @@ eingeschaltet ist. Nachsehen unter **Windows-Sicherheit → App- & Browsersteuer
 
 - **Aus** oder **Auswertung**: Es geht weiter wie unten beschrieben.
 - **Ein**: Der Installer wird mit „Eine Anwendungssteuerungsrichtlinie hat diese Datei blockiert“ abgewiesen. Dann bitte
-  auf eine signierte Fassung warten. Smart App Control lässt sich zwar ausschalten, aber danach nicht ohne Weiteres wieder
-  einschalten (nur durch Zurücksetzen von Windows); das sollte niemand für einen Test tun.
+  auf eine signierte Fassung warten. Smart App Control für den Test auszuschalten, ist keine gute Idee: Seit dem
+  Windows-Update vom April 2026 lässt es sich zwar ohne Zurücksetzen von Windows wieder einschalten, nach dem Update
+  KB5127648 (Oktober 2026) bleibt der Schalter bei manchen aber ausgegraut. Und sobald es wieder an ist, blockiert es
+  openpacketmon ohnehin.
 
 ## Installieren
 

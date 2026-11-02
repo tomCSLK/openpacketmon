@@ -124,7 +124,9 @@ Netzwerkverkehrs-Monitor in Rust (iced-GUI, libpcap). Maßgeblich für Stand, Li
   Windows ohne Umbau läuft.
 - **Windows-Version** (begonnen 2026-11-02, vor dem ersten Release, enthält MCP): Alles für die Fortsetzung auf einem Windows-Rechner
   steht in `docs/windows.md` (Software, Einrichten, Linux-Bindungen im Code, Tests, Installer, Code-Signatur, CI, Reihenfolge).
-  Der Installer soll, wenn möglich, signiert werden: zuerst SignPath Foundation, sonst OV-Zertifikat.
+  Der Installer soll, wenn möglich, signiert werden: zuerst SignPath Foundation, sonst Certum Open Source; ein OV-Zertifikat ist
+  dem Nutzer zu teuer (2026-11-02). **Signatur angehalten** (2026-11-02): Smart App Control der Tester blockiert den unsignierten
+  Installer, die kostenlosen Wege brauchen ein öffentliches Projekt; der Nutzer klärt den Haltepunkt ab (`docs/windows.md` 6.1).
 - **Hinweis zur Oberflächentechnik** (Stand 2026-10-31, Hintergrund der Umstellung aus `PLAN.md` 5.5): Die Craft-Programme (WordCraft, DeckCraft,
   GridCraft, PdfCraft, PhotoCraft u. a. sowie der ArtCraft Launcher, Organisation `github.com/storytold`, MIT OR Apache-2.0) sind Rust-Programme
   mit **egui + eframe 0.37** (Fenster über `winit`, Zeichnen über `egui-wgpu`/`egui_glow`; egui und winit aus eigenen Forks mit festen Commits;

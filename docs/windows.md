@@ -9,7 +9,9 @@ und Versionsangaben (Abschnitt 4). Dazu gekommen: Adapter erscheinen mit ihrer B
 importierte PCAP-Datei ist gleich nach dem Stoppen wieder frei, ohne Npcap startet das Programm mit einem Hinweis statt abzustürzen,
 die C-Laufzeit ist statisch gelinkt, der Helfer schneidet im Test auf dem Npcap-Loopback-Adapter mit, und es gibt einen
 **Installer** (Inno Setup, `dev/build-installer.ps1`, Abschnitt 6) samt Anleitung für Tester (`docs/windows-tester.md`).
-**Noch nicht von Hand ausprobiert:** Bedienung und Mitschnitt im Fenster, Installation auf einem sauberen System. Weitergegeben wurde noch nichts.
+Mitschnitt im Fenster vom Nutzer getestet, bisher ohne Probleme; MCP geprüft; erste Tester-Fassung **0.3.11** gebaut (Abschnitt 6).
+**Noch nicht ausprobiert:** Installation auf einem sauberen System. Weitergegeben wurde noch nichts: Die Tester haben Smart App Control
+an, und das blockiert den unsignierten Installer; die Signatur ist angehalten (Abschnitt 6.1).
 Die Punkte in Abschnitt 4 stammen aus einer Durchsicht des Codes auf dem Linux-Rechner, ergänzt um das, was unter Windows
 aufgefallen ist.
 
@@ -275,21 +277,38 @@ auf bis zu fünf Rechnern; beim Weitergeben an Tester darauf hinweisen.
   `CLAUDE.md`, und Sniffnet-Logo, -Grafiken und -Namen müssen raus.
 - Der Installer darf Npcap nicht enthalten, er nennt nur den Download.
 - **Code-Signatur:** Der Installer soll, wenn möglich, signiert werden (Nutzer, 2026-10-30); ohne Signatur warnt Windows
-  SmartScreen. Die Wege stehen in Abschnitt 6.1.
+  SmartScreen, und **Smart App Control blockiert ihn ganz**. Die Tester haben Smart App Control an (Nutzer, 2026-11-02), können
+  0.3.11 also nicht installieren. Die Wege und der Stand stehen in Abschnitt 6.1.
 - `dev/release.sh` kennt nur das `.deb`. Es braucht eine Erweiterung oder einen Schritt in GitHub Actions.
 - Die Update-Prüfung vergleicht nur Versionsnummern. Der Hinweis muss unter Windows auf den Installer zeigen.
 - `THIRD-PARTY-LICENSES.txt` enthält jetzt auch die Windows-Crates, siehe Abschnitt 7.
 
 ### 6.1 Code-Signatur
 
-Recherche vom 2026-10-30, vor der Umsetzung erneut prüfen. Vorgehen: zuerst SignPath versuchen, sonst ein OV-Zertifikat kaufen.
-Auch mit Signatur kann SmartScreen anfangs warnen, bis der Installer genug Reputation gesammelt hat.
+Recherche vom 2026-10-30, ergänzt 2026-11-02; vor der Umsetzung erneut prüfen. Auch mit Signatur kann SmartScreen anfangs warnen,
+bis der Installer genug Reputation gesammelt hat. Smart App Control dagegen lässt ein Programm mit gültiger Signatur einer
+vertrauenswürdigen Zertifizierungsstelle laufen.
+
+**Stand (Nutzer, 2026-11-02): angehalten.** Smart App Control blockiert den unsignierten Installer bei den Testern. Die kostenlosen
+Wege (SignPath, Certum Open Source) verlangen ein öffentlich sichtbares Projekt und warten damit am Haltepunkt aus `PLAN.md` 4.10;
+der Nutzer klärt den Haltepunkt ab. Ein normales OV-Zertifikat ist dem Nutzer **zu teuer** für Open-Source-Software und wird
+nicht weiter verfolgt.
 
 | Weg | Für uns | Bedingungen und Haken |
 |---|---|---|
-| **SignPath Foundation** (kostenlos für Open Source, https://signpath.org/terms.html) | **erster Versuch, Zusage nicht sicher** | Siehe unten |
-| **OV-Zertifikat** einer Zertifizierungsstelle | Rückfall, geht auch für Privatpersonen | Kostet jährlich Geld, Preise vor dem Kauf vergleichen. Der Schlüssel liegt auf Hardware-Token oder in einem Cloud-Dienst, das muss zum Build passen |
-| **Azure Artifact Signing** (früher Trusted Signing) | **kommt nicht infrage** | Laut einer Antwort auf Microsoft Q&A für Einzelentwickler nur in USA und Kanada, Organisationen auch in der EU. Ab 9,99 $ im Monat, braucht ein bezahltes Azure-Abo |
+| **SignPath Foundation** (kostenlos für Open Source, https://signpath.org/terms.html) | **erster Versuch nach dem Haltepunkt, Zusage nicht sicher** | Siehe unten |
+| **Certum Open Source Code Signing** (https://shop.certum.eu/code-signing.html) | **Rückfall nach dem Haltepunkt** | Ab 49 € (Cloud-Signatur SimplySign) oder 69 € (mit Karte und Leser), nur für Privatpersonen, im Zertifikat steht „Open Source Developer“. Certum verlangt die Adresse eines öffentlich auffindbaren Projekts, das die Verbindung zum Antragsteller zeigt, und stellt sonst nichts aus (https://www.support.certum.eu/en/required-documents/). Gültig höchstens 459 Tage |
+| **OV-Zertifikat** einer Zertifizierungsstelle | **abgelehnt** (Nutzer, 2026-11-02: zu teuer) | Etwa Certum Standard 169 € mit Karte, 209 € in der Cloud, jährlich |
+| **Azure Artifact Signing** (früher Trusted Signing) | **kommt nicht infrage** | Laut Microsoft-Quickstart (https://learn.microsoft.com/azure/artifact-signing/quickstart) für Einzelentwickler nur in USA und Kanada, Organisationen auch in der EU. Ab 9,99 $ im Monat, braucht ein bezahltes Azure-Abo |
+| **Microsoft Store** (versteckter Eintrag, MSIX) | nicht weiter verfolgt | Microsoft signiert das Paket, verlangt aber Umbau auf MSIX und eine Prüfung im Store; ein Store-Eintrag ist schon eine Form der Veröffentlichung (Haltepunkt) |
+
+Smart App Control bei den Testern auszuschalten, ist kein Ausweg: Seit dem April-Update 2026 lässt es sich ohne Zurücksetzen von
+Windows wieder einschalten, nach KB5127648 (Oktober 2026) bleibt der Schalter bei manchen aber ausgegraut; und wieder
+eingeschaltet blockiert es das Programm trotzdem.
+
+Beim Umsetzen signieren: `openpacketmon.exe`, `openpacketmon-capture.exe`, Installer und Deinstaller (Inno Setup `SignTool` und
+`SignedUninstaller=yes`), jeweils mit Zeitstempel, in `dev/build-installer.ps1`; ohne Zertifikat weiter unsigniert mit Hinweis.
+Prüfen, ob Smart App Control auch die Datei durchlässt, die der Inno-Installer beim Start in den Temp-Ordner entpackt.
 
 Was SignPath verlangt und was das für uns heißt:
 
@@ -324,14 +343,17 @@ Was SignPath verlangt und was das für uns heißt:
 
 1. Einrichten (Abschnitt 1 bis 3), `cargo check --workspace` und die echte Fehlerliste mit Abschnitt 4 abgleichen. **Erledigt** (2026-11-02).
 2. Programm bauen und starten, ein Mitschnitt mit Npcap. **Teilweise:** Debug- und Release-Fassung bauen, das Fenster startet ohne
-   Konsole und mit Icon, der Helfer schneidet im Test mit; der Mitschnitt im Fenster fehlt noch (braucht den Nutzer).
-3. `cargo test`, Pfade und Rechte. **Tests grün** (2026-11-02), Helfer erbt offene Dateien gelöst; Rechte von `mcp-access.json` offen.
+   Konsole und mit Icon, der Helfer schneidet im Test mit; Mitschnitt im Fenster vom Nutzer getestet (2026-11-02).
+3. `cargo test`, Pfade und Rechte. **Tests grün** (2026-11-02), Helfer erbt offene Dateien gelöst; Rechte von `mcp-access.json` geprüft (Abschnitt 5 Punkt 9). Offen: MCP-Integrationstests
+   nicht von den echten Einstellungen getrennt (Abschnitt 4).
 4. Windows-Eigenheiten aus Abschnitt 5. **Teilweise:** Adapternamen, Start ohne Npcap, C-Laufzeit, Npcap-Timeout erledigt.
 5. CI, Lizenzliste, `deny.toml`. **Lizenzliste und `deny.toml` erledigt**, CI-Job für Windows offen.
 6. Installer (unsigniert), Test auf sauberem System, README; dann **Weitergabe an die Tester** als Datei (Abschnitt 6). **Installer
-   und Tester-Anleitung erledigt**; offen: Test auf sauberem System, README, Version für die Tester-Fassung (nennt der Nutzer).
+   und Tester-Anleitung erledigt**, erste Tester-Fassung 0.3.11 gebaut; offen: Test auf sauberem System, README, MCP-Einrichtung
+   (`claude mcp add …`) in `docs/windows-tester.md`. Weitergabe an Tester mit Smart App Control erst mit Signatur (Punkt 7).
    Ein Windows-Release auf GitHub erst mit dem ersten Release nach dem Haltepunkt.
-7. Signatur beantragen (Abschnitt 6.1), danach signierte Installer.
+7. Signatur beantragen (Abschnitt 6.1), danach signierte Installer. **Angehalten** (2026-11-02), bis der Nutzer den Haltepunkt
+   geklärt hat.
 
 **Beginn (Nutzer, 2026-11-02):** Windows wird **vor** dem ersten Release gemacht, weil andere Tester eine Windows-Fassung
 brauchen; MCP ist fertig. Bis zum Release gilt auch auf dem Windows-Rechner der Haltepunkt aus `PLAN.md` 4.10. Die Abschnitte 4 und 5 stammen aus der Zeit vor MCP: Beim Beginn die Liste um das ergänzen, was

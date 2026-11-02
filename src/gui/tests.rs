@@ -210,6 +210,11 @@ fn shots() {
     let idle = engine_with(0);
     let busy = engine_with(2_000);
     for (theme, suffix) in [(Theme::Light, "light"), (Theme::Dark, "dark")] {
+        // adapters without IP traffic are only known once the preview could open them
+        for preview in &mut idle.engine.lock().previews {
+            let name = preview.device.get_name();
+            preview.no_ip = name.starts_with("bluetooth") || name.starts_with("nf");
+        }
         let mut harness = window(&idle, theme, Lang::De);
         shot(&mut harness, &folder, &format!("capture-{suffix}"));
 

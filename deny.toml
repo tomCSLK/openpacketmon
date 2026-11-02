@@ -12,6 +12,8 @@ unmaintained = "all"
 unsound = "all"
 # Vulnerabilities always fail. Unmaintained and unsound crates fail as well, except these known ones that only
 # arrive through other crates; they are checked again when those crates are updated.
+# Checked 2026-11-02: accesskit_unix 0.24.1 and accesskit_atspi_common 0.21.1 are the newest releases and still use
+# zbus 5; the advisories say the crates were merged into zbus 6, not that they have a flaw.
 ignore = [
     { id = "RUSTSEC-2026-0370", reason = "zvariant (merged into zbus 6) only through accesskit_unix, the screen reader support of egui" },
     { id = "RUSTSEC-2026-0371", reason = "zbus_names (merged into zbus 6) only through accesskit_unix, the screen reader support of egui" },
@@ -37,7 +39,9 @@ allow = [
     "Zlib",
 ]
 confidence-threshold = 0.9
-# The fonts built into egui: Hack (MIT), Noto Emoji and Emoji Icon Font (OFL-1.1), Ubuntu Light (Ubuntu-font-1.0).
+# The fonts built into egui as fallbacks: Hack (MIT and Bitstream Vera License), Emoji Icon Font (MIT), Noto Emoji
+# (OFL-1.1), Ubuntu Light (Ubuntu-font-1.0). All allow embedding and redistribution with their license texts, which
+# dev/third-party-licenses.py copies into THIRD-PARTY-LICENSES.txt.
 exceptions = [
     { crate = "epaint_default_fonts", allow = ["OFL-1.1", "Ubuntu-font-1.0"] },
 ]

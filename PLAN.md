@@ -942,16 +942,59 @@ korrigierten Paket-Abhängigkeiten). Von Sniffnet noch keine Antwort.
 **Entschieden (Nutzer, 2026-10-30):** Antwort von Sniffnet abwarten, dann umschalten und **0.3.0** als erstes Release
 veröffentlichen. Bleibt die Antwort aus, entscheidet der Nutzer über das weitere Vorgehen.
 
+**Neu gefasst (2026-11-02):** Die Liste darunter galt für die Browser-Oberfläche (0.3.0, `app/`, WebKitGTK). Seit dem
+Umstieg auf egui (5.5) gibt es kein Fenster-Programm `app/` mehr, das Paket hängt nicht mehr an WebKitGTK, und das erste
+Release wird 0.4.0 oder 0.5.0. Vor dem Release erledigt (2026-11-02, auf Ansage, ohne den Haltepunkt zu berühren):
+- **`deny.toml` neu bewertet:** Die drei Ausnahmen RUSTSEC-2026-0370/0371/0372 bleiben. Sie sind „unmaintained“ (zvariant,
+  zbus_names, zvariant_derive gingen in zbus 6 auf), keine Schwachstelle; sie kommen nur über `accesskit_unix` (Screenreader
+  von egui), und accesskit 0.24.1/`accesskit_atspi_common` 0.21.1 sind die neuesten Fassungen, noch mit zbus 5. Prüfdatum
+  steht in `deny.toml`. Schriften: Die Ausnahme für `epaint_default_fonts` bleibt, aber deren Lizenztexte fehlten in
+  `THIRD-PARTY-LICENSES.txt`, weil sie im Unterordner `fonts/` liegen: Ubuntu Font Licence, OFL (Noto Emoji), Hack mit
+  Bitstream-Vera-Lizenz, MIT (Emoji Icon Font). `dev/third-party-licenses.py` nimmt sie jetzt über `EXTRA_LICENSE_FILES` mit
+  und hält an, wenn eine dieser Dateien fehlt.
+- **Unzuverlässiger Test `test_increments_ping_sequence` behoben:** Er erwartete 0, 1, 2 vom gemeinsamen Zähler
+  `PING_SEQUENCE`, den die gleichzeitig laufenden Ping-Tests mit hochzählen. Jetzt zählt er einen eigenen Zähler über
+  `next_from` und prüft auch den Überlauf nach `u16::MAX`. `latency.rs` ist damit eine geänderte Datei des Originals
+  (Kopfzeilen, `NOTICE`); das fand der Trockenlauf.
+- **Sicherheitsdurchsicht** (Teile seit 4.8: egui-Oberfläche, Mitschnitt-Helfer, MCP, Geo-Download, Update-Prüfung):
+  - Helfer: übersetzt den BPF-Filter jetzt erst **nach** dem Abgeben der Rechte; ein Fehler im BPF-Übersetzer von libpcap
+    bekommt so keine Rechte mehr. Neuer Test `refuses_a_broken_filter_after_giving_up_the_rights` im Netz-Namensraum;
+    `inside_the_namespace` prüft weiter, dass der Filter wirkt und die Rechte weg sind.
+  - Update-Prüfung: Zeitlimit 30 s (vorher keins, eine hängende Verbindung hätte die Prüfung für immer offen gelassen).
+  - Ohne Befund: Links im Fenster nur zu festen Adressen (Quellcode, Releases, DB-IP); Paketinhalte werden überall nur als
+    druckbares ASCII gezeigt, alles andere als `·` (`dissect::text`, Stream, Hex-Dump), Steuerzeichen beim Kopieren
+    ersetzt; fremde Unicode-Zeichen kommen nur aus Geo-Datenbanken, Programm- und Hostnamen, fehlende Zeichen zeichnet
+    `MissingGlyphPolicy::Tofu` als Kästchen; lange Texte in Listen werden abgeschnitten. Geo-Download mit Grenzen (64 MiB
+    gepackt, 256 MiB entpackt, 120 s). Protokoll Helfer → Programm mit Längengrenzen (256 KiB je Paket, 4 KiB Text). MCP: Stand
+    der Prüfung aus 5.4 Stufe 4 (24 von 24 Angriffen abgewehrt), seitdem unverändert.
+  - Langer Zufallstest im Release-Bau mit 300 000 Runden je Test (Zerleger, Filter, Masker, MCP-Werkzeuge) ohne Befund.
+  - Zur Entscheidung (Nutzer): Das Paket setzt die Rechte auf `/usr/bin/openpacketmon-capture` für **alle** lokalen
+    Benutzer, wie Sniffnet bei seinem Programm. Wireshark fragt bei der Installation und erlaubt es nur der Gruppe
+    `wireshark`. Möglich wäre eine Gruppe `openpacketmon` (Helfer `root:openpacketmon`, Modus `0750`, Nutzer in die
+    Gruppe aufnehmen). Für einen Laptop mit einem Benutzer ändert das nichts; nicht umgesetzt.
+- **Trockenlauf `dev/release.sh`** (erstmals, mit vorübergehendem Abschnitt `## [0.3.9]` im CHANGELOG, danach
+  zurückgesetzt): Der erste Lauf hielt an der fehlenden Kennzeichnung von `latency.rs` an (behoben), der zweite lief durch:
+  Prüfungen, Release-Bau, Paket mit allen Pflichtdateien, Version und Abhängigkeiten, `SHA256SUMS`. Abhängigkeiten des
+  Pakets: `libasound2t64`, `libc6 (>= 2.39)`, `libcap2-bin`, `libpcap0.8t64`, `libvulkan1 | libegl1`, Wayland-, X11- und
+  xkbcommon-Bibliotheken. Damit läuft es erst ab Ubuntu 24.04 und Debian 13 (die `t64`-Pakete und glibc 2.39 fehlen
+  Debian 12 und Ubuntu 22.04). Der Teil mit `--publish` ist weiter ungetestet.
+- **Installationstest im Container** (podman, frische Images `ubuntu:24.04` und `debian:trixie`, Paket aus dem
+  Trockenlauf): Installation mit `apt` ohne Empfehlungen, `openpacketmon --version`, keine fehlenden Bibliotheken
+  (`ldd`), `postinst` setzt `cap_net_admin,cap_net_raw=eip` auf den Helfer, `--list-adapters`, Desktop-Datei, Entfernen mit
+  `purge` sauber. Im Ubuntu-Image fehlen `NOTICE` und `THIRD-PARTY-LICENSES.txt` unter `/usr/share/doc/openpacketmon/`, weil
+  das minimierte Image `/usr/share/doc/*` ausschließt; im Paket sind sie drin, und das Programm zeigt beide Texte selbst
+  (Seite Lizenzen). Fenster und Mitschnitt gehen im Container nicht, siehe Schritt 4.
+
 Noch offen, in dieser Reihenfolge:
 1. **Antwort von Sniffnet** (Gmail-Faden `1a18d94568cbe1f1`, Betreff „Sniffnet IPFIX collector: …“). Einen Termin, den
-   Sniffnet nennt, einhalten; die Herkunftsangabe im Advisory prüfen.
-2. Nutzertest 0.2.7 vorläufig abgeschlossen (2026-10-31). Zurück-Knopf und Statistik-Knopf (Phase 3 Punkte 17, 18) sind umgesetzt
-   (2026-10-31), Test-Paket **0.2.8** gebaut. Ebenfalls umgesetzt: Vorschläge in den Filterfeldern (Punkt 19).
-   Test-Paket **0.2.9** gebaut (2026-10-31). Offen: Zurück-Pfeil, Alt+Links und Vorschläge im Fenster-Programm prüfen.
-3. Version **0.3.0** setzen: `Cargo.toml`, `app/Cargo.toml`, `cargo update --workspace --offline`; in `CHANGELOG.md`
-   `## [Unreleased]` zu `## [0.3.0]` mit Datum; Release-Hinweise (Englisch) als Datei schreiben; committen, pushen, CI grün.
-4. Trockenlauf `dev/release.sh` (das Skript lief noch nie), Installationstest auf sauberem Ubuntu 24.04 und Debian 13
-   (Start, Fenster, Mitschnitt). Danach die Angabe in der README prüfen, die diese Systeme nennt.
+   Sniffnet nennt, einhalten; die Herkunftsangabe im Advisory prüfen. Stand 2026-11-02: keine Antwort, keine
+   Unzustellbarkeitsmeldung, `src/networking/ipfix/` bei Sniffnet seit 2026-09-05 unverändert. Sniffnet hat „Private
+   vulnerability reporting“ auf GitHub an; eine Nachfrage dort oder im Mail-Faden etwa ab 2026-11-06, nur auf Ansage.
+2. Nutzertest der egui-Fassung abschließen (zuletzt Test-Paket 0.3.10 mit den Adaptern ohne IP-Verkehr und den Punkten oben).
+3. Version **0.4.0 oder 0.5.0** setzen: `Cargo.toml`, `capture/Cargo.toml`, `cargo update --workspace --offline`; in
+   `CHANGELOG.md` `## [Unreleased]` zu `## [X.Y.Z] - Datum`; Release-Hinweise (Englisch) als Datei; committen, pushen, CI grün.
+4. Installationstest mit Fenster und Mitschnitt auf einem sauberen Ubuntu 24.04 und Debian 13 (VM oder anderer Rechner);
+   der Test im Container (siehe oben) prüft nur Abhängigkeiten, Installation, Rechte und Entfernen.
 5. Repo-Einstellungen: Themen (`network-monitor`, `packet-capture`, `rust`, `linux`), Force-Push auf `main` sperren.
    Beschreibung gesetzt, Wiki/Projects aus.
 6. Sichtbarkeit auf **öffentlich** (macht der Nutzer oder nach ausdrücklicher Freigabe per `gh repo edit
@@ -1389,9 +1432,9 @@ Stand egui (2026-11-01, Stufen 1 bis 4 freigegeben vom Nutzer, Test-Pakete **0.3
 - **Aus dem Test von 0.3.8 umgesetzt** (2026-11-02, Freigabe „führe die korrekturen durch“, Test-Paket **0.3.9**):
   - **Verkehrsbalken der Top-Listen** (Übersicht, Hosts, Dienste, Programme): Am Übergang Blau → Grün war eine Kerbe, die wie eine Lücke aussah, weil `widgets::share_bar` beide Teile einzeln mit runden Ecken zeichnete; kleine Teile wurden zu Punkten. Jetzt eine Form: beide Teile zusammen in der zweiten Farbe mit runden Enden, der erste darüber nur links rund. An der Naht scheint kein Hintergrund durch. Im Bildtest vergrößert geprüft, hell und dunkel.
   - **Schrift der Knöpfe auf gleicher Höhe:** „Beenden“ und „Pakete dieser Verbindung“ im Seitenkopf hatten ihre Schrift 2 px höher als die Knopfgruppe „Bytes · Bits · Pakete“ daneben (gemessen im Bildtest: Großbuchstaben bei y 27 statt 29, Kästen gleich, 32 px). Ursache: egui 0.37 setzt die Schrift eines Buttons dorthin, wohin das Layout außen herum ausrichtet (`ui.layout().align2()`): im Seitenkopf (`right_to_left(Align::Min)`) oben, in der Zeile der Gruppe (`ui.horizontal`, mittig) in die Mitte; der Innenraum ist höher als die Schrift. Am Button lässt sich das nicht einstellen, und ein passender Innenabstand ließ 1 px Rest (ganze Pixel). Jetzt zeichnet `widgets::add_button` die Schrift selbst in die Mitte des Kastens; der egui-Button behält Größe, Platz, Bedienung und Beschriftung (für Tests und Screenreader) und bekommt eine durchsichtige Schrift. Gilt für alle Knöpfe aus `button`, `small_button` und `segmented`. Gemessen in Übersicht, Stream (Seiten- und Kartenkopf) und Aufzeichnung: überall 11 px von der Oberkante bis zu den Großbuchstaben.
-- **Offen, aus dem Test (2026-11-01, noch nicht umgesetzt):** Adapter ohne IP-Verkehr (`bluetooth0`, `bluetooth-monitor`, `nflog`, `nfqueue`) zeigen in der Vorschau „0“ und eine leere Kurve, obwohl die Vorschau sie wegen des nicht unterstützten Link-Typs gar nicht öffnet (`traffic_preview.rs`, trotz laufender Bluetooth-Kopfhörer). Wählt man sie, endet `parse_packets` sofort ohne Meldung. Bluetooth selbst bleibt laut 5.1 außerhalb des Umfangs. Entschieden (Nutzer, 2026-11-01): solche Adapter ausgrauen, nicht wählbar, Hinweis „Kein IP-Verkehr, wird nicht ausgewertet“ statt Kurve; nicht ausblenden. Umsetzung erst auf Ansage, der Nutzer testet weiter.
+- **Adapter ohne IP-Verkehr ausgegraut** (aus dem Test 2026-11-01, umgesetzt 2026-11-02 auf Ansage, Test-Paket 0.3.10): Adapter wie `bluetooth0`, `bluetooth-monitor`, `nflog`, `nfqueue` zeigten in der Vorschau „0“ und eine leere Kurve, obwohl die Vorschau sie wegen des nicht unterstützten Link-Typs gar nicht öffnet; ein Start endete in `parse_packets` ohne Meldung. Bluetooth selbst bleibt laut 5.1 außerhalb des Umfangs. Jetzt meldet die Vorschau solche Adapter (`TrafficPreview::no_ip`, `DevicePreview::no_ip`), die Seite Aufzeichnung zeigt sie grau, nicht wählbar und am Ende der Liste, mit „Kein IP-Verkehr, wird nicht ausgewertet“ statt Kurve; sie werden nicht ausgeblendet. Eine zuvor gespeicherte Wahl eines solchen Adapters wird nicht übernommen. Ein Start auf so einer Quelle (auch Datei oder `--adapter`) bricht mit `CaptureError::NoIp` und Begründung samt Link-Typ ab, statt still nichts zu zeigen. Geprüft mit Tests (Vorschau, Ablehnung beim Start, leere PCAP mit Link-Typ 201), Bildtest hell und dunkel und `--adapter bluetooth0`/`nflog` über den installierten Mitschnitt-Helfer.
 - **Nicht von Hand geprüft:** Bedienung im echten Fenster, Live-Mitschnitt in der Oberfläche, Ton, Dateidialoge, Skalierung des Bildschirms, Geo-Download, `.deb` auf anderen Systemen. Auf dem Laptop bleibt nach dem Umstieg `~/.config/autostart/openpacketmon-app.desktop` stehen und muss von Hand weg.
-- Vor dem Release: `deny.toml`-Ausnahmen neu bewerten (RUSTSEC-2026-0370/0371/0372, Schriftlizenzen); `test_increments_ping_sequence` beheben; Sicherheitsdurchsicht der geänderten Teile: Webangriffe (4.8) fallen weg, neu ist, dass Paketinhalte als Text im Fenster stehen (fehlende Zeichen zeigt das Programm als Kästchen, `MissingGlyphPolicy::Tofu`). MCP (5.4) gehört in diese Durchsicht, es wird mit dem ersten Release veröffentlicht.
+- Vor dem Release (erledigt 2026-11-02, Ergebnis in 4.10): `deny.toml`-Ausnahmen neu bewerten (RUSTSEC-2026-0370/0371/0372, Schriftlizenzen); `test_increments_ping_sequence` beheben; Sicherheitsdurchsicht der geänderten Teile: Webangriffe (4.8) fallen weg, neu ist, dass Paketinhalte als Text im Fenster stehen (fehlende Zeichen zeigt das Programm als Kästchen, `MissingGlyphPolicy::Tofu`). MCP (5.4) gehört in diese Durchsicht, es wird mit dem ersten Release veröffentlicht.
 
 Entschieden (Nutzer, 2026-10-31): Der Paketspeicher bleibt im RAM, die Grenze wird wählbar (bis etwa 2 GiB mit passender Paketzahl).
 Eine temporäre Datei wie bei Wireshark kommt nur, falls das später nicht reicht, weil sonst unverschlüsselter Verkehr auf der SSD läge.

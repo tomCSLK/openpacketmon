@@ -84,6 +84,10 @@ fn run() -> Result<(), String> {
     let mut cap = open(&options)?;
     // nothing below needs the rights any more: the open socket keeps working without them
     drop_rights()?;
+    // the filter is compiled from text only now, so a flaw in the BPF compiler of libpcap gets no rights
+    if !options.bpf.is_empty() {
+        cap.filter(&options.bpf, true).map_err(|e| e.to_string())?;
+    }
     enlarge_pipe();
     let link_type = cap.get_datalink().0;
     let mut out = BufWriter::with_capacity(64 * 1024, stdout().lock());
@@ -100,7 +104,8 @@ fn run() -> Result<(), String> {
     capture(&mut cap, &options.bpf, &mut out)
 }
 
-/// Opens the adapter with the settings of openpacketmon; only an existing adapter is accepted
+/// Opens the adapter with the settings of openpacketmon (without the filter, which comes after the
+/// rights are gone); only an existing adapter is accepted
 fn open(options: &Options) -> Result<Capture<Active>, String> {
     let device = Device::list()
         .map_err(|e| e.to_string())?
@@ -121,9 +126,6 @@ fn open(options: &Options) -> Result<Capture<Active>, String> {
     #[cfg(target_os = "linux")]
     {
         cap = cap.setnonblock().map_err(|e| e.to_string())?;
-    }
-    if !options.bpf.is_empty() {
-        cap.filter(&options.bpf, true).map_err(|e| e.to_string())?;
     }
     Ok(cap)
 }

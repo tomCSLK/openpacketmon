@@ -102,6 +102,7 @@ impl EngineState {
             .map(|dev| DevicePreview {
                 device: MyDevice::from_pcap_device(dev),
                 packets: std::collections::VecDeque::new(),
+                no_ip: false,
             })
             .collect();
         let mmdb_readers = MmdbReaders {
@@ -273,6 +274,21 @@ impl EngineState {
         }
 
         if capture_context.error().is_some() {
+            return None;
+        }
+        if let Some(link_type) = capture_context.link_type()
+            && !link_type.is_supported()
+        {
+            // nothing of it would be evaluated: say so, instead of a capture that shows nothing
+            let name = self.capture_source.get_name();
+            if let Some(preview) = self
+                .previews
+                .iter_mut()
+                .find(|p| *p.device.get_name() == name)
+            {
+                preview.no_ip = true;
+            }
+            self.capture_error = Some(CaptureError::NoIp(link_type.description()));
             return None;
         }
 

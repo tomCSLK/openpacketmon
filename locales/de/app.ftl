@@ -56,6 +56,7 @@ capture-adapters-hint = Die Kurven zeigen die Pakete der letzten 30 Sekunden; so
 capture-adapter = Adapter
 capture-addresses = Adressen
 capture-activity = Pakete (30 s)
+capture-no-ip = Kein IP-Verkehr, wird nicht ausgewertet
 capture-no-adapters = Keine Netzwerkadapter gefunden.
 capture-no-adapters-hint = openpacketmon-capture braucht das Recht, Pakete mitzuschneiden (setcap cap_net_raw,cap_net_admin=eip, beim Paket eingerichtet).
 capture-export-enable = Pakete zusätzlich in eine PCAP-Datei schreiben
@@ -91,6 +92,8 @@ capture-error = Die Aufzeichnung konnte nicht gestartet werden: { $error }
 capture-error-unknown = Die Aufzeichnung konnte nicht gestartet werden.
 capture-file-missing = Gib den Pfad der Aufzeichnungsdatei an.
 capture-adapter-missing = Wähle einen Netzwerkadapter aus der Liste.
+capture-adapter-no-ip = Dieser Adapter führt keinen IP-Verkehr und wird nicht ausgewertet. Wähle einen anderen.
+capture-no-ip-source = Die Quelle enthält keinen IP-Verkehr (Link-Typ { $link }) und wird nicht ausgewertet.
 capture-stopped = Die Aufzeichnung ist stehen geblieben, es kommen keine Pakete mehr: { $reason }
 capture-ipfix-undecodable = Die empfangenen IPFIX-Daten können zurzeit nicht ausgewertet werden (Vorlage des Exporters fehlt noch).
 capture-state-running = läuft

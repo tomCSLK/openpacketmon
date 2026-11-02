@@ -23,6 +23,16 @@ LICENSE_FILE = re.compile(r"^(licen[cs]e|copying|notice|unlicense)([-._].*)?$", 
 # the programs whose dependencies are listed
 ROOTS = ("openpacketmon", "openpacketmon-capture")
 
+# license files a crate keeps outside its top folder; the fonts egui builds in carry their own licenses
+EXTRA_LICENSE_FILES = {
+    "epaint_default_fonts": [
+        "fonts/UFL.txt",
+        "fonts/OFL.txt",
+        "fonts/Hack-Regular.txt",
+        "fonts/emoji-icon-font-mit-license.txt",
+    ],
+}
+
 BUNDLED = [
     ("Inter 4.1", "resources/fonts/", "OFL-1.1", "resources/fonts/OFL.txt"),
 ]
@@ -77,7 +87,9 @@ def shipped_packages(meta):
 def license_texts(package):
     folder = pathlib.Path(package["manifest_path"]).parent
     files = sorted(f for f in folder.iterdir() if f.is_file() and LICENSE_FILE.match(f.name))
-    return [(f.name, f.read_text(encoding="utf-8", errors="replace").strip()) for f in files]
+    # a missing extra file stops the script: the crate has changed and the list must be checked
+    files += [folder / name for name in EXTRA_LICENSE_FILES.get(package["name"], [])]
+    return [(str(f.relative_to(folder)), f.read_text(encoding="utf-8", errors="strict").strip()) for f in files]
 
 
 def add(texts, text, user):

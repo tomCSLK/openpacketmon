@@ -21,6 +21,8 @@ pub struct AdapterRow {
     pub selected: bool,
     /// Packets seen in the last 30 seconds
     pub packets: String,
+    /// No IP traffic on this adapter: shown greyed out, cannot be chosen
+    pub no_ip: bool,
 }
 
 /// The running capture, shown instead of the selection
@@ -86,6 +88,7 @@ pub fn capture_setup(t: Lang, state: &EngineState) -> CaptureSetup {
                 .join(", "),
             selected: *p.device.get_name() == selected_device,
             packets: format::count(t, p.tot_packets()),
+            no_ip: p.no_ip,
         })
         .collect();
     let running = state.is_running().then(|| running_capture(t, state));
@@ -226,6 +229,13 @@ pub fn apply_start(engine: &mut EngineState, request: &StartRequest) -> Option<&
             if !engine.select_device(&request.device) {
                 return Some("capture-adapter-missing");
             }
+            if engine
+                .previews
+                .iter()
+                .any(|p| p.no_ip && *p.device.get_name() == request.device)
+            {
+                return Some("capture-adapter-no-ip");
+            }
             let export = &mut engine.conf.export_pcap;
             export.set_enabled(request.export);
             export.set_directory(request.export_dir.trim().to_owned());
@@ -258,6 +268,7 @@ pub fn start_error(t: Lang, engine: &EngineState, problem: Option<&str>) -> Stri
     problem.map_or_else(
         || match &engine.capture_error {
             Some(CaptureError::Fatal(e)) => t.get1("capture-error", "error", e.as_str()),
+            Some(CaptureError::NoIp(link)) => t.get1("capture-no-ip-source", "link", link.as_str()),
             _ => t.get("capture-error-unknown"),
         },
         |id| t.get(id),
@@ -271,6 +282,9 @@ pub fn capture_problem(t: Lang, engine: &EngineState) -> Option<String> {
         Some(CaptureError::IpfixUndecodable) => Some(t.get("capture-ipfix-undecodable")),
         Some(CaptureError::Stopped(reason)) => {
             Some(t.get1("capture-stopped", "reason", reason.as_str()))
+        }
+        Some(CaptureError::NoIp(link)) => {
+            Some(t.get1("capture-no-ip-source", "link", link.as_str()))
         }
         None => None,
     }
@@ -345,6 +359,35 @@ mod tests {
             Some("capture-adapter-missing")
         );
         assert!(!engine.lock().is_running());
+    }
+
+    #[test]
+    fn an_adapter_without_ip_traffic_cannot_be_chosen() {
+        let mut state = EngineState::new(Conf::default());
+        state.previews.push(crate::engine::previews::DevicePreview {
+            device: crate::networking::types::my_device::MyDevice::from_pcap_device(
+                pcap::Device::from("no-ip-test0"),
+            ),
+            packets: std::collections::VecDeque::new(),
+            no_ip: true,
+        });
+        let mut bluetooth = request(None);
+        bluetooth.source = CaptureSourcePicklist::Device;
+        bluetooth.device = "no-ip-test0".to_owned();
+        assert_eq!(
+            apply_start(&mut state, &bluetooth),
+            Some("capture-adapter-no-ip")
+        );
+        let row = capture_setup(Lang::En, &state)
+            .adapters
+            .into_iter()
+            .find(|a| a.name == "no-ip-test0")
+            .unwrap();
+        assert!(row.no_ip);
+        assert_eq!(
+            start_error(Lang::En, &state, Some("capture-adapter-no-ip")),
+            Lang::En.get("capture-adapter-no-ip")
+        );
     }
 
     #[test]

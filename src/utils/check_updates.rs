@@ -34,6 +34,8 @@ async fn is_newer_release_available_inner(
 ) -> UpdateStatus {
     let Ok(client) = reqwest::Client::builder()
         .user_agent(format!("{APP_NAME}-{APP_VERSION}"))
+        // a stalled connection would leave the check waiting for good
+        .timeout(Duration::from_secs(30))
         .build()
         .log_err(location!())
     else {

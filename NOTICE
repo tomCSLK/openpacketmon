@@ -55,6 +55,7 @@ their top that they were modified ("Modified for openpacketmon"):
   src/networking/types/host.rs
   src/networking/types/info_address_port_pair.rs
   src/networking/types/info_traffic.rs
+  src/networking/types/latency.rs
   src/networking/types/mod.rs
   src/networking/types/my_device.rs
   src/networking/types/program.rs

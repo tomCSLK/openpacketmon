@@ -117,6 +117,9 @@ fn start_requested_capture(
     }
     match &engine.lock().capture_error {
         Some(CaptureError::Fatal(e)) => eprintln!("Could not start the capture: {e}"),
+        Some(CaptureError::NoIp(link)) => {
+            eprintln!("Not started: the source carries no IP traffic (link type {link})");
+        }
         _ => eprintln!("Could not start the capture"),
     }
     false

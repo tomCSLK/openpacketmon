@@ -347,4 +347,37 @@ pub(crate) mod tests {
             Some(crate::networking::types::capture_context::CaptureError::Fatal(_))
         ));
     }
+
+    #[test]
+    #[serial]
+    fn a_source_without_ip_traffic_is_not_started() {
+        // an empty capture file of Bluetooth HCI (link type 201), as `bluetooth0` delivers
+        let dir = std::env::temp_dir().join(format!("openpacketmon-noip-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("bluetooth.pcap");
+        let mut header = vec![0xd4, 0xc3, 0xb2, 0xa1, 2, 0, 4, 0];
+        header.extend_from_slice(&[0; 8]);
+        header.extend_from_slice(&65_535_u32.to_le_bytes());
+        header.extend_from_slice(&201_u32.to_le_bytes());
+        std::fs::write(&path, header).unwrap();
+
+        let runtime = tokio::runtime::Runtime::new().unwrap();
+        let engine = Engine::new(Conf::default(), runtime.handle().clone());
+        {
+            let mut state = engine.lock();
+            state.set_capture_source(CaptureSourcePicklist::File);
+            state.set_pcap_import(path.display().to_string());
+        }
+        assert!(!engine.start());
+        {
+            let state = engine.lock();
+            assert!(!state.is_running());
+            assert!(matches!(
+                &state.capture_error,
+                Some(crate::networking::types::capture_context::CaptureError::NoIp(link))
+                    if link.starts_with("BLUETOOTH_HCI_H4_WITH_PHDR")
+            ));
+        }
+        let _ = std::fs::remove_dir_all(dir);
+    }
 }

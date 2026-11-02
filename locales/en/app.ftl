@@ -56,6 +56,7 @@ capture-adapters-hint = The curves show the packets of the last 30 seconds, so t
 capture-adapter = Adapter
 capture-addresses = Addresses
 capture-activity = Packets (30 s)
+capture-no-ip = No IP traffic, not analyzed
 capture-no-adapters = No network adapters found.
 capture-no-adapters-hint = openpacketmon-capture needs the right to capture packets (setcap cap_net_raw,cap_net_admin=eip, set up by the package).
 capture-export-enable = Also write the packets to a PCAP file
@@ -91,6 +92,8 @@ capture-error = The capture could not be started: { $error }
 capture-error-unknown = The capture could not be started.
 capture-file-missing = Enter the path of the capture file.
 capture-adapter-missing = Choose a network adapter from the list.
+capture-adapter-no-ip = This adapter carries no IP traffic and is not analyzed. Choose another one.
+capture-no-ip-source = The source carries no IP traffic (link type { $link }) and is not analyzed.
 capture-stopped = The capture has stopped, no more packets arrive: { $reason }
 capture-ipfix-undecodable = The IPFIX data received cannot be decoded at the moment (the exporter's template is still missing).
 capture-state-running = running

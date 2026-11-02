@@ -10,13 +10,16 @@ use async_channel::Sender;
 use pcap::{Device, Stat};
 use sniffnet_packet_parser::LinkType;
 use sniffnet_packet_parser::ParsedPacket;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::thread;
 use std::time::{Duration, Instant};
 
 #[derive(Default, Clone, Debug)]
 pub struct TrafficPreview {
     pub data: Vec<(MyDevice, u128)>,
+    /// Adapters whose link type carries no IP traffic the program understands (Bluetooth, NFLOG …);
+    /// the preview does not watch them, and a capture on them would see nothing
+    pub no_ip: HashSet<String>,
 }
 
 pub fn traffic_preview(tx: &Sender<TrafficPreview>) {
@@ -24,7 +27,8 @@ pub fn traffic_preview(tx: &Sender<TrafficPreview>) {
     let (pcap_tx, pcap_rx) = std::sync::mpsc::sync_channel(10_000);
 
     let mut data = HashMap::new();
-    handle_devices_and_previews(&mut data, tx, &pcap_tx);
+    let mut no_ip = HashSet::new();
+    handle_devices_and_previews(&mut data, &mut no_ip, tx, &pcap_tx);
 
     loop {
         let (packet_res, _) = pcap_rx
@@ -39,7 +43,7 @@ pub fn traffic_preview(tx: &Sender<TrafficPreview>) {
             ticks = ticks
                 .checked_add(Duration::from_secs(1))
                 .unwrap_or(Instant::now());
-            handle_devices_and_previews(&mut data, tx, &pcap_tx);
+            handle_devices_and_previews(&mut data, &mut no_ip, tx, &pcap_tx);
         }
 
         if let Ok(packet) = packet_res {
@@ -55,6 +59,7 @@ pub fn traffic_preview(tx: &Sender<TrafficPreview>) {
 
 fn handle_devices_and_previews(
     data: &mut HashMap<String, u128>,
+    no_ip: &mut HashSet<String>,
     tx: &Sender<TrafficPreview>,
     pcap_tx: &std::sync::mpsc::SyncSender<(Result<PacketOwned, pcap::Error>, Option<Stat>)>,
 ) {
@@ -79,6 +84,7 @@ fn handle_devices_and_previews(
             continue;
         };
         if !link_type.is_supported() {
+            no_ip.insert(dev_name);
             continue;
         }
         let pcap_tx = pcap_tx.clone();
@@ -97,6 +103,7 @@ fn handle_devices_and_previews(
             })
             .log_err(location!());
     }
+    traffic_preview.no_ip.clone_from(no_ip);
     let _ = tx.send_blocking(traffic_preview);
     for v in data.values_mut() {
         *v = 0;

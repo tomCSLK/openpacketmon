@@ -184,3 +184,13 @@ fn refuses_an_unknown_adapter() {
     assert!(String::from_utf8_lossy(&helper.data).contains("no-such-adapter"));
     assert!(!helper.child.wait().unwrap().success());
 }
+
+#[test]
+#[ignore = "started by captures_in_a_namespace"]
+fn refuses_a_broken_filter_after_giving_up_the_rights() {
+    // the filter is compiled without rights, and a broken one still stops the helper
+    let mut helper = Helper::start("lo", "udp port");
+    assert_eq!(helper.next(), Frame::Failed);
+    assert!(!helper.data.is_empty());
+    assert!(!helper.child.wait().unwrap().success());
+}

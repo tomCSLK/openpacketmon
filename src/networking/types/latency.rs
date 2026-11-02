@@ -1,3 +1,6 @@
+// Modified for openpacketmon (2026), see NOTICE. Based on `src/networking/types/latency.rs` of Sniffnet
+// (https://github.com/GyulyVGC/sniffnet), Copyright (c) 2022 Giuliano Bellini, MIT OR Apache-2.0.
+
 use std::net::IpAddr;
 use std::sync::atomic::{AtomicU16, Ordering};
 use std::sync::{Arc, OnceLock};
@@ -83,14 +86,21 @@ fn ping_identifier() -> PingIdentifier {
 }
 
 fn next_sequence() -> PingSequence {
-    PingSequence(PING_SEQUENCE.fetch_add(1, Ordering::Relaxed))
+    next_from(&PING_SEQUENCE)
+}
+
+/// The next number of a counter, starting again at 0 after `u16::MAX`
+fn next_from(counter: &AtomicU16) -> PingSequence {
+    PingSequence(counter.fetch_add(1, Ordering::Relaxed))
 }
 
 #[cfg(test)]
 mod tests {
     use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 
-    use super::{LatencyStatus, measure_latency, next_sequence, ping_identifier};
+    use std::sync::atomic::AtomicU16;
+
+    use super::{LatencyStatus, measure_latency, next_from, ping_identifier};
 
     #[test]
     fn test_uses_process_id_as_ping_identifier() {
@@ -99,12 +109,14 @@ mod tests {
 
     #[test]
     fn test_increments_ping_sequence() {
-        let first = next_sequence().0;
-        assert_eq!(first, 0);
-        let second = next_sequence().0;
-        assert_eq!(second, 1);
-        let third = next_sequence().0;
-        assert_eq!(third, 2);
+        // a counter of its own: the shared one also counts the pings of tests running at the same time
+        let counter = AtomicU16::new(0);
+        assert_eq!(next_from(&counter).0, 0);
+        assert_eq!(next_from(&counter).0, 1);
+        assert_eq!(next_from(&counter).0, 2);
+        let counter = AtomicU16::new(u16::MAX);
+        assert_eq!(next_from(&counter).0, u16::MAX);
+        assert_eq!(next_from(&counter).0, 0);
     }
 
     #[tokio::test]

@@ -31,6 +31,9 @@ pub enum CaptureError {
     IpfixUndecodable,
     /// The running capture has ended by itself: no packets come any more
     Stopped(String),
+    /// The adapter or file carries no IP traffic the program understands (Bluetooth, NFLOG …),
+    /// with the description of its link type; the capture is not started
+    NoIp(String),
 }
 
 impl CaptureContext {

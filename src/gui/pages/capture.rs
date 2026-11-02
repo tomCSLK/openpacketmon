@@ -11,7 +11,7 @@ use crate::gui::widgets::{self, Kind};
 use crate::gui::{App, Page};
 use crate::networking::types::capture_context::CaptureSourcePicklist;
 use crate::view::capture::{
-    CaptureSetup, PacketChoice, StartRequest, apply_start, capture_setup, start_error,
+    AdapterRow, CaptureSetup, PacketChoice, StartRequest, apply_start, capture_setup, start_error,
 };
 use crate::view::i18n::Lang;
 
@@ -44,7 +44,7 @@ impl Form {
             device: setup
                 .adapters
                 .iter()
-                .find(|a| a.selected)
+                .find(|a| a.selected && !a.no_ip)
                 .map(|a| a.name.clone())
                 .unwrap_or_default(),
             file: setup.file.clone(),
@@ -462,6 +462,15 @@ fn device_fields(ui: &mut Ui, t: Lang, form: &mut Form, snapshot: &Snapshot) {
                 widgets::fact_label(ui, &t.get("capture-activity"));
                 ui.end_row();
                 for adapter in &snapshot.setup.adapters {
+                    if adapter.no_ip {
+                        // the preview only learns this after opening the adapter
+                        if form.device == adapter.name {
+                            form.device.clear();
+                        }
+                        no_ip_row(ui, t, adapter);
+                        ui.end_row();
+                        continue;
+                    }
                     ui.vertical(|ui| {
                         ui.spacing_mut().item_spacing.y = 0.0;
                         let name = RichText::new(&adapter.name).strong();
@@ -508,6 +517,32 @@ fn device_fields(ui: &mut Ui, t: Lang, form: &mut Form, snapshot: &Snapshot) {
             ui.end_row();
         });
     }
+}
+
+/// An adapter without IP traffic (Bluetooth, NFLOG …): greyed out, cannot be chosen, a note
+/// instead of the activity, since the preview does not watch it
+fn no_ip_row(ui: &mut Ui, t: Lang, adapter: &AdapterRow) {
+    let p = palette(ui.ctx());
+    let note = t.get("capture-no-ip");
+    ui.vertical(|ui| {
+        ui.spacing_mut().item_spacing.y = 0.0;
+        let name = RichText::new(&adapter.name).strong();
+        ui.add_enabled(false, egui::RadioButton::new(false, name))
+            .on_disabled_hover_text(&note);
+        if !adapter.desc.is_empty() {
+            ui.label(RichText::new(&adapter.desc).small().color(p.faint));
+        }
+    });
+    if adapter.addresses.is_empty() {
+        ui.label(RichText::new("–").color(p.faint));
+    } else {
+        ui.add(
+            egui::Label::new(RichText::new(&adapter.addresses).small().color(p.faint))
+                .wrap_mode(egui::TextWrapMode::Truncate),
+        )
+        .on_hover_text(&adapter.addresses);
+    }
+    ui.label(RichText::new(note).small().color(p.muted));
 }
 
 /// The activity of an adapter in the last seconds

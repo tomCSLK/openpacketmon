@@ -8,8 +8,8 @@ charts, down to the single packet. It is a native program with its own window, i
 
 > **Status: early version.** Expect rough edges, and please report what you find.
 
-Platform: Linux on x86-64 for now. The package is made for Ubuntu 24.04 or newer, Debian 13 or newer and systems based on
-them; it needs glibc 2.39 or newer.
+Platform: Linux on x86-64. The package is made for Ubuntu 24.04 or newer, Debian 13 or newer and systems based on
+them; it needs glibc 2.39 or newer. A Windows version is being tested and follows later.
 
 ## Installation
 

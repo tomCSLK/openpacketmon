@@ -82,15 +82,15 @@ Netzwerkverkehrs-Monitor in Rust (iced-GUI, libpcap). Maßgeblich für Stand, Li
   PR- und Issue-Vorlagen, CI-Job `dco`; README, `CLAUDE.md`, `PLAN.md` durchgesehen, Suchläufe ohne Befund.
   **4.8 erledigt** (2026-10-29): Code-Review, Zufallstests (`src/fuzz.rs`, lang mit `FUZZ_ITERATIONS=1000000
   cargo test --release fuzz`) und 190 Angriffe auf eine Testinstanz (Port 7390, präparierte PCAP). Behoben: Absturz
-  im DNS-über-TCP-Zerleger (ein Paket genügte), IPFIX-Vorlagen mit Tausenden leerer Feldern (CPU/Speicher), halbe
+  im DNS-über-TCP-Zerleger (ein Paket genügte), Grenzen für IPFIX-Vorlagen, halbe
   HTTP-Anfragen ohne Timeout (`web::serve` jetzt mit hyper und `header_read_timeout` 10 s), verdrehte Bereiche bei
   kaputten IPv6-Erweiterungen, `back`-Pfade mit Tab, quadratische Favoriten-Prüfung, `xdg-open` nur für http(s).
   Details `PLAN.md` 4.8. Test-Paket **0.2.5** mit diesen Korrekturen gebaut (2026-10-29).
   **4.9 erledigt** (2026-10-29): alte Historie als Bundle in `~/Dokumente/openpacketmon-history-bis-2026-10-29.bundle`,
   altes Repo privat als `tomCSLK/openpacketmon-old`, neues privates `tomCSLK/openpacketmon` mit einem Anfangs-Commit;
   Tag `upstream-base` nur noch im Bundle, Zweig `design-muster` nur lokal. Details `PLAN.md` 4.9.
-- **4.10 vorbereitet, Haltepunkt** (2026-10-30, `PLAN.md` 4.10): Der IPFIX-Befund steckt weiter in Sniffnet und wurde an
-  `security@sniffnet.app` gemeldet. **Repo bleibt privat, bis Sniffnet geantwortet hat oder ein Termin vereinbart ist.**
+- **4.10 vorbereitet, Haltepunkt** (2026-10-30, `PLAN.md` 4.10): Ein Befund aus 4.8 wurde an Sniffnet gemeldet, das Repo
+  blieb deshalb privat. **Haltepunkt am 2026-11-02 vom Nutzer aufgehoben, Repo öffentlich** (Sniffnet vorher benachrichtigt).
   `.deb` mit `depends = "$auto, libcap2-bin"`, neues `dev/release.sh` (Release-Titel `vX.Y.Z`, sonst bleibt die
   Update-Prüfung stumm; noch nicht ausgeführt), README und CHANGELOG für das erste Release überarbeitet.
   Commit `55f5213`, CI grün; Test-Paket **0.2.7** (nur die korrigierten Abhängigkeiten dazu). Entschieden: nach der Antwort
@@ -115,7 +115,7 @@ Netzwerkverkehrs-Monitor in Rust (iced-GUI, libpcap). Maßgeblich für Stand, Li
   **erstes Release 0.4.0 oder 0.5.0** statt 0.3.0; der Haltepunkt gilt unverändert. Ebenfalls entschieden: **Plan B** mit kleinem
   Mitschnitt-Helfer und egui-Programm ohne Rechte, ohne Webschicht; Paketspeicher bleibt im RAM mit wählbarer Grenze. Probebau im Scratchpad bestanden (flüssig mit 2 Millionen
   Zeilen, 0,4 % CPU im Leerlauf, Ergebnis in `PLAN.md` 5.5): wgpu und eingebaute Schrift Inter; Bedienung von Hand steht noch aus.
-- **Reihenfolge** (Nutzer, 2026-10-31, zweimal geändert 2026-11-02): MCP-Anbindung (erledigt) → **Windows-Version** (vorgezogen, weil andere Tester sie brauchen; `PLAN.md` 5.3, `docs/windows.md`) → erstes Release (0.4.0 oder 0.5.0, wartet am Haltepunkt). Der Haltepunkt gilt auch für Windows.
+- **Reihenfolge** (Nutzer, 2026-10-31, zweimal geändert 2026-11-02): MCP-Anbindung (erledigt) → **Windows-Version** (vorgezogen, weil andere Tester sie brauchen; `PLAN.md` 5.3, `docs/windows.md`) → erstes Release (0.4.0 oder 0.5.0). Haltepunkt am 2026-11-02 aufgehoben, Repo öffentlich (`PLAN.md` 4.10).
 - **Windows-Rechner eingerichtet** (2026-11-02, `docs/windows.md` 1): Rust, cargo-deny, Npcap 1.90 (WinPcap-Kompatibilitätsmodus) und Npcap SDK (`%USERPROFILE%\npcap-sdk`, Benutzervariable `LIB`) nachinstalliert. Erster `cargo check --workspace` im Zweig `windows`: ein Fehler (`libc::timeval` in `capture_helper.rs`, behoben), jetzt grün mit vier Warnungen über Linux-Code; `cargo build --workspace` linkt, beide Programme starten; `cargo test --workspace` nach drei Korrekturen grün (386 bestanden; `geo_dir` unter Windows `%LOCALAPPDATA%\openpacketmon\geo`, offene Datei im Test geschlossen, MCP-Umschalttest wartet bis zur ersten Antwort). `cargo clippy -- -D warnings` unter Windows grün. Gefunden: Mitschnitt-Helfer erbten unter Windows das Handle importierter PCAP-Dateien (`docs/windows.md` 4 „Helfer erbt offene Dateien“); gelöst mit „Stop wartet“ (nächster Punkt). Smart App Control blockiert ab und zu frisch gebaute Dateien, dann neu linken (`docs/windows.md` oben). Release-Fassung baut (2026-11-02): ohne Konsolenfenster (`windows_subsystem` nur im Release, Helfer mit `CREATE_NO_WINDOW`), mit Icon und Versionsangaben (`dev/make-ico.py`, `winresource` in `build.rs`); Kommandozeilen-Ausgaben dort nur mit `| Out-Host`. Fenster startet, Bedienung und Mitschnitt noch nicht ausprobiert.
 - **Windows Stufe A und Installer** (2026-11-02, freigegeben, auf dem Zweig `windows` committet und am selben Tag nach `main` übernommen, `PLAN.md` 5.3, `docs/windows.md`): Adapter mit Beschreibung statt `\Device\NPF_{…}`; `Engine::stop` wartet, bis der Mitschnitt seine Dateien geschlossen hat (`CaptureEnded`), importierte PCAP-Datei sofort frei, Tests räumen auf und starten keine echten Helfer (`capture_helper::tests::REAL_HELPERS`); `wpcap.dll` verzögert geladen, ohne Npcap Dialog (`src/npcap.rs`); C-Laufzeit statisch (`.cargo/config.toml`); Helfer-Live-Test auf Npcap-Loopback. Unter Windows zeichnet das Fenster mit DirectX 12, sonst OpenGL (mit Vulkan blinkte es bei Mausbewegungen, Intel Arc; `WGPU_BACKEND` gilt weiter). **Installer:** Inno Setup 6, `resources/packaging/windows/openpacketmon.iss`, gebaut mit `powershell -ExecutionPolicy Bypass -File dev\build-installer.ps1` (Version aus `Cargo.toml`, nennt der Nutzer), standardmäßig nur für den Benutzer; Tester-Anleitung `docs/windows-tester.md`. `THIRD-PARTY-LICENSES.txt` deckt jetzt Linux und Windows ab, `deny.toml` prüft beide Ziele. Offen: Mitschnitt im Fenster (Nutzer), sauberes System (Windows-Sandbox), CI-Job Windows, MCP-Integrationstests unter Windows nicht von den echten Einstellungen getrennt (`confy` ignoriert dort `XDG_CONFIG_HOME`). Systemsprache: unter Windows über `sys-locale` (2026-11-02). Mitschnitt im Fenster vom Nutzer getestet, bisher ohne Probleme. **Erste Tester-Fassung 0.3.11** (Windows-Installer, 2026-11-02, SHA-256 in `docs/windows.md` 6). MCP unter Windows geprüft (alle Lesewerkzeuge, `mcp-access.json` nur für Benutzer, SYSTEM und Administratoren lesbar).
 - **Nutzertest 0.3.10** (2026-11-02): Bedienung über längere Zeit, Mitschnitt mit BPF-Filter, Ton, Dateidialoge, Skalierung, Geo-Download und die grauen Adapter ohne Befund. README beschreibt jetzt, wie man den Mitschnitt-Helfer auf eine Gruppe beschränkt (im Container geprüft).
@@ -126,7 +126,7 @@ Netzwerkverkehrs-Monitor in Rust (iced-GUI, libpcap). Maßgeblich für Stand, Li
   steht in `docs/windows.md` (Software, Einrichten, Linux-Bindungen im Code, Tests, Installer, Code-Signatur, CI, Reihenfolge).
   Der Installer soll, wenn möglich, signiert werden: zuerst SignPath Foundation, sonst Certum Open Source; ein OV-Zertifikat ist
   dem Nutzer zu teuer (2026-11-02). **Signatur angehalten** (2026-11-02): Smart App Control der Tester blockiert den unsignierten
-  Installer, die kostenlosen Wege brauchen ein öffentliches Projekt; der Nutzer klärt den Haltepunkt ab (`docs/windows.md` 6.1).
+  Installer, die kostenlosen Wege brauchen ein öffentliches Projekt (`docs/windows.md` 6.1). Haltepunkt am 2026-11-02 aufgehoben, Repo öffentlich (`PLAN.md` 4.10); nächster Schritt ist der Antrag.
 - **Hinweis zur Oberflächentechnik** (Stand 2026-10-31, Hintergrund der Umstellung aus `PLAN.md` 5.5): Die Craft-Programme (WordCraft, DeckCraft,
   GridCraft, PdfCraft, PhotoCraft u. a. sowie der ArtCraft Launcher, Organisation `github.com/storytold`, MIT OR Apache-2.0) sind Rust-Programme
   mit **egui + eframe 0.37** (Fenster über `winit`, Zeichnen über `egui-wgpu`/`egui_glow`; egui und winit aus eigenen Forks mit festen Commits;
@@ -149,8 +149,9 @@ Netzwerkverkehrs-Monitor in Rust (iced-GUI, libpcap). Maßgeblich für Stand, Li
 - Erst planen, Umsetzung nur nach ausdrücklicher Freigabe durch den Nutzer.
 - Committen, Pushen und Pakete bauen nur auf Ansage des Nutzers; die Version nennt der Nutzer. Nach einer Änderung Doku
   nachziehen, lokal prüfen und berichten, nicht auf die CI warten.
-- **Repo nicht öffentlich schalten und nichts veröffentlichen, solange der Haltepunkt in `PLAN.md` 4.10 gilt** (auch auf
-  anderen Rechnern).
+- **Haltepunkt aufgehoben** (Nutzer, 2026-11-02, `PLAN.md` 4.10): Das Repo ist öffentlich. Einzelheiten zu dem an Sniffnet
+  gemeldeten Befund (Messwerte, Ablauf, Mail) gehören nur in `CLAUDE.local.md`, nie in Commits, Issues oder öffentliche Dateien,
+  bis das Original ihn behoben hat (auch auf anderen Rechnern).
 - **Nichts auf GitHub anlegen oder hochladen, bevor Name und Logo feststehen.** Repo zuerst privat (kein GitHub-Fork, siehe `PLAN.md` Phase 1).
 - Vor dem Öffentlich-Schalten `PLAN.md` Phase 4 vollständig abarbeiten (u. a. GeoIP zur Laufzeit, Fremdlizenzen, Sicherheitstest).
 - Oberfläche: Farben und Aufbau wie opennetmon, in `src/gui/theme.rs`. Neue Seitendaten gehören nach `src/view/`, Zeichnen nach `src/gui/`; Texte nur über `locales/`.

@@ -117,7 +117,7 @@ einen Kauf gebeten, nicht verpflichtet.
   - `~/Dokumente/openpacketmon-history-bis-2026-10-29.bundle` (alte Historie),
   - der lokale Zweig `design-muster`.
 - **Notizen von Claude Code** liegen nur auf dem Laptop. Die wichtigen Regeln stehen deshalb auch in `CLAUDE.md`
-  (Arbeitsregeln) und `PLAN.md` 4.10 (Haltepunkt Sniffnet).
+  (Arbeitsregeln) und `PLAN.md` 4.10 (Haltepunkt, seit 2026-11-02 aufgehoben).
 
 ## 3. Einrichten
 
@@ -248,8 +248,8 @@ die Handle-Liste mit `unsafe`, falls das einmal stört.
 ## 6. Installer und Release
 
 **Entschieden (Nutzer, 2026-11-02):** Die Tester bekommen **gleich einen Installer**, zunächst **unsigniert** (SmartScreen warnt
-dann; „Weitere Informationen → Trotzdem ausführen“). Solange der Haltepunkt aus `PLAN.md` 4.10 gilt, bekommen Tester nur
-die Installer-Datei, keinen Zugang zum Repo und keine Release-Seite: Der Code zeigt die an Sniffnet gemeldete Lücke. Der
+dann; „Weitere Informationen → Trotzdem ausführen“). Bis zum 2026-11-02 bekamen Tester nur die Installer-Datei
+(Haltepunkt aus `PLAN.md` 4.10); seitdem ist das Repo öffentlich, ein Release mit Installer folgt. Der
 Installer nennt Npcap und dessen Download, enthält es aber nicht. Die kostenlose Npcap-Lizenz erlaubt den privaten Einsatz
 auf bis zu fünf Rechnern; beim Weitergeben an Tester darauf hinweisen.
 
@@ -268,7 +268,7 @@ auf bis zu fünf Rechnern; beim Weitergeben an Tester darauf hinweisen.
   aus dem Installationsordner; stille Deinstallation entfernt Ordner, Eintrag und Startmenü, die Einstellungen bleiben.
   **Noch nicht** auf einem sauberen System (Abschnitt 5 Punkt 8, z. B. Windows-Sandbox) und nicht von Hand durchgeklickt.
 - **Erste Tester-Fassung 0.3.11** (2026-11-02, Version vom Nutzer): `target\installer\openpacketmon-0.3.11-setup.exe`, 10 179 802 Bytes,
-  SHA-256 `d36c0f589da73f98d57dd12f7431deb973f45a4916280799af2ed17174753b0e`, unsigniert. Weitergabe nur als Datei (Haltepunkt 4.10).
+  SHA-256 `d36c0f589da73f98d57dd12f7431deb973f45a4916280799af2ed17174753b0e`, unsigniert. Weitergabe nur als Datei (damals galt der Haltepunkt 4.10).
 - `docs/windows-tester.md`: Anleitung für Tester (Npcap mit WinPcap-Modus, Smart App Control, SmartScreen, was ausprobieren,
   Rückmeldung, Deinstallation).
 
@@ -289,9 +289,9 @@ Recherche vom 2026-10-30, ergänzt 2026-11-02; vor der Umsetzung erneut prüfen.
 bis der Installer genug Reputation gesammelt hat. Smart App Control dagegen lässt ein Programm mit gültiger Signatur einer
 vertrauenswürdigen Zertifizierungsstelle laufen.
 
-**Stand (Nutzer, 2026-11-02): angehalten.** Smart App Control blockiert den unsignierten Installer bei den Testern. Die kostenlosen
-Wege (SignPath, Certum Open Source) verlangen ein öffentlich sichtbares Projekt und warten damit am Haltepunkt aus `PLAN.md` 4.10;
-der Nutzer klärt den Haltepunkt ab. Ein normales OV-Zertifikat ist dem Nutzer **zu teuer** für Open-Source-Software und wird
+**Stand (Nutzer, 2026-11-02):** Smart App Control blockiert den unsignierten Installer bei den Testern. Die kostenlosen
+Wege (SignPath, Certum Open Source) verlangen ein öffentlich sichtbares Projekt; deshalb hat der Nutzer den Haltepunkt aus
+`PLAN.md` 4.10 am 2026-11-02 aufgehoben und das Repo öffentlich geschaltet. Nächster Schritt: Antrag stellen. Ein normales OV-Zertifikat ist dem Nutzer **zu teuer** für Open-Source-Software und wird
 nicht weiter verfolgt.
 
 | Weg | Für uns | Bedingungen und Haken |
@@ -351,10 +351,9 @@ Was SignPath verlangt und was das für uns heißt:
 6. Installer (unsigniert), Test auf sauberem System, README; dann **Weitergabe an die Tester** als Datei (Abschnitt 6). **Installer
    und Tester-Anleitung erledigt**, erste Tester-Fassung 0.3.11 gebaut; offen: Test auf sauberem System, README, MCP-Einrichtung
    (`claude mcp add …`) in `docs/windows-tester.md`. Weitergabe an Tester mit Smart App Control erst mit Signatur (Punkt 7).
-   Ein Windows-Release auf GitHub erst mit dem ersten Release nach dem Haltepunkt.
-7. Signatur beantragen (Abschnitt 6.1), danach signierte Installer. **Angehalten** (2026-11-02), bis der Nutzer den Haltepunkt
-   geklärt hat.
+   Ein Windows-Release auf GitHub mit dem ersten Release (Haltepunkt seit 2026-11-02 aufgehoben).
+7. Signatur beantragen (Abschnitt 6.1), danach signierte Installer. Seit 2026-11-02 möglich, das Repo ist öffentlich.
 
 **Beginn (Nutzer, 2026-11-02):** Windows wird **vor** dem ersten Release gemacht, weil andere Tester eine Windows-Fassung
-brauchen; MCP ist fertig. Bis zum Release gilt auch auf dem Windows-Rechner der Haltepunkt aus `PLAN.md` 4.10. Die Abschnitte 4 und 5 stammen aus der Zeit vor MCP: Beim Beginn die Liste um das ergänzen, was
+brauchen; MCP ist fertig. Der Haltepunkt aus `PLAN.md` 4.10 galt auch auf dem Windows-Rechner; er ist seit 2026-11-02 aufgehoben. Die Abschnitte 4 und 5 stammen aus der Zeit vor MCP: Beim Beginn die Liste um das ergänzen, was
 seitdem dazugekommen ist.

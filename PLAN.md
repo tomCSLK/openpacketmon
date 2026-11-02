@@ -841,10 +841,9 @@ Speicher der Testinstanz dabei 50 → 90 MB. Rechte: nur `cap_net_admin,cap_net_
 1. **Absturz im DNS-Zerleger** (DNS über TCP mit 1 Byte Nutzlast und Bytes hinter dem IP-Paket: Länge aus dem
    Trailer gelesen, `data[56..55]` → Panic). Von außen mit einem Paket auslösbar; die Paketliste, Filter und
    Details mit diesem Paket wären danach jedes Mal abgebrochen. Länge jetzt nur aus der Nutzlast (`dns.rs`).
-2. **IPFIX-Collector** (lauscht standardmäßig auf `0.0.0.0:4739`): eine Vorlage mit 16 000 Feldern der Länge 0 und
-   ein 64-KB-Datagramm kosteten ~6 s CPU je Datagramm; 2000 solcher Vorlagen ~390 MB (Grenze 10 000 → ~1,9 GB).
-   Jetzt werden Felder der Länge 0 verworfen (jedes Feld braucht ≥ 1 Byte) und Vorlagen mit mehr als 512 Feldern
-   ignoriert (`collect.rs`); Test `test_process_datagram_hostile_templates`.
+2. **IPFIX-Collector** (lauscht standardmäßig auf `0.0.0.0:4739`): präparierte Vorlagen kosteten viel CPU und Speicher.
+   Jetzt mit Grenzen für Vorlagen (`collect.rs`); Test `test_process_datagram_hostile_templates`. Einzelheiten und
+   Messwerte nur lokal (`CLAUDE.local.md`), bis das Original den Befund behoben hat.
 3. **Halbe HTTP-Anfragen** blieben unbegrenzt offen (900 Stück: +67 MB, nur lokal erreichbar). `web::serve` nimmt
    Verbindungen jetzt selbst an (hyper `http1` mit `header_read_timeout` 10 s, `hyper`/`hyper-util` als direkte
    Abhängigkeiten, keine neuen Crates); danach nach 15 s keine offen.
@@ -915,13 +914,12 @@ Voraussetzung: 4.1–4.8 erledigt, committet, CI grün, Arbeitsbaum sauber.
 
 #### 4.10 Umschalten und erstes öffentliches Release
 
-**Haltepunkt (2026-10-30):** Der IPFIX-Befund aus 4.8 steckt weiter in Sniffnet (`collect.rs` in `main` @ `931d7ede`
-unverändert, der ganze IPFIX-Pfad gleich). Am 2026-10-30 per E-Mail an `security@sniffnet.app` gemeldet (Weg laut deren
-`SECURITY.md`), mit dem Versprechen, das Repo bis zu ihrer Antwort privat zu lassen, weil Code, Test und 4.8 den Fund
-offenlegen. Messung auf unserem Code ohne die Korrektur (Release ohne LTO): 11,7 s CPU je 65-KB-Datagramm, 2000 Vorlagen
-377 MiB. Sniffnet selbst wurde nicht gebaut. Die übrigen Befunde aus 4.8 liegen im neuen Code, nicht im Original.
-**Nicht umschalten, bevor Sniffnet geantwortet hat oder ein Termin vereinbart ist.** `dev/release.sh --publish` hält bei
-einem privaten Repo an.
+**Haltepunkt (2026-10-30 bis 2026-11-02):** Ein Befund aus 4.8 wurde am 2026-10-30 an die Entwickler von Sniffnet gemeldet;
+das Repo blieb deshalb zunächst privat. **Aufgehoben (Nutzer, 2026-11-02):** Ohne Antwort von Sniffnet hat der Nutzer
+entschieden, das Repo sofort öffentlich zu schalten, weil die Tester unter Windows einen signierten Installer brauchen und die
+kostenlosen Signaturwege ein öffentliches Projekt verlangen (5.3, `docs/windows.md` 6.1). Sniffnet wurde vorher benachrichtigt.
+Einzelheiten zum Befund stehen nur in `CLAUDE.local.md` und kommen erst nach der Behebung im Original in öffentliche Dateien.
+`dev/release.sh --publish` hält bei einem privaten Repo an.
 
 Vorbereitet (2026-10-30):
 - `.deb`: `depends = "$auto, libcap2-bin"`. Vorher fehlte `libc6`, das Paket ließ sich auf zu alten Systemen fehlerfrei
@@ -989,10 +987,9 @@ Release wird 0.4.0 oder 0.5.0. Vor dem Release erledigt (2026-11-02, auf Ansage,
   (Seite Lizenzen). Fenster und Mitschnitt gehen im Container nicht, siehe Schritt 4.
 
 Noch offen, in dieser Reihenfolge:
-1. **Antwort von Sniffnet** (Gmail-Faden `1a18d94568cbe1f1`, Betreff „Sniffnet IPFIX collector: …“). Einen Termin, den
-   Sniffnet nennt, einhalten; die Herkunftsangabe im Advisory prüfen. Stand 2026-11-02: keine Antwort, keine
-   Unzustellbarkeitsmeldung, `src/networking/ipfix/` bei Sniffnet seit 2026-09-05 unverändert. Sniffnet hat „Private
-   vulnerability reporting“ auf GitHub an; eine Nachfrage dort oder im Mail-Faden etwa ab 2026-11-06, nur auf Ansage.
+1. ~~Antwort von Sniffnet~~ Haltepunkt am 2026-11-02 aufgehoben, Sniffnet vorher benachrichtigt (Einzelheiten
+   `CLAUDE.local.md`). Antwortet Sniffnet, die Herkunftsangabe im Advisory prüfen; Einzelheiten zum Befund erst nach der
+   Behebung im Original veröffentlichen.
 2. Nutzertest der egui-Fassung abschließen (zuletzt Test-Paket 0.3.10 mit den Adaptern ohne IP-Verkehr und den Punkten oben).
 3. Version **0.4.0 oder 0.5.0** setzen: `Cargo.toml`, `capture/Cargo.toml`, `cargo update --workspace --offline`; in
    `CHANGELOG.md` `## [Unreleased]` zu `## [X.Y.Z] - Datum`; Release-Hinweise (Englisch) als Datei; committen, pushen, CI grün.

@@ -10,8 +10,9 @@ importierte PCAP-Datei ist gleich nach dem Stoppen wieder frei, ohne Npcap start
 die C-Laufzeit ist statisch gelinkt, der Helfer schneidet im Test auf dem Npcap-Loopback-Adapter mit, und es gibt einen
 **Installer** (Inno Setup, `dev/build-installer.ps1`, Abschnitt 6) samt Anleitung für Tester (`docs/windows-tester.md`).
 Mitschnitt im Fenster vom Nutzer getestet, bisher ohne Probleme; MCP geprüft; erste Tester-Fassung **0.3.11** gebaut (Abschnitt 6).
-**Noch nicht ausprobiert:** Installation auf einem sauberen System. Weitergegeben wurde noch nichts: Die Tester haben Smart App Control
-an, und das blockiert den unsignierten Installer; die Signatur ist angehalten (Abschnitt 6.1).
+**Signiert und veröffentlicht (2026-11-03):** Der Installer 0.4.0 ist mit dem Certum-Zertifikat signiert, vom Nutzer mit Smart App
+Control getestet und zum Release `v0.4.0` auf GitHub hinzugefügt (Abschnitt 6.1). **Noch nicht ausprobiert:** Installation auf einem
+sauberen System.
 Die Punkte in Abschnitt 4 stammen aus einer Durchsicht des Codes auf dem Linux-Rechner, ergänzt um das, was unter Windows
 aufgefallen ist.
 
@@ -315,7 +316,9 @@ nicht ins Repo; der Schlüssel bleibt bei Certum.
 veröffentlicht), SHA-256 `cea6950721d2c2e9ab68d4307aa602f2ebfd78a12db541d765762b3ebf3b00cf`. `signtool verify /pa /all` bestätigt
 `openpacketmon.exe`, `openpacketmon-capture.exe` und den Installer (SHA-256, Zeitstempel RFC 3161). Der Deinstaller wird von Inno
 Setup im Installer signiert und lässt sich erst nach einer Installation prüfen; das steht noch aus, ebenso der Test bei einem Tester
-mit Smart App Control. Nicht weitergegeben und nicht hochgeladen.
+mit Smart App Control. **Test bestanden (Nutzer, 2026-11-03).** Am selben Tag zum bestehenden Release `v0.4.0` hinzugefügt
+(dazu neue `SHA256SUMS`, Release-Text mit Abschnitt Windows). Der Programmcode ist derselbe wie beim Tag `v0.4.0`; danach haben sich
+nur `devuild-installer.ps1` und `openpacketmon.iss` (Signatur) geändert.
 
 **Signieren im Skript (vorbereitet 2026-11-02, mit dem Zertifikat am 2026-11-03 geprüft):** `dev\build-installer.ps1 -CertSha1 <Fingerabdruck>`
 (oder Variable `OPENPACKETMON_SIGN_SHA1`) signiert `openpacketmon.exe` und `openpacketmon-capture.exe` vor dem Verpacken, Inno Setup
@@ -382,9 +385,10 @@ Was SignPath verlangt und was das für uns heißt:
 5. CI, Lizenzliste, `deny.toml`. **Lizenzliste und `deny.toml` erledigt**, CI-Job für Windows offen.
 6. Installer (unsigniert), Test auf sauberem System, README; dann **Weitergabe an die Tester** als Datei (Abschnitt 6). **Installer
    und Tester-Anleitung erledigt**, erste Tester-Fassung 0.3.11 gebaut; offen: Test auf sauberem System, README, MCP-Einrichtung
-   (`claude mcp add …`) in `docs/windows-tester.md`. Weitergabe an Tester mit Smart App Control erst mit Signatur (Punkt 7).
-   Ein Windows-Release auf GitHub mit dem ersten Release (Haltepunkt seit 2026-11-02 aufgehoben).
-7. Signatur beantragen (Abschnitt 6.1), danach signierte Installer. Seit 2026-11-02 möglich, das Repo ist öffentlich.
+   (`claude mcp add …`) in `docs/windows-tester.md`. README hat seit 2026-11-03 einen Abschnitt Windows. **Signierter Installer
+   0.4.0 im Release `v0.4.0`** (2026-11-03).
+7. Signatur beantragen (Abschnitt 6.1), danach signierte Installer. **Erledigt** (2026-11-03): Certum Open Source, Cloud; mit Smart
+   App Control getestet. Offen: `dev/release.sh` kennt nur das `.deb`, den Installer lädt man bisher von Hand hoch.
 
 **Beginn (Nutzer, 2026-11-02):** Windows wird **vor** dem ersten Release gemacht, weil andere Tester eine Windows-Fassung
 brauchen; MCP ist fertig. Der Haltepunkt aus `PLAN.md` 4.10 galt auch auf dem Windows-Rechner; er ist seit 2026-11-02 aufgehoben. Die Abschnitte 4 und 5 stammen aus der Zeit vor MCP: Beim Beginn die Liste um das ergänzen, was

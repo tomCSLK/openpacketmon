@@ -1,7 +1,8 @@
 # openpacketmon unter Windows testen
 
-Anleitung für Tester der Windows-Fassung (Stand 2026-11-02). Es ist eine **Testfassung**: Bitte die Installer-Datei nicht
-weitergeben. Rückmeldungen gehen direkt an Thomas.
+Anleitung für Tester der Windows-Fassung (Stand 2026-11-03). Der Installer liegt seit 0.4.0 beim
+[Release auf GitHub](https://github.com/tomCSLK/openpacketmon/releases/latest) und ist signiert. Rückmeldungen gehen direkt an
+Thomas oder als Issue auf GitHub.
 
 ## Was gebraucht wird
 
@@ -10,24 +11,18 @@ weitergeben. Rückmeldungen gehen direkt an Thomas.
   muss selbst installiert werden: https://npcap.com/#download, dort „Npcap … installer“. Beim Installieren
   **„Install Npcap in WinPcap API-compatible Mode“ angehakt lassen**. Die kostenlose Ausgabe darf auf bis zu fünf
   Rechnern für den eigenen Gebrauch eingesetzt werden; die genauen Bedingungen stehen auf npcap.com.
-- Die Installer-Datei `openpacketmon-<version>-setup.exe`.
+- Die Installer-Datei `openpacketmon-<version>-setup.exe` vom Release.
 
-## Vorher prüfen: Smart App Control
+## Smart App Control
 
-Die Testfassung ist noch **nicht signiert**. Windows 11 blockiert unsignierte Programme ganz, wenn Smart App Control
-eingeschaltet ist. Nachsehen unter **Windows-Sicherheit → App- & Browsersteuerung → Smart App Control**:
-
-- **Aus** oder **Auswertung**: Es geht weiter wie unten beschrieben.
-- **Ein**: Der Installer wird mit „Eine Anwendungssteuerungsrichtlinie hat diese Datei blockiert“ abgewiesen. Dann bitte
-  auf eine signierte Fassung warten. Smart App Control für den Test auszuschalten, ist keine gute Idee: Seit dem
-  Windows-Update vom April 2026 lässt es sich zwar ohne Zurücksetzen von Windows wieder einschalten, nach dem Update
-  KB5127648 (Oktober 2026) bleibt der Schalter bei manchen aber ausgegraut. Und sobald es wieder an ist, blockiert es
-  openpacketmon ohnehin.
+Installer und Programme sind signiert (Certum, „Open Source Developer Thomas Waldemar Cieslik“). Smart App Control lässt sie
+deshalb laufen, es muss nicht ausgeschaltet werden. Getestet am 2026-11-03 mit 0.4.0. Wer prüfen will: Rechtsklick auf die
+Datei → Eigenschaften → Digitale Signaturen.
 
 ## Installieren
 
-1. Die Installer-Datei starten. Windows SmartScreen meldet „Der Computer wurde durch Windows geschützt“, weil die Datei
-   unsigniert und neu ist: **Weitere Informationen → Trotzdem ausführen**.
+1. Die Installer-Datei starten. Solange eine Version neu ist, kann Windows SmartScreen trotz Signatur „Der Computer wurde
+   durch Windows geschützt“ melden: **Weitere Informationen → Trotzdem ausführen**. Als Herausgeber muss dort der Name oben stehen.
 2. Standardmäßig wird openpacketmon nur für den eigenen Benutzer installiert, ohne Administratorrechte. Wer es für alle
    Benutzer will, wählt das in der ersten Frage des Installers (braucht dann Administratorrechte).
 3. Fehlt Npcap noch, sagt das der Installer auf einer eigenen Seite, mit einem Knopf zur Downloadseite. openpacketmon wird

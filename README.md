@@ -8,10 +8,12 @@ charts, down to the single packet. It is a native program with its own window, i
 
 > **Status: early version.** Expect rough edges, and please report what you find.
 
-Platform: Linux on x86-64. The package is made for Ubuntu 24.04 or newer, Debian 13 or newer and systems based on
-them; it needs glibc 2.39 or newer. A Windows version is being tested and follows later.
+Platforms: Linux and Windows on x86-64. The Linux package is made for Ubuntu 24.04 or newer, Debian 13 or newer and
+systems based on them; it needs glibc 2.39 or newer. The Windows installer is for Windows 10 and 11, 64-bit.
 
 ## Installation
+
+### Linux
 
 Download the `.deb` from the [latest release](https://github.com/tomCSLK/openpacketmon/releases/latest) and install it:
 
@@ -21,6 +23,16 @@ sudo apt install ./openpacketmon_*.deb
 
 The package also grants the capture capabilities, see [Security](#security). A new version is installed the same way;
 openpacketmon shows when one is available.
+
+### Windows
+
+1. Install [Npcap](https://npcap.com/#download) and leave "Install Npcap in WinPcap API-compatible Mode" ticked. Npcap is
+   not part of openpacketmon and comes with its own license terms.
+2. Download `openpacketmon-<version>-setup.exe` from the [latest release](https://github.com/tomCSLK/openpacketmon/releases/latest)
+   and run it. It is signed, so Smart App Control lets it run; SmartScreen may still warn while a version is new. By default it
+   installs for the current user without administrator rights, and openpacketmon itself never needs them.
+
+Building and packaging under Windows are described in [docs/windows.md](docs/windows.md).
 
 ## Based on Sniffnet
 
@@ -130,7 +142,10 @@ drops its rights once the adapter is open and hands the packets on without looki
 program without rights, because their content comes from other computers. Please report vulnerabilities privately, see
 [SECURITY.md](SECURITY.md).
 
-The package lets **every user of the computer** run the helper, as Sniffnet does with its program: anyone who can log in
+Under Windows, Npcap decides who may capture: with its installer option "Restrict Npcap driver's access to Administrators
+only", only administrators can.
+
+Under Linux, the package lets **every user of the computer** run the helper, as Sniffnet does with its program: anyone who can log in
 can capture the traffic of all adapters. On a computer you share with others, allow it only to the members of a group:
 
 ```sh

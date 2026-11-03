@@ -267,7 +267,8 @@ auf bis zu fünf Rechnern; beim Weitergeben an Tester darauf hinweisen.
 - Lokal geprüft (2026-11-02, Installer mit der unveränderten Version 0.3.10, nur zum Testen): stille Installation mit `/CURRENTUSER`
   in einen Testordner, Dateien, Startmenü-Eintrag und Eintrag unter „Installierte Apps“ (openpacketmon 0.3.10) da, Programm startet
   aus dem Installationsordner; stille Deinstallation entfernt Ordner, Eintrag und Startmenü, die Einstellungen bleiben.
-  **Noch nicht** auf einem sauberen System (Abschnitt 5 Punkt 8, z. B. Windows-Sandbox) und nicht von Hand durchgeklickt.
+  **Noch nicht** auf einem sauberen System (Abschnitt 5 Punkt 8; in der Windows-Sandbox bisher nur stille Installation und
+  Signaturen, 6.1) und nicht von Hand durchgeklickt.
 - **Erste Tester-Fassung 0.3.11** (2026-11-02, Version vom Nutzer): `target\installer\openpacketmon-0.3.11-setup.exe`, 10 179 802 Bytes,
   SHA-256 `d36c0f589da73f98d57dd12f7431deb973f45a4916280799af2ed17174753b0e`, unsigniert. Weitergabe nur als Datei (damals galt der Haltepunkt 4.10).
 - `docs/windows-tester.md`: Anleitung für Tester (Npcap mit WinPcap-Modus, Smart App Control, SmartScreen, was ausprobieren,
@@ -345,6 +346,15 @@ Einrichten auf dem Windows-Rechner (so beim ersten Mal am 2026-11-03 durchlaufen
 5. Prüfen: Eigenschaften → Digitale Signaturen beim Installer, beim installierten `openpacketmon.exe` und beim Deinstaller; dann
    bei einem Tester mit Smart App Control installieren. Dabei auch prüfen, ob Smart App Control die Datei durchlässt, die der
    Inno-Installer beim Start in den Temp-Ordner entpackt.
+
+**Deinstaller in der Windows-Sandbox geprüft (2026-11-03):** Der veröffentlichte `openpacketmon-0.4.0-setup.exe` wurde in einer frischen
+Windows-Sandbox still installiert (`/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /CURRENTUSER`, Exitcode 0, kein Neustart nötig), danach
+`Get-AuthenticodeSignature` auf Installer und installierte Dateien. Installer, `openpacketmon.exe`, `openpacketmon-capture.exe` und
+`unins000.exe` (alle unter `%LOCALAPPDATA%\Programs\openpacketmon`): „Valid“, Signierer „Open Source Developer Thomas Waldemar
+Cieslik“, Aussteller „Certum Code Signing 2021 CA“, Zeitstempel „Certum Timestamp 2026“. Die Sandbox muss der Nutzer einmal
+einschalten (Windows-Feature „Windows-Sandbox“, Administrator und Neustart); danach genügt eine `.wsb`-Datei mit dem Installer in
+einem nur lesbaren und einem beschreibbaren Ordner und einem Prüfskript als `LogonCommand`. Nicht geprüft: Deinstallation,
+Update über eine ältere Version, Start ohne Npcap (Abschnitt 5 Punkt 8).
 
 **Release (2026-11-03):** Den Installer baut und signiert der Windows-Rechner, das `.deb` der Linux-Rechner. `dev/release.sh` hat dafür zwei Wege:
 - `dev/release.sh --add-windows target/installer/openpacketmon-X.Y.Z-setup.exe --publish` in Git Bash hier, **nachdem** das Release

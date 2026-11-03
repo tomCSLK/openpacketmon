@@ -1308,8 +1308,10 @@ Erster signierter Installer `openpacketmon-0.4.0-setup.exe` (Version unveränder
 von `signtool verify` bestätigt. Offen: Deinstaller nach einer Installation prüfen, Test bei einem Tester mit Smart App Control,
 Tester-Anleitung auf den signierten Installer umstellen, Weitergabe. Details `docs/windows.md` 6.1.
 **Veröffentlicht (Nutzer, 2026-11-03):** Test mit Smart App Control bestanden; Installer und neue `SHA256SUMS` zum Release `v0.4.0`
-hinzugefügt, Release-Text, README, CHANGELOG und Tester-Anleitung nennen Windows. Offen: Deinstaller-Signatur selbst prüfen,
-CI-Job Windows, sauberes System. `dev/release.sh` nimmt den Installer seit 2026-11-03 mit (`--add-windows` für ein bestehendes
+hinzugefügt, Release-Text, README, CHANGELOG und Tester-Anleitung nennen Windows. **Deinstaller geprüft (2026-11-03,
+Windows-Sandbox):** veröffentlichter Installer still für den Sandbox-Benutzer installiert (Exitcode 0, ohne Neustart);
+Installer, `openpacketmon.exe`, `openpacketmon-capture.exe` und `unins000.exe` mit gültiger Signatur, Zeitstempel von Certum
+(`docs/windows.md` 6.1). Offen: CI-Job Windows, sauberes System (Deinstallation, Update, Start ohne Npcap). `dev/release.sh` nimmt den Installer seit 2026-11-03 mit (`--add-windows` für ein bestehendes
 Release, auch in Git Bash unter Windows; `--windows` für ein neues Release unter Linux; `docs/windows.md` 6.1).
 
 #### 5.4 MCP-Anbindung (Idee des Nutzers, 2026-10-31; neu gefasst und begonnen 2026-11-02, vom Nutzer freigegeben; Stufen 1 bis 3 erledigt)

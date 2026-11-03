@@ -280,7 +280,8 @@ auf bis zu fünf Rechnern; beim Weitergeben an Tester darauf hinweisen.
 - **Code-Signatur:** Der Installer soll, wenn möglich, signiert werden (Nutzer, 2026-10-30); ohne Signatur warnt Windows
   SmartScreen, und **Smart App Control blockiert ihn ganz**. Die Tester haben Smart App Control an (Nutzer, 2026-11-02), können
   0.3.11 also nicht installieren. Die Wege und der Stand stehen in Abschnitt 6.1.
-- `dev/release.sh` kennt nur das `.deb`. Es braucht eine Erweiterung oder einen Schritt in GitHub Actions.
+- `dev/release.sh` nimmt seit 2026-11-03 den signierten Installer mit (Abschnitt 6.1, „Release“); gebaut und signiert wird er
+  weiter hier mit `dev\build-installer.ps1`.
 - Die Update-Prüfung vergleicht nur Versionsnummern. Der Hinweis muss unter Windows auf den Installer zeigen.
 - `THIRD-PARTY-LICENSES.txt` enthält jetzt auch die Windows-Crates, siehe Abschnitt 7.
 
@@ -318,7 +319,7 @@ veröffentlicht), SHA-256 `cea6950721d2c2e9ab68d4307aa602f2ebfd78a12db541d765762
 Setup im Installer signiert und lässt sich erst nach einer Installation prüfen; das steht noch aus, ebenso der Test bei einem Tester
 mit Smart App Control. **Test bestanden (Nutzer, 2026-11-03).** Am selben Tag zum bestehenden Release `v0.4.0` hinzugefügt
 (dazu neue `SHA256SUMS`, Release-Text mit Abschnitt Windows). Der Programmcode ist derselbe wie beim Tag `v0.4.0`; danach haben sich
-nur `devuild-installer.ps1` und `openpacketmon.iss` (Signatur) geändert.
+nur `dev\build-installer.ps1` und `openpacketmon.iss` (Signatur) geändert.
 
 **Signieren im Skript (vorbereitet 2026-11-02, mit dem Zertifikat am 2026-11-03 geprüft):** `dev\build-installer.ps1 -CertSha1 <Fingerabdruck>`
 (oder Variable `OPENPACKETMON_SIGN_SHA1`) signiert `openpacketmon.exe` und `openpacketmon-capture.exe` vor dem Verpacken, Inno Setup
@@ -345,6 +346,17 @@ Einrichten auf dem Windows-Rechner (so beim ersten Mal am 2026-11-03 durchlaufen
    bei einem Tester mit Smart App Control installieren. Dabei auch prüfen, ob Smart App Control die Datei durchlässt, die der
    Inno-Installer beim Start in den Temp-Ordner entpackt.
 
+**Release (2026-11-03):** Den Installer baut und signiert der Windows-Rechner, das `.deb` der Linux-Rechner. `dev/release.sh` hat dafür zwei Wege:
+- `dev/release.sh --add-windows target/installer/openpacketmon-X.Y.Z-setup.exe --publish` in Git Bash hier, **nachdem** das Release
+  unter Linux erstellt ist: baut nichts, prüft Dateiname (Version aus `Cargo.toml`), Signatur (`signtool verify /pa /all`) und dass sich
+  seit dem Tag nur Doku, `dev/`, `resources/packaging/` und `.github/` geändert haben; dann Installer hoch, `SHA256SUMS` um seine
+  Zeile ergänzt und ersetzt, alles wieder geladen und gegen `SHA256SUMS` geprüft. Ohne `--publish` nur die Prüfungen. Den Release-Text
+  um Windows ergänzen (`gh release edit vX.Y.Z --notes-file …`). Geprüft 2026-11-03 ohne `--publish` an `v0.4.0`, auch mit falscher
+  Version und mit unsignierter Datei (beide abgewiesen).
+- `dev/release.sh --windows openpacketmon-X.Y.Z-setup.exe --publish --notes …` unter Linux, wenn der Installer vorher dorthin kopiert
+  wurde: kommt mit ins neue Release und in `SHA256SUMS`; die Signatur prüft dort `osslsigncode` (`sudo apt install osslsigncode`).
+  Noch nicht ausprobiert. Dass der Installer aus demselben Commit gebaut ist, prüft das Skript in diesem Weg nicht.
+
 Was SignPath verlangt und was das für uns heißt:
 
 - **Bereits veröffentlicht:** Das Projekt muss schon in der Form veröffentlicht sein, die signiert werden soll. Es braucht also
@@ -368,7 +380,7 @@ Was SignPath verlangt und was das für uns heißt:
   **Erledigt** (2026-11-02): **eine gemeinsame Liste** für Linux und Windows (`TARGETS`, Vereinigung beider Abhängigkeitsbäume, 482
   statt 452 Crates), mit Hinweisen, dass Npcap nicht beiliegt und die C-Laufzeit von Microsoft unter Windows statisch gelinkt ist.
   `winresource` steht nicht darin: Es ist nur Build-Abhängigkeit unter Windows und wird nicht ins Programm übersetzt.
-- `dev/*.sh` laufen in Git Bash. `dev/build-deb.sh` und `dev/release.sh` sind nur für Linux gedacht.
+- `dev/*.sh` laufen in Git Bash. `dev/build-deb.sh` und `dev/release.sh` sind für Linux gedacht; nur `dev/release.sh --add-windows` läuft auch hier.
 - `.github/workflows/ci.yml`: einen Job auf `windows-latest` ergänzen, mit Npcap SDK (Sniffnet lädt `npcap-sdk-1.16.zip` von
   npcap.com und setzt `LIB`). Die Sniffnet-CI installiert Npcap per OEM-Installer über ein Secret, das wir nicht haben, und
   lässt Windows ohne das Secret bei Pull Requests aus. Bei uns ist also zuerst `fmt`, `check` und `clippy` realistisch. Ob
@@ -388,7 +400,7 @@ Was SignPath verlangt und was das für uns heißt:
    (`claude mcp add …`) in `docs/windows-tester.md`. README hat seit 2026-11-03 einen Abschnitt Windows. **Signierter Installer
    0.4.0 im Release `v0.4.0`** (2026-11-03).
 7. Signatur beantragen (Abschnitt 6.1), danach signierte Installer. **Erledigt** (2026-11-03): Certum Open Source, Cloud; mit Smart
-   App Control getestet. Offen: `dev/release.sh` kennt nur das `.deb`, den Installer lädt man bisher von Hand hoch.
+   App Control getestet. `dev/release.sh` nimmt den Installer seit 2026-11-03 mit.
 
 **Beginn (Nutzer, 2026-11-02):** Windows wird **vor** dem ersten Release gemacht, weil andere Tester eine Windows-Fassung
 brauchen; MCP ist fertig. Der Haltepunkt aus `PLAN.md` 4.10 galt auch auf dem Windows-Rechner; er ist seit 2026-11-02 aufgehoben. Die Abschnitte 4 und 5 stammen aus der Zeit vor MCP: Beim Beginn die Liste um das ergänzen, was

@@ -1309,7 +1309,8 @@ von `signtool verify` bestätigt. Offen: Deinstaller nach einer Installation pr�
 Tester-Anleitung auf den signierten Installer umstellen, Weitergabe. Details `docs/windows.md` 6.1.
 **Veröffentlicht (Nutzer, 2026-11-03):** Test mit Smart App Control bestanden; Installer und neue `SHA256SUMS` zum Release `v0.4.0`
 hinzugefügt, Release-Text, README, CHANGELOG und Tester-Anleitung nennen Windows. Offen: Deinstaller-Signatur selbst prüfen,
-`dev/release.sh` um den Windows-Installer ergänzen, CI-Job Windows, sauberes System.
+CI-Job Windows, sauberes System. `dev/release.sh` nimmt den Installer seit 2026-11-03 mit (`--add-windows` für ein bestehendes
+Release, auch in Git Bash unter Windows; `--windows` für ein neues Release unter Linux; `docs/windows.md` 6.1).
 
 #### 5.4 MCP-Anbindung (Idee des Nutzers, 2026-10-31; neu gefasst und begonnen 2026-11-02, vom Nutzer freigegeben; Stufen 1 bis 3 erledigt)
 

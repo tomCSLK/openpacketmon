@@ -306,7 +306,18 @@ Smart App Control bei den Testern auszuschalten, ist kein Ausweg: Seit dem April
 Windows wieder einschalten, nach KB5127648 (Oktober 2026) bleibt der Schalter bei manchen aber ausgegraut; und wieder
 eingeschaltet blockiert es das Programm trotzdem.
 
-**Signieren im Skript (vorbereitet 2026-11-02, noch ungetestet, kein Zertifikat da):** `dev\build-installer.ps1 -CertSha1 <Fingerabdruck>`
+**Zertifikat (2026-11-03):** Certum „Open Source Code Signing in the Cloud“ ausgestellt und aktiviert, `CN=Open Source Developer
+<Name>`, ausgestellt von „Certum Code Signing 2021 CA“, RSA 3072, gültig bis 2027-11-03, Fingerabdruck
+`5A5AE6506A7649F1FFBD9856FB22E63E39D98C17`. Die Zertifikatsdateien (`.cer`, `.pem`) enthalten nur den öffentlichen Teil und gehören
+nicht ins Repo; der Schlüssel bleibt bei Certum.
+
+**Erster signierter Bau (2026-11-03):** `openpacketmon-0.4.0-setup.exe` mit der Version aus `Cargo.toml` (0.4.0, schon als Linux-Release
+veröffentlicht), SHA-256 `cea6950721d2c2e9ab68d4307aa602f2ebfd78a12db541d765762b3ebf3b00cf`. `signtool verify /pa /all` bestätigt
+`openpacketmon.exe`, `openpacketmon-capture.exe` und den Installer (SHA-256, Zeitstempel RFC 3161). Der Deinstaller wird von Inno
+Setup im Installer signiert und lässt sich erst nach einer Installation prüfen; das steht noch aus, ebenso der Test bei einem Tester
+mit Smart App Control. Nicht weitergegeben und nicht hochgeladen.
+
+**Signieren im Skript (vorbereitet 2026-11-02, mit dem Zertifikat am 2026-11-03 geprüft):** `dev\build-installer.ps1 -CertSha1 <Fingerabdruck>`
 (oder Variable `OPENPACKETMON_SIGN_SHA1`) signiert `openpacketmon.exe` und `openpacketmon-capture.exe` vor dem Verpacken, Inno Setup
 signiert Installer und Deinstaller (`#ifdef Sign` in `openpacketmon.iss`: `SignTool=openpacketmon`, `SignedUninstaller=yes`, der
 Befehl kommt als `/Sopenpacketmon=…` von ISCC). Befehl wie in Certums Anleitung „Code Signing in the Cloud – Using Signtool“:
@@ -315,9 +326,13 @@ Dateien. Das Skript sucht `signtool.exe` im `PATH` oder im neuesten Windows SDK 
 und hält an, wenn das Zertifikat nicht im Speicher des Benutzers (`Cert:\CurrentUser\My`) liegt oder abgelaufen ist. Ohne
 Fingerabdruck bleibt alles unsigniert, mit Hinweis am Ende.
 
-Einrichten auf dem Windows-Rechner, sobald das Zertifikat ausgestellt ist (laut Certum, beim ersten Mal prüfen und hier nachtragen):
-1. SimplySign-App auf dem Handy einrichten (bei der Aktivierung), SimplySign Desktop auf dem Windows-Rechner installieren und mit
-   einem Code aus der App anmelden. Das Zertifikat erscheint dann im Zertifikatspeicher des Benutzers.
+Einrichten auf dem Windows-Rechner (so beim ersten Mal am 2026-11-03 durchlaufen):
+1. Aktivieren: Certum schickt eine E-Mail mit Link; auf der Seite dahinter den Aktivierungscode aus dem Certum-Konto eingeben, dann
+   erscheint ein QR-Code. In der SimplySign-App auf dem Handy **„Andere Aktivierungsmethoden“ → „QR-Code scannen“** wählen (nicht
+   „Zugang wiederherstellen“, das endet mit „invalid token“) und als Modus „Signieren und Codes erzeugen“ nehmen.
+   SimplySign Desktop installieren, dann über das Symbol im Infobereich „Connect to SimplySign“: E-Mail-Adresse des Certum-Kontos
+   und ein Code aus der App. Erst danach erscheint das Zertifikat mit privatem Schlüssel im Zertifikatspeicher des Benutzers; vorher
+   läuft SimplySign Desktop zwar, aber ohne Zertifikat. Nach einer Weile meldet es sich ab, dann mit neuem Code wieder anmelden.
 2. Fingerabdruck ablesen: `Get-ChildItem Cert:\CurrentUser\My | Where-Object Subject -like '*Open Source Developer*' | Format-List Subject, Thumbprint, NotAfter`.
 3. `signtool` vorhanden? Kommt mit dem Windows SDK (Visual Studio „Desktopentwicklung mit C++“), sonst
    `winget install Microsoft.WindowsSDK.10.0.26100`.

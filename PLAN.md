@@ -1303,6 +1303,10 @@ unsigniert. Einrichtung von SimplySign Desktop und Ablauf in `docs/windows.md` 6
 **Certum-Stand (2026-11-02 abends):** „Open Source Code Signing in the Cloud“ (365 Tage) gekauft, Daten eingegeben, automatische
 Identitätsprüfung (IDnow) abgeschlossen, ein Dokument hochgeladen; Vorprüfung „Waiting for verification“, Zertifikat „Under
 verification“. Warten auf Certum. Die Projektadresse war auf der Vorprüfungsseite nicht zu sehen; fragt Certum danach, nachreichen.
+**Zertifikat da (2026-11-03):** ausgestellt, über die SimplySign-App aktiviert, SimplySign Desktop angemeldet, gültig bis 2027-11-03.
+Erster signierter Installer `openpacketmon-0.4.0-setup.exe` (Version unverändert aus `Cargo.toml`) gebaut; Programme und Installer
+von `signtool verify` bestätigt. Offen: Deinstaller nach einer Installation prüfen, Test bei einem Tester mit Smart App Control,
+Tester-Anleitung auf den signierten Installer umstellen, Weitergabe. Details `docs/windows.md` 6.1.
 
 #### 5.4 MCP-Anbindung (Idee des Nutzers, 2026-10-31; neu gefasst und begonnen 2026-11-02, vom Nutzer freigegeben; Stufen 1 bis 3 erledigt)
 

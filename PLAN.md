@@ -988,8 +988,9 @@ Release wird 0.4.0 oder 0.5.0. Vor dem Release erledigt (2026-11-02, auf Ansage,
 
 Noch offen, in dieser Reihenfolge:
 1. ~~Antwort von Sniffnet~~ Haltepunkt am 2026-11-02 aufgehoben, Sniffnet vorher benachrichtigt (Einzelheiten
-   `CLAUDE.local.md`). Antwortet Sniffnet, die Herkunftsangabe im Advisory prüfen; Einzelheiten zum Befund erst nach der
-   Behebung im Original veröffentlichen.
+   `CLAUDE.local.md`). Sniffnet hat am 2026-11-08 geantwortet und einen Pull Request erlaubt; der Fix liegt als
+   GyulyVGC/sniffnet#1357 vor (2026-11-09), die Rückmeldung dazu steht aus. Herkunftsangabe im Advisory prüfen, sobald
+   der Pull Request übernommen oder abgelehnt ist.
 2. ~~Nutzertest der egui-Fassung abschließen~~ erledigt: Test-Paket 0.3.10 ohne Befund (2026-11-02, 5.5).
 3. ~~Version setzen~~ erledigt 2026-11-02: **0.4.0** (Nutzer), Commit `4e94702`, CI grün. Ursprünglich: Version **0.4.0 oder 0.5.0** setzen: `Cargo.toml`, `capture/Cargo.toml`, `cargo update --workspace --offline`; in
    `CHANGELOG.md` `## [Unreleased]` zu `## [X.Y.Z] - Datum`; Release-Hinweise (Englisch) als Datei; committen, pushen, CI grün.

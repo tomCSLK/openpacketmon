@@ -1529,6 +1529,40 @@ Stand egui (2026-11-01, Stufen 1 bis 4 freigegeben vom Nutzer, Test-Pakete **0.3
 Entschieden (Nutzer, 2026-10-31): Der Paketspeicher bleibt im RAM, die Grenze wird wählbar (bis etwa 2 GiB mit passender Paketzahl).
 Eine temporäre Datei wie bei Wireshark kommt nur, falls das später nicht reicht, weil sonst unverschlüsselter Verkehr auf der SSD läge.
 
+#### 5.6 Neue Oberfläche im Stil von opensecmon (Wunsch des Nutzers, 2026-11-09; Entwurf abgenommen, vorerst nur dokumentiert und geplant)
+
+Auftrag: klickbarer Entwurf wie bei opennetmon (`../PRTG_Nachbau/docs/entwurf/`, dort am 2026-11-09 abgenommen), Farben und Gestaltung
+von dort, Logo im selben Stil. Ergebnis in **`docs/entwurf/`** (statisches HTML, kein Anwendungscode; Start `index.html`, Einzelheiten
+und offene Punkte in `docs/entwurf/README.md`). Inhalt und Funktionen wie 0.4.0, alle Daten erfunden (Dokumentationsbereiche).
+
+- **Aufbau:** Kopfleiste statt violetter Seitenleiste (Übersicht, Verbindungen, Pakete, Statistik, Hosts, Dienste, Programme; Glocke,
+  Thema, Hilfe, Zahnrad), Aufzeichnung immer rechts oben (Zustand, Adapter, Dauer, Pausieren, Beenden), Statusleiste unten (Pakete,
+  Paketspeicher, verworfen, KI-Hinweis, neue Version, Links; „IP Geolocation by DB-IP“ bei jeder Breite sichtbar).
+- **Gestaltung:** graue Flächen, Akzent `#1c5ea8`, Fira Sans/Fira Code (Ligaturen aus), dichte Zeilen (Tabellen 34 px, Paketliste 26 px),
+  leiser getönte Farben der Paketliste für hell und dunkel, Symbole nach Lucide (ISC).
+- **Seiten:** Aufzeichnung, Übersicht, Verbindungen, Verbindung, Pakete (virtuelle Liste mit 48 000 Zeilen, Live-Folgen, Anzeigefilter mit
+  Prüfung und Vorschlägen, Strg+G, Leiste für das gewählte Paket), Paketdetails (Felder ↔ Bytes), Stream folgen, Statistik, Hosts, Dienste,
+  Programme, Benachrichtigungen, Einstellungen mit Unternavigation, Logo (fünf Entwürfe, gewählt C „Lupe über Paketen“), Breiten
+  (1440, 1280, 1024, 760 px).
+- **Neu** (vom Nutzer alle übernommen): „Auffällig“ auf der Übersicht, Tastenkürzel-Hilfe „?“, „/“ ins Filterfeld, Leiste für das
+  gewählte Paket, Rückfrage beim Beenden der Aufzeichnung.
+- **Geprüft** (2026-11-09): alle Seiten ohne Skriptfehler; Bytes jeder Paketschicht ergeben die Paketlänge; Bildschirmfotos aus Headless
+  Chrome bei 1280 × 820 hell, dazu dunkel, 1200, 1024 und 760 px und die Zustände „pausiert“/„keine“ sowie Paketinhalte für KI;
+  von Hand im Browser: Filter (Vorschläge, Fehlermeldung mit Stelle, `?f=`), Verbindungsfilter, „Gehe zu“, ↑/↓/Pos1/Ende, Hilfe und
+  Rückfrage beim Beenden, Thema, Felder ↔ Bytes, MCP-Schalter.
+- **Abgenommen (Nutzer, 2026-11-09):** Farben und Aufbau passen; Logo **C „Lupe über Paketen“** (Such- und Filterfelder bekommen deshalb kein
+  Lupensymbol); alle neuen Teile bleiben; maßgeblich ist **1280 × 820** (Desktop-Programm, heute schon die Standardgröße), kleinere Größen
+  werden nicht eigens gestaltet. **Mindestgröße bleibt 760 × 480** wie heute (`src/gui/mod.rs`, `with_min_inner_size`; Vorschlag vom
+  Nutzer bestätigt, 2026-11-09), nicht 1280 × 820, sonst passt das Fenster auf 1366 × 768 nicht mehr ganz. Zwischen 760 und 1280 px gelten
+  nur die Regeln aus dem Entwurf (unter 1180 px „Mehr“, unter 900 px nur Symbole, Statusleiste kürzt in fester Reihenfolge, DB-IP bleibt).
+- **Vorerst nur dokumentiert und geplant** (Nutzer, 2026-11-09): keine Umsetzung; Entwurf und Plan auf Wunsch des Nutzers committet
+  (2026-11-09). Angekündigt ist eine **Ergänzung zu den Updates** (heute Hinweis auf neue Versionen in der Statusleiste und unter
+  Einstellungen → Aktualisierungen); sie kommt vor der Umsetzung in den Entwurf.
+- **Umsetzung** erst nach der Ergänzung zu den Updates und nach „go“, in vier Stufen mit Test-Paket (Vorschlag in `docs/entwurf/README.md`): A Farben/Schriften (`src/gui/theme.rs`,
+  Fira als TTF, Lizenzliste), B Kopf- und Statusleiste (`src/gui/mod.rs`, `widgets.rs`, `locales/`; Fenster bleibt 1280 × 820 mit
+  Mindestgröße 760 × 480), C Seite für Seite (`src/gui/pages/`,
+  Seitendaten bleiben in `src/view/`), D Symbole, Logo C, Programmsymbole, README-Bild.
+
 ---
 
 ## 5. Offene Fragen an den Nutzer

@@ -1,6 +1,14 @@
 # PLAN.md – Fork von Sniffnet
 
-Stand: 2026-10-28. Phasen **1, 2 und 3 erledigt** (Repo privat: https://github.com/tomCSLK/openpacketmon; Kern als Engine, Browser-UI auf 127.0.0.1, `.deb` mit systemd-User-Dienst). Nächster Schritt: Phase 4 vor dem Öffentlich-Schalten, Phase 5 gemeinsam festlegen.
+**Stand: 2026-11-09.**
+
+- **v0.4.0** ist das erste öffentliche Release (2026-11-02, Linux; signierter Windows-Installer seit 2026-11-03), Repo https://github.com/tomCSLK/openpacketmon
+  öffentlich. Oberfläche egui (5.5), Mitschnitt-Helfer mit Rechten, MCP-Anbindung (5.4), Windows (5.3, Reste in `docs/windows.md` 8).
+- **Als Nächstes:** neue Oberfläche im Stil von opensecmon (5.6). Entwurf abgenommen; die Ergänzung zu den Updates (Hinweis auf neue Versionen,
+  abgestimmt mit dem geplanten Launcher) ist eingebaut und wartet auf Abnahme. Umsetzung erst danach und nach „go“.
+- **Offen außerhalb:** Pull Request mit der Korrektur des Befunds aus 4.8 beim Original (Einzelheiten nur in `CLAUDE.local.md`).
+- Die Abschnitte 2 bis 4 und die Stände in 5.1 bis 5.5 sind **Verlauf** (die Lizenzprüfung in 1 gilt weiter); was dort über Browser-Oberfläche, `src/web/`, `templates/`,
+  `static/`, Fenster-Programm oder privates Repo steht, gilt nicht mehr.
 
 Upstream: https://github.com/GyulyVGC/sniffnet – Autor Giuliano Bellini, letztes Release **v1.5.1** (2026-07-22),
 geprüfter Stand `main` @ `ab4bf73` (2026-10-20).
@@ -13,16 +21,16 @@ geprüfter Stand `main` @ `ab4bf73` (2026-10-20).
 
 | Thema | Entscheidung |
 |---|---|
-| GitHub | Zuerst **privates** Repo, später öffentlich schaltbar. |
+| GitHub | Zuerst **privates** Repo, später öffentlich schaltbar. **Öffentlich seit 2026-11-02** (4.10). |
 | Lizenz | **Wie das Original: `MIT OR Apache-2.0`**, auch für eigene Änderungen. |
 | Funktionsumfang | **Wie das Original** (Liste in Abschnitt 2.1). Bewusst entfernt (2026-10-29): Mini-Ansicht, Benachrichtigungen nach Datenmenge, Blacklist und Webhook, Favoriten für Dienste, die **IP-Blacklist** ganz. |
-| Oberfläche | **Komplett neu, im Stil von opennetmon.** Fonts und Icons des Originals sind damit irrelevant. |
+| Oberfläche | **Komplett neu, im Stil von opennetmon.** Fonts und Icons des Originals sind damit irrelevant. **Neu geplant (2026-11-09): im Stil von opensecmon** (5.6). |
 | Einsatzort | **Auf dem Client** installiert (Arbeitsrechner), nicht auf dem Server. **Keine Server-Installation vorgesehen** (2026-10-28): Bedienung nur am selben Rechner, keine Handy-Darstellung nötig. |
 | Name | **openpacketmon** (2026-10-28). Crate, Binary, Paket und GitHub-Repo `tomCSLK/openpacketmon`. Markenregister prüft der Nutzer. |
-| Logo | **`~/Bilder/openpacketmon_Logo_v2.jpeg`** (2400×1792, dunkler Hintergrund: Netz-Kugel mit Paket und Pulslinie, Schriftzug „openpacketmon – PACKET MONITORING“). Original bleibt außerhalb des Repos; `_v1` ist verworfen. |
+| Logo | **`~/Bilder/openpacketmon_Logo_v2.jpeg`** (2400×1792, dunkler Hintergrund: Netz-Kugel mit Paket und Pulslinie, Schriftzug „openpacketmon – PACKET MONITORING“). Original bleibt außerhalb des Repos; `_v1` ist verworfen. Mit der neuen Oberfläche ersetzt durch **Logo C „Lupe über Paketen“** (5.6). |
 | Verhältnis zu upstream | **Abspalten** (eigenständige Weiterentwicklung, kein regelmäßiges Mergen). Erweiterungen planen wir gemeinsam. |
-| Plattform | **Zunächst nur Linux** (Zorin OS / Ubuntu, `.deb`). **Windows später vorgesehen** (2026-10-28; Npcap installiert der Nutzer selbst, wird nie mitgeliefert); macOS offen. |
-| UI-Variante | **A – lokaler Dienst + Browser** (Abschnitt 3); **dazu B – eigenes Fenster mit Symbol im Infobereich** (beschlossen und umgesetzt 2026-10-28, Abschnitt 4 „Fenster-Programm“). |
+| Plattform | **Zunächst nur Linux** (Zorin OS / Ubuntu, `.deb`). **Windows später vorgesehen** (2026-10-28; Npcap installiert der Nutzer selbst, wird nie mitgeliefert); macOS offen. **Windows seit 2026-11-02** (5.3, signierter Installer). |
+| UI-Variante | **A – lokaler Dienst + Browser** (Abschnitt 3); **dazu B – eigenes Fenster mit Symbol im Infobereich** (beschlossen und umgesetzt 2026-10-28, Abschnitt 4 „Fenster-Programm“). **Ersetzt am 2026-11-01 durch die native egui-Oberfläche** (5.5). |
 | Git-Historie | **Ohne Upstream-Historie** starten; erster Commit = unveränderter Stand `ab4bf73` mit Quellenangabe. |
 | opennetmon-Dateien | **Freigegeben:** `app.css`, Templates, Skripte u. Ä. aus opennetmon dürfen im Fork unter `MIT OR Apache-2.0` stehen (Fremddateien wie uPlot behalten ihre Lizenz). |
 
@@ -86,7 +94,7 @@ Alle sind per `include_bytes!` bzw. `build.rs` fest ins Binary eingebaut. Durch 
 `cargo metadata --locked`: 701 Pakete, durchweg permissiv (MIT/Apache, BSD, ISC, Zlib, Unicode-3.0, BSL-1.0, CC0, CDLA-Permissive-2.0);
 MPL-2.0 nur `symphonia*`, `freedesktop_entry_parser`, `option-ext` (unverändert nutzen = unkritisch). Kein Ausschlussgrund.
 Mit der neuen UI fallen iced, plotters, rodio/symphonia usw. weg; dazu kommen die opennetmon-Crates (axum, askama, rust-embed, fluent …).
-Für Pakete: `THIRD-PARTY-LICENSES.txt` automatisch erzeugen (Skript wie `PRTG_Nachbau/dev/third-party-licenses.py` oder `cargo-about`),
+Für Pakete: `THIRD-PARTY-LICENSES.txt` automatisch erzeugen (Skript wie `../opennetmon/dev/third-party-licenses.py` oder `cargo-about`),
 `cargo deny check licenses` in der CI.
 
 ### 1.6 Native Bibliotheken
@@ -138,19 +146,11 @@ Pakete `.deb`/`.rpm` mit `setcap cap_net_raw,cap_net_admin`. Git-Historie 348 MB
 
 ---
 
-## 3. Architektur der neuen Oberfläche (Vorschlag)
+## 3. Architektur der Oberfläche (Verlauf)
 
-opennetmon ist eine **Web-Oberfläche** (axum + askama, `static/app.css` als Designsystem, uPlot, Fluent, `rust-embed`).
-„Aussehen wie opennetmon“ heißt am einfachsten: dieselbe Technik, auf dem Client.
-
-| Variante | Beschreibung | Bewertung |
-|---|---|---|
-| **A – lokaler Dienst + Browser** (**gewählt** 2026-10-28) | Ein Programm mit Aufzeichnungsrechten (`cap_net_raw`) läuft im Hintergrund (systemd-Benutzer- oder Systemdienst) und liefert die UI nur auf `127.0.0.1`. Bedienung im Browser, Startmenü-Eintrag öffnet die Seite. | Größte Wiederverwendung von opennetmon (CSS, Templates, Graphen, Übersetzungen). Aufzeichnung läuft weiter, wenn der Browser zu ist. Rechte sauber getrennt. |
-| B – eigenes Fenster (WebView: `wry`/Tauri) | Dieselbe HTML-Oberfläche in einem App-Fenster statt im Browser. | Wirkt wie eine Desktop-App; zusätzliche Abhängigkeiten (WebKitGTK, WebView2). Lässt sich **später auf A aufsetzen**. |
-| C – iced behalten, nur umstylen | Original-GUI-Technik mit opennetmon-Farben. | Sieht nie wirklich wie opennetmon aus, kein Wiederverwenden. Nicht empfohlen. |
-
-Bei A wichtig: Zugriff auch lokal absichern (andere Benutzer auf dem Rechner könnten den Port erreichen) – Anmeldung oder
-Zugangstoken im Startlink; nur `127.0.0.1` binden; Schreibaktionen mit CSRF-Schutz wie in opennetmon.
+Am 2026-10-28 gewählt: **A – lokaler Dienst + Browser** (axum/askama wie opennetmon, nur auf `127.0.0.1`, Startlink mit Token), noch am selben
+Tag ergänzt um **B – eigenes Fenster** (wry/WebKitGTK). Verworfen: iced behalten und nur umstylen. Seit **2026-11-01 ersetzt durch die native
+egui-Oberfläche** mit kleinem Mitschnitt-Helfer (5.5); die Abwägung von damals steht in der Git-Historie.
 
 ---
 
@@ -171,7 +171,7 @@ Erledigt (2026-10-28).
 
 Umgesetzt (2026-10-28): Repo `tomCSLK/openpacketmon` privat angelegt (kein Fork, Wiki aus), **GitHub Actions abgeschaltet**
 (die Upstream-Workflows bauen sonst bei jedem Push auch für macOS/Windows; wieder einschalten, wenn in Phase 2 eigene Workflows
-stehen – `dependabot.yml` kommt dann ebenfalls weg). Lokaler Ordner `Sniffnet_Fork/` ist das Repo.
+stehen – `dependabot.yml` kommt dann ebenfalls weg). Lokaler Ordner `Sniffnet_Fork/` (heute `openpacketmon/`) ist das Repo.
 Commit `ce5fa2d` = Upstream `ab4bf739d464…` Datei für Datei identisch (605 Dateien, Blob-Hashes verglichen), Tag `upstream-base`;
 danach `CLAUDE.md`, `PLAN.md` und `.gitignore`-Zusatz. GitHub warnt beim Push vor `resources/logos/merch/merch-inkscape.svg`
 (59 MB, Grenze 100 MB) – fällt in Phase 2 weg.
@@ -1529,9 +1529,9 @@ Stand egui (2026-11-01, Stufen 1 bis 4 freigegeben vom Nutzer, Test-Pakete **0.3
 Entschieden (Nutzer, 2026-10-31): Der Paketspeicher bleibt im RAM, die Grenze wird wählbar (bis etwa 2 GiB mit passender Paketzahl).
 Eine temporäre Datei wie bei Wireshark kommt nur, falls das später nicht reicht, weil sonst unverschlüsselter Verkehr auf der SSD läge.
 
-#### 5.6 Neue Oberfläche im Stil von opensecmon (Wunsch des Nutzers, 2026-11-09; Entwurf abgenommen, vorerst nur dokumentiert und geplant)
+#### 5.6 Neue Oberfläche im Stil von opensecmon (Wunsch des Nutzers, 2026-11-09; Entwurf abgenommen, Ergänzung zu den Updates wartet auf Abnahme)
 
-Auftrag: klickbarer Entwurf wie bei opennetmon (`../PRTG_Nachbau/docs/entwurf/`, dort am 2026-11-09 abgenommen), Farben und Gestaltung
+Auftrag: klickbarer Entwurf wie bei opennetmon (`../opennetmon/docs/entwurf/`, dort lokal, am 2026-11-09 abgenommen), Farben und Gestaltung
 von dort, Logo im selben Stil. Ergebnis in **`docs/entwurf/`** (statisches HTML, kein Anwendungscode; Start `index.html`, Einzelheiten
 und offene Punkte in `docs/entwurf/README.md`). Inhalt und Funktionen wie 0.4.0, alle Daten erfunden (Dokumentationsbereiche).
 
@@ -1556,21 +1556,36 @@ und offene Punkte in `docs/entwurf/README.md`). Inhalt und Funktionen wie 0.4.0,
   Nutzer bestätigt, 2026-11-09), nicht 1280 × 820, sonst passt das Fenster auf 1366 × 768 nicht mehr ganz. Zwischen 760 und 1280 px gelten
   nur die Regeln aus dem Entwurf (unter 1180 px „Mehr“, unter 900 px nur Symbole, Statusleiste kürzt in fester Reihenfolge, DB-IP bleibt).
 - **Vorerst nur dokumentiert und geplant** (Nutzer, 2026-11-09): keine Umsetzung; Entwurf und Plan auf Wunsch des Nutzers committet
-  (2026-11-09). Angekündigt ist eine **Ergänzung zu den Updates** (heute Hinweis auf neue Versionen in der Statusleiste und unter
-  Einstellungen → Aktualisierungen); sie kommt vor der Umsetzung in den Entwurf.
-- **Umsetzung** erst nach der Ergänzung zu den Updates und nach „go“, in vier Stufen mit Test-Paket (Vorschlag in `docs/entwurf/README.md`): A Farben/Schriften (`src/gui/theme.rs`,
-  Fira als TTF, Lizenzliste), B Kopf- und Statusleiste (`src/gui/mod.rs`, `widgets.rs`, `locales/`; Fenster bleibt 1280 × 820 mit
-  Mindestgröße 760 × 480), C Seite für Seite (`src/gui/pages/`,
-  Seitendaten bleiben in `src/view/`), D Symbole, Logo C, Programmsymbole, README-Bild.
+  (2026-11-09).
+- **Ergänzung zu den Updates** (vom Nutzer angekündigt, am 2026-11-09 eingebaut, **noch nicht abgenommen**): der Hinweis auf neue Versionen nach
+  der Absprache im Entwurf des geplanten Launchers („Aufruf aus den Apps“, vereinbart 2026-11-09; Pfad in `CLAUDE.local.md`), wie bei opennetmon
+  (dort Vorhaben P). openpacketmon sucht weiter selbst auf GitHub und lädt oder installiert nichts.
+  - Statusleiste: „Version x.y verfügbar“ öffnet ein kleines Fenster („openpacketmon x.y ist erschienen“, installierte Version, Datum).
+    **Mit Launcher** (nur Linux, erkannt an seiner Programmdatei): „Aktualisieren“ startet den Launcher mit der Seite von openpacketmon (läuft er
+    schon, zeigt sein Fenster sie); er installiert, sobald openpacketmon geschlossen ist, und wartet darauf. Bei laufender Aufzeichnung der
+    Hinweis, vorher als PCAP zu sichern. **Ohne Launcher und unter Windows:** „Release-Seite öffnen“. Immer dazu „Was ist neu?“.
+  - Einstellungen → Aktualisierungen: Installiert, Neueste Version (Datum oder „aktuell“), Zuletzt gesucht, derselbe Knopf, ohne Launcher kurz
+    die Schritte von Hand (`.deb` mit `SHA256SUMS` prüfen und mit apt installieren; Windows-Installer), darunter die **Release-Notes** von GitHub
+    (englisch wie dort; ohne neue Version die der installierten Version). Heute gibt es dort nur einen Link zur Release-Seite.
+  - Im Entwurf über die Entwurfsleiste „Update: mit Launcher / ohne Launcher / keins“; geprüft (2026-11-09) ohne Skriptfehler auf allen Seiten,
+    Bildschirmfotos hell/dunkel bei 1280 × 820 und 760 × 480, Esc und Klick daneben schließen das Fenster, „Was ist neu?“ springt zu den Notes.
+  - Für die Umsetzung: `check_updates.rs` liest bisher nur den Release-Titel (`name`); dazu `body` (Markdown) und `published_at` aus derselben
+    Antwort. Die Release-Notes sind Fremdtext (nur `https://`-Links, kein HTML, Länge begrenzen) und brauchen einen kleinen Markdown-Renderer
+    (eigener Code oder Crate mit passender Lizenz). Der Launcher wird ohne Shell gestartet. Name und Aufruf des Launchers erst ins Repo, wenn er
+    öffentlich ist.
+- **Umsetzung** erst nach Abnahme der Ergänzung zu den Updates und nach „go“, in vier Stufen mit Test-Paket (Vorschlag in `docs/entwurf/README.md`):
+  A Farben/Schriften (`src/gui/theme.rs`, Fira als TTF, Lizenzliste), B Kopf- und Statusleiste mit dem Hinweis auf neue Versionen
+  (`src/gui/mod.rs`, `widgets.rs`, `locales/`; Fenster bleibt 1280 × 820 mit Mindestgröße 760 × 480), C Seite für Seite (`src/gui/pages/`,
+  Seitendaten bleiben in `src/view/`; darin Einstellungen → Aktualisierungen mit Release-Notes), D Symbole, Logo C, Programmsymbole, README-Bild.
 
 ---
 
-## 5. Offene Fragen an den Nutzer
+## 5. Offene Punkte (Stand 2026-11-09)
 
-Keine offenen Fragen. Phasen 1 und 2 am 2026-10-28 umgesetzt; Phase 3 erst nach Freigabe.
+1. Abnahme der Ergänzung zu den Updates im Entwurf (5.6), danach „go“ für die Umsetzung der neuen Oberfläche.
+2. Windows-Reste (`docs/windows.md` 8): CI-Job, Test auf sauberem System, MCP-Einrichtung in `docs/windows-tester.md`, MCP-Integrationstests
+   unter Windows von den echten Einstellungen trennen.
+3. Rückmeldung des Originals zum Pull Request mit der Korrektur aus 4.8 (Einzelheiten nur in `CLAUDE.local.md`).
+4. Weitere Ideen in 5.2, noch nicht beschlossen.
 
-## 6. Namenskandidaten (erledigt: **openpacketmon** gewählt)
-
-Am 2026-10-28 weder auf crates.io noch als exakter GitHub-Repo-Name vergeben: `opentrafficmon`, `opennetscope`, `openpacketmon`,
-`opennettraffic`, `opennetwatch`, `netlauscher`. (`trafficlens` ist auf GitHub mehrfach vergeben.)
-Markenregister sind damit **nicht** geprüft – das macht der Nutzer vor der Festlegung.
+Die Namenssuche (früher Abschnitt 6, 2026-10-28) ist erledigt: **openpacketmon**, Marke vom Nutzer geprüft.

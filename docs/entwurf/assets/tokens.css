@@ -1,5 +1,5 @@
 /* Entwurf openpacketmon – Design-Tokens (hell/dunkel). Farben, Schrift und Maße wie opensecmon und der Entwurf von
-   opennetmon (../PRTG_Nachbau/docs/entwurf/assets/tokens.css, abgenommen 2026-11-09).
+   opennetmon (../opennetmon/docs/entwurf/assets/tokens.css, dort nur lokal, abgenommen 2026-11-09).
    Neu für openpacketmon: Farben der Paketliste (--row-*), Client/Server in „Stream folgen“ (--cli, --srv),
    Markierung im Hex-Dump (--hl) und die Statusleiste (--status-h).
    In der Anwendung würden diese Werte in src/gui/theme.rs (Palette LIGHT/DARK) übernommen. */

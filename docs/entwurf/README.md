@@ -8,7 +8,8 @@ Inhalt und Funktionen wie openpacketmon 0.4.0. Stand: 2026-11-09, **vom Nutzer a
 geplant. Nichts davon ist in der Anwendung umgesetzt.
 
 - Start: `index.html` im Browser öffnen (geht direkt als Datei; geprüft wurde über `python3 -m http.server`).
-- Die Entwurfsleiste oben wechselt die Seite, den **Zustand der Aufzeichnung** („läuft“, „pausiert“, „keine“) und das **Thema** (System, Hell, Dunkel).
+- Die Entwurfsleiste oben wechselt die Seite, den **Zustand der Aufzeichnung** („läuft“, „pausiert“, „keine“), den Fall **„Update“**
+  („mit Launcher“, „ohne Launcher“ wie unter Windows, „keins“ = aktuell) und das **Thema** (System, Hell, Dunkel).
   Läuft die Aufzeichnung, kommen wie im Programm alle 0,3 s neue Pakete dazu (Paketliste, Statusleiste, Übersicht).
 - **Alle Daten sind erfunden** und stammen aus den Dokumentationsbereichen: 192.0.2.0/24 (eigenes Netz), 198.51.100.0/24, 203.0.113.0/24,
   2001:db8::/32, MAC 00:00:5e:00:53:xx, AS 64496–64511, Namen unter example.com/.net/.org und `.local` (einzige Ausnahme: 172.17.0.1, die
@@ -30,7 +31,7 @@ geplant. Nichts davon ist in der Anwendung umgesetzt.
 | `statistik.html` | Kacheln, Verkehr der Auswahl, Protokollhierarchie mit Sprüngen, TCP-Analyse, Antwortzeiten (`?f=`, `?c=`, `?cf=`) |
 | `hosts.html`, `dienste.html`, `programme.html` | Listen mit Verkehrsbalken, Favoriten (nicht bei Diensten), Sprung in die Verbindungen |
 | `benachrichtigungen.html` | Verkehr der Favoriten |
-| `einstellungen.html` | ein Bereich mit Unternavigation: Anzeige, Benachrichtigungen, Paketspeicher, Geodaten, KI-Assistenten (MCP), Aktualisierungen, Über und Lizenzen (`#mcp` …) |
+| `einstellungen.html` | ein Bereich mit Unternavigation: Anzeige, Benachrichtigungen, Paketspeicher, Geodaten, KI-Assistenten (MCP), Aktualisierungen (Versionen, Weg zum Update, Release-Notes), Über und Lizenzen (`#mcp` …; `?notes=1#aktualisierungen` springt zu den Release-Notes) |
 | `logo.html` | fünf Logo-Entwürfe, **gewählt C „Lupe über Paketen“**; jeder lässt sich zum Vergleich in die Kopfleiste setzen |
 | `breiten.html` | dieselbe Seite bei 1440 × 900, 1280 × 820 (Standardgröße des Fensters, maßgeblich), 1024 × 720 und 760 × 480 (nicht eigens gestaltet) |
 
@@ -45,6 +46,19 @@ geplant. Nichts davon ist in der Anwendung umgesetzt.
   Paketinhalten), neue Version, Version, Quellcode, Sniffnet, Lizenzen und „IP Geolocation by DB-IP“. Der DB-IP-Hinweis (CC BY 4.0) bleibt bei
   jeder Breite sichtbar; was nicht passt, entfällt in dieser Reihenfolge: Quellcode und Sniffnet (unter 1440 px, stehen unter „Über und Lizenzen“),
   verworfene Pakete (unter 1024 px), Paketspeicher, KI-Hinweis und Version (unter 900 px).
+- **Neue Version** (Ergänzung zu den Updates, 2026-11-09, abgestimmt mit dem Entwurf des geplanten Launchers): openpacketmon sucht wie heute
+  selbst auf GitHub nach einer neuen Version und lädt oder installiert nichts. Der Hinweis „Version x.y verfügbar“ in der Statusleiste öffnet
+  ein kleines Fenster über der Statusleiste: „openpacketmon x.y ist erschienen“, installierte Version, Datum, Knöpfe „Was ist neu?“ und
+  - **mit Launcher** (Linux, Launcher installiert): „Der Launcher lädt, prüft und installiert es. openpacketmon muss dafür geschlossen sein;
+    der Launcher wartet darauf.“ Knopf **„Aktualisieren“** startet den Launcher mit der Seite von openpacketmon (läuft er schon, zeigt sein
+    Fenster sie). Läuft eine Aufzeichnung, dazu der Hinweis, vorher als PCAP zu sichern;
+  - **ohne Launcher** (und immer unter Windows): „Das Paket liegt auf der Release-Seite“, Knopf **„Release-Seite öffnen“**.
+
+  „Was ist neu?“ führt zu **Einstellungen → Aktualisierungen**: Installiert, Neueste Version (mit Datum oder „aktuell“), Zuletzt gesucht,
+  derselbe Knopf, ohne Launcher kurz die Schritte von Hand (Linux: `.deb` und `SHA256SUMS` laden, `sha256sum -c`, `apt install`; Windows:
+  Installer), darunter **„Was ist neu in x.y“** mit den Release-Notes von GitHub (englisch wie dort). Ohne neue Version kein Hinweis in der
+  Statusleiste; die Seite zeigt „aktuell“ und die Release-Notes der installierten Version. Name und Aufruf des Launchers stehen nicht im
+  Repo, solange er nicht öffentlich ist (`CLAUDE.local.md`).
 - **Farben:** graue Flächen mit ruhigem Blau (`#1c5ea8`) statt Violett, Zustände immer mit Symbol und Text. Die Farben der Paketliste behalten
   ihre Bedeutung, sind aber leiser getönt und für hell und dunkel abgestimmt; Eingehend Blau, Ausgehend Orange (wie opennetmon).
 - **Schrift:** Fira Sans und Fira Code (Adressen, Zeiten, Hex, Filter) statt Inter; dichte Zeilen (Tabellen 34 px, Paketliste 26 px).
@@ -63,11 +77,11 @@ geplant. Nichts davon ist in der Anwendung umgesetzt.
    werden nicht eigens gestaltet und geprüft. **Mindestgröße bleibt 760 × 480** wie heute (Vorschlag, vom Nutzer bestätigt), nicht
    1280 × 820, weil das Fenster sonst auf Bildschirmen mit 1366 × 768 nicht mehr ganz Platz hätte. Unter 1280 × 820 wird die Seite nur
    enger, nach den Regeln oben (unter 1180 px „Mehr“, unter 900 px nur Symbole, Statusleiste kürzt in fester Reihenfolge).
-5. Vorerst **nur dokumentiert und geplant**: Der Entwurf liegt im Repo (auf Wunsch des Nutzers committet), umgesetzt wird nichts. Der Nutzer hat eine **Ergänzung zu den
-   Updates** angekündigt (heute: Hinweis auf neue Versionen in der Statusleiste und unter Einstellungen → Aktualisierungen); sie kommt vor der
-   Umsetzung in den Entwurf.
+5. Vorerst **nur dokumentiert und geplant**: Der Entwurf liegt im Repo (auf Wunsch des Nutzers committet), umgesetzt wird nichts.
+6. Die angekündigte **Ergänzung zu den Updates** ist der Hinweis auf neue Versionen nach der Absprache mit dem Launcher (oben „Neue Version“),
+   am 2026-11-09 in den Entwurf eingebaut. **Noch nicht abgenommen.**
 
-## Umsetzung in egui (Vorschlag, erst nach der Ergänzung zu den Updates und nach „go“, in Stufen mit Test-Paket)
+## Umsetzung in egui (Vorschlag, erst nach Abnahme der Ergänzung zu den Updates und nach „go“, in Stufen mit Test-Paket)
 
 | Stufe | Inhalt | Dateien in der Anwendung |
 |---|---|---|
@@ -75,6 +89,12 @@ geplant. Nichts davon ist in der Anwendung umgesetzt.
 | B | Kopfleiste (`Panel::top`) mit Navigation, „Mehr“, Aufzeichnungsanzeige, Glocke, Thema, Hilfe, Zahnrad; Statusleiste (`Panel::bottom`); Seitenleiste entfällt; Fenster bleibt 1280 × 820, Mindestgröße 760 × 480 | `src/gui/mod.rs`, `src/gui/widgets.rs`, Texte in `locales/` |
 | C | Seite für Seite: Übersicht, Paketliste und -details, Verbindungen, Statistik, Listen, Einstellungen mit Unternavigation, Aufzeichnung | `src/gui/pages/*.rs`, `src/gui/chart.rs`, `src/gui/filter_field.rs`; Seitendaten bleiben in `src/view/` |
 | D | Symbole nach Lucide statt der heutigen SVGs, Logo C und Programmsymbole (PNG 16–1024, `.ico`), README-Bild | `resources/icons/`, `resources/packaging/`, `docs/assets/`, `dev/make-ico.py` |
+
+Neue Version (in B und C): `src/utils/check_updates.rs` liest heute nur den Release-Titel (`name`, `vX.Y.Z`); dazu kommen aus derselben
+Antwort `body` (Release-Notes, Markdown) und `published_at`, außerdem die Zeit der letzten Suche. Die Release-Notes brauchen einen kleinen
+Markdown-Renderer (Überschriften, Listen, Links, Code; eigener Code oder eine Crate mit passender Lizenz, dann in `deny.toml` und die
+Lizenzliste). Den Launcher erkennt openpacketmon an seiner Programmdatei (nur Linux); der Aufruf startet ihn ohne Shell und wartet nicht auf ihn.
+Die Release-Notes sind Fremdtext aus dem Netz: Links nur für `https://`, kein HTML, Länge begrenzen.
 
 Zu beachten: `src/gui/tests.rs` prüft Bedienung und Bilder, die Übersetzungsprüfung (`every_message_is_used`) neue und entfallende Texte,
 `deny.toml` und die Lizenzliste neue Schriften. Die Lucide-Symbole stehen unter ISC und müssen in die Lizenzliste.

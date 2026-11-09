@@ -1,20 +1,17 @@
 # Windows-Version von openpacketmon
 
-Stand: 2026-10-30, ergänzt 2026-11-02 (MCP, Mitschnitt-Helfer, vorgezogener Beginn, Installer für Tester, Erfahrungen beim Einrichten des Windows-Rechners). Diese Datei beschreibt, was nötig ist, um das Projekt auf einem Windows-Rechner fortzusetzen und dort eine
+Angelegt 2026-10-30, ergänzt bis 2026-11-09. Diese Datei beschreibt, was nötig ist, um das Projekt auf einem Windows-Rechner fortzusetzen und dort eine
 Windows-Version zu bauen und zu testen.
 
-**Heutiger Stand (2026-11-02, abends):** Im Zweig `windows` bauen **Debug- und Release-Fassung** unter Windows, die Tests sind grün, und
-das Fenster startet. Die Release-Fassung öffnet kein Konsolenfenster, auch nicht für die Helfer, und `openpacketmon.exe` trägt Icon
-und Versionsangaben (Abschnitt 4). Dazu gekommen: Adapter erscheinen mit ihrer Beschreibung statt `\Device\NPF_{…}`, eine
-importierte PCAP-Datei ist gleich nach dem Stoppen wieder frei, ohne Npcap startet das Programm mit einem Hinweis statt abzustürzen,
-die C-Laufzeit ist statisch gelinkt, der Helfer schneidet im Test auf dem Npcap-Loopback-Adapter mit, und es gibt einen
-**Installer** (Inno Setup, `dev/build-installer.ps1`, Abschnitt 6) samt Anleitung für Tester (`docs/windows-tester.md`).
-Mitschnitt im Fenster vom Nutzer getestet, bisher ohne Probleme; MCP geprüft; erste Tester-Fassung **0.3.11** gebaut (Abschnitt 6).
-**Signiert und veröffentlicht (2026-11-03):** Der Installer 0.4.0 ist mit dem Certum-Zertifikat signiert, vom Nutzer mit Smart App
-Control getestet und zum Release `v0.4.0` auf GitHub hinzugefügt (Abschnitt 6.1). **Noch nicht ausprobiert:** Installation auf einem
-sauberen System.
-Die Punkte in Abschnitt 4 stammen aus einer Durchsicht des Codes auf dem Linux-Rechner, ergänzt um das, was unter Windows
-aufgefallen ist.
+**Stand (2026-11-09):** Windows läuft auf `main` (der Zweig `windows` ist seit 2026-11-02 übernommen). Debug- und Release-Fassung bauen,
+die Tests sind grün; die Release-Fassung öffnet kein Konsolenfenster und trägt Icon und Versionsangaben. Adapter erscheinen mit ihrer
+Beschreibung, ohne Npcap startet das Programm mit einem Hinweis, die C-Laufzeit ist statisch gelinkt. Den **Installer** (Inno Setup,
+`dev/build-installer.ps1`, Abschnitt 6) gibt es mit Anleitung für Tester (`docs/windows-tester.md`); er ist mit dem Certum-Zertifikat
+**signiert** und seit 2026-11-03 im Release `v0.4.0` (Abschnitt 6.1). Mitschnitt im Fenster und MCP sind geprüft. Was noch offen ist, steht
+am Ende von Abschnitt 8. Die Punkte in Abschnitt 4 stammen aus einer Durchsicht des Codes auf dem Linux-Rechner, ergänzt um das, was unter
+Windows aufgefallen ist.
+
+Die folgenden Absätze bis „Smart App Control“ sind **Verlauf** der ersten Schritte am 2026-11-02.
 
 **Erster `cargo check --workspace` unter Windows (2026-11-02, Zweig `windows`):** Die Abhängigkeiten bauen, auch `aws-lc-sys`,
 `ring` und `pcap` ohne CMake und NASM. Einziger Fehler war `libc::timeval` in `src/networking/types/capture_helper.rs`
@@ -108,13 +105,13 @@ einen Kauf gebeten, nicht verpflichtet.
 
 ## 2. Zugänge und Dateien
 
-- **GitHub:** Das Repo `tomCSLK/openpacketmon` ist noch privat, also vorher `gh auth login` mit dem Konto `tomCSLK`.
+- **GitHub:** Das Repo `tomCSLK/openpacketmon` ist öffentlich (seit 2026-11-02); zum Pushen und für Releases `gh auth login` mit dem Konto `tomCSLK`.
 - **Im Repo ist alles, was zum Bauen nötig ist.** Das gilt auch für die Icons bis 1024 px (`resources/packaging/linux/graphics/`).
 - **Nur auf dem Linux-Laptop, zum Bauen nicht nötig:**
   - `CLAUDE.local.md` (nur Angaben zum Laptop),
   - `~/Claude/Projekte/CLAUDE.md` (Übersicht aller Projekte),
   - `~/Bilder/openpacketmon_*` (Original-Logos),
-  - `../PRTG_Nachbau` (opennetmon) und `../design-system`,
+  - `../opennetmon` und `../design-system`,
   - `~/Dokumente/openpacketmon-history-bis-2026-10-29.bundle` (alte Historie),
   - der lokale Zweig `design-muster`.
 - **Notizen von Claude Code** liegen nur auf dem Laptop. Die wichtigen Regeln stehen deshalb auch in `CLAUDE.md`
@@ -283,7 +280,8 @@ auf bis zu fünf Rechnern; beim Weitergeben an Tester darauf hinweisen.
   0.3.11 also nicht installieren. Die Wege und der Stand stehen in Abschnitt 6.1.
 - `dev/release.sh` nimmt seit 2026-11-03 den signierten Installer mit (Abschnitt 6.1, „Release“); gebaut und signiert wird er
   weiter hier mit `dev\build-installer.ps1`.
-- Die Update-Prüfung vergleicht nur Versionsnummern. Der Hinweis muss unter Windows auf den Installer zeigen.
+- Die Update-Prüfung vergleicht nur Versionsnummern. Der Hinweis muss unter Windows auf den Installer zeigen. Mit der neuen Oberfläche
+  öffnet er unter Windows immer die Release-Seite (den geplanten Launcher gibt es nur unter Linux; `PLAN.md` 5.6).
 - `THIRD-PARTY-LICENSES.txt` enthält jetzt auch die Windows-Crates, siehe Abschnitt 7.
 
 ### 6.1 Code-Signatur
@@ -292,15 +290,15 @@ Recherche vom 2026-10-30, ergänzt 2026-11-02; vor der Umsetzung erneut prüfen.
 bis der Installer genug Reputation gesammelt hat. Smart App Control dagegen lässt ein Programm mit gültiger Signatur einer
 vertrauenswürdigen Zertifizierungsstelle laufen.
 
-**Stand (Nutzer, 2026-11-02):** Smart App Control blockiert den unsignierten Installer bei den Testern. Die kostenlosen
-Wege (SignPath, Certum Open Source) verlangen ein öffentlich sichtbares Projekt; deshalb hat der Nutzer den Haltepunkt aus
-`PLAN.md` 4.10 am 2026-11-02 aufgehoben und das Repo öffentlich geschaltet. Nächster Schritt: Antrag stellen. Ein normales OV-Zertifikat ist dem Nutzer **zu teuer** für Open-Source-Software und wird
-nicht weiter verfolgt.
+**Stand (2026-11-03):** Signiert wird mit **Certum Open Source Code Signing in the Cloud**, gültig bis 2027-11-03 (unten „Zertifikat“);
+vor Ablauf verlängern, dafür gelten wieder die Bedingungen in der Tabelle. Anlass war Smart App Control bei den Testern, das den
+unsignierten Installer blockierte (2026-11-02); dafür hat der Nutzer das Repo öffentlich geschaltet. Ein normales OV-Zertifikat ist dem
+Nutzer **zu teuer** für Open-Source-Software. SignPath wurde nicht beantragt.
 
 | Weg | Für uns | Bedingungen und Haken |
 |---|---|---|
-| **SignPath Foundation** (kostenlos für Open Source, https://signpath.org/terms.html) | **erster Versuch nach dem Haltepunkt, Zusage nicht sicher** | Siehe unten |
-| **Certum Open Source Code Signing** (https://shop.certum.eu/code-signing.html) | **Rückfall nach dem Haltepunkt** | Ab 49 € (Cloud-Signatur SimplySign) oder 69 € (mit Karte und Leser), nur für Privatpersonen, im Zertifikat steht „Open Source Developer“. Certum verlangt die Adresse eines öffentlich auffindbaren Projekts, das die Verbindung zum Antragsteller zeigt, und stellt sonst nichts aus (https://www.support.certum.eu/en/required-documents/). Gültig höchstens 459 Tage **Geprüft 2026-11-02** (Shop und https://support.certum.eu/en/code-signing-required-documents/, Stand 2026-06-18): Cloud 49 €, Satz mit Karte und Leser 69 €, nur Aktivierungscode für eigene Karte 25 €; nur für natürliche Personen, im Zertifikat Name mit „Open Source Developer“, Organisation „Open Source Developer“; Identität automatisch online, per Notar, Registrierungsstelle oder Fotos mit Ausweis (beide Seiten); dazu eine **Versorgerrechnung** (Strom, Gas, Wasser, Telefon) auf den eigenen Namen und die Projektadresse, aus der die Verbindung zum Antragsteller klar hervorgeht; Unterlagen per Upload im Certum-Konto. Cloud: SimplySign-App (Android/iOS) für Zugangscodes, SimplySign Desktop, höchstens 5000 Signaturen im Monat; laut Shop auch Signieren mit Werkzeugen unter Linux/macOS. Bei kommerziellem Vertrieb wird das Zertifikat widerrufen. Die Produktseite der Cloud-Variante zeigte beim Abruf „Product is out of stock“, die Seitendaten aber „in stock“: im Shop prüfen |
+| **SignPath Foundation** (kostenlos für Open Source, https://signpath.org/terms.html) | **nicht beantragt** (Certum genügt) | Verlangt ein schon veröffentlichtes, zuerst unsigniertes Windows-Release, den Build in GitHub Actions, keine „Hacking-Werkzeuge“ (Ablehnung bei einem Mitschnitt-Programm möglich, ohne Einspruch), eine „Code signing policy“ auf der Website; im Zertifikat steht „SignPath Foundation“ |
+| **Certum Open Source Code Signing** (https://shop.certum.eu/code-signing.html) | **gewählt, aktiv seit 2026-11-03** | Ab 49 € (Cloud-Signatur SimplySign) oder 69 € (mit Karte und Leser), nur für Privatpersonen, im Zertifikat steht „Open Source Developer“. Certum verlangt die Adresse eines öffentlich auffindbaren Projekts, das die Verbindung zum Antragsteller zeigt, und stellt sonst nichts aus (https://www.support.certum.eu/en/required-documents/). Gültig höchstens 459 Tage **Geprüft 2026-11-02** (Shop und https://support.certum.eu/en/code-signing-required-documents/, Stand 2026-06-18): Cloud 49 €, Satz mit Karte und Leser 69 €, nur Aktivierungscode für eigene Karte 25 €; nur für natürliche Personen, im Zertifikat Name mit „Open Source Developer“, Organisation „Open Source Developer“; Identität automatisch online, per Notar, Registrierungsstelle oder Fotos mit Ausweis (beide Seiten); dazu eine **Versorgerrechnung** (Strom, Gas, Wasser, Telefon) auf den eigenen Namen und die Projektadresse, aus der die Verbindung zum Antragsteller klar hervorgeht; Unterlagen per Upload im Certum-Konto. Cloud: SimplySign-App (Android/iOS) für Zugangscodes, SimplySign Desktop, höchstens 5000 Signaturen im Monat; laut Shop auch Signieren mit Werkzeugen unter Linux/macOS. Bei kommerziellem Vertrieb wird das Zertifikat widerrufen. Die Produktseite der Cloud-Variante zeigte beim Abruf „Product is out of stock“, die Seitendaten aber „in stock“: im Shop prüfen |
 | **OV-Zertifikat** einer Zertifizierungsstelle | **abgelehnt** (Nutzer, 2026-11-02: zu teuer) | Etwa Certum Standard 169 € mit Karte, 209 € in der Cloud, jährlich |
 | **Azure Artifact Signing** (früher Trusted Signing) | **kommt nicht infrage** | Laut Microsoft-Quickstart (https://learn.microsoft.com/azure/artifact-signing/quickstart) für Einzelentwickler nur in USA und Kanada, Organisationen auch in der EU. Ab 9,99 $ im Monat, braucht ein bezahltes Azure-Abo |
 | **Microsoft Store** (versteckter Eintrag, MSIX) | nicht weiter verfolgt | Microsoft signiert das Paket, verlangt aber Umbau auf MSIX und eine Prüfung im Store; ein Store-Eintrag ist schon eine Form der Veröffentlichung (Haltepunkt) |
@@ -367,21 +365,6 @@ Update über eine ältere Version, Start ohne Npcap (Abschnitt 5 Punkt 8).
   wurde: kommt mit ins neue Release und in `SHA256SUMS`; die Signatur prüft dort `osslsigncode` (`sudo apt install osslsigncode`).
   Noch nicht ausprobiert. Dass der Installer aus demselben Commit gebaut ist, prüft das Skript in diesem Weg nicht.
 
-Was SignPath verlangt und was das für uns heißt:
-
-- **Bereits veröffentlicht:** Das Projekt muss schon in der Form veröffentlicht sein, die signiert werden soll. Es braucht also
-  ein öffentliches Repo und zuerst ein **unsigniertes Windows-Release**. SignPath verlangt außerdem eine nachprüfbare Reputation.
-- **Build in der CI:** Die Binärdateien müssen nachprüfbar aus dem Quellcode entstehen. Der Windows-Build muss also in GitHub
-  Actions laufen, nicht auf dem eigenen Rechner. Jedes Release wird von Hand freigegeben.
-- **Kein Hacking-Werkzeug:** Verboten sind Funktionen, die Sicherheitslücken finden oder ausnutzen, auch Diagnosewerkzeuge, die
-  aktiv nach ausnutzbaren Schwachstellen suchen. openpacketmon sucht nicht nach Lücken, sondern zeigt Verkehr. Trotzdem ist es ein
-  Paketmitschnitt-Programm, und SignPath entscheidet ohne Einspruchsmöglichkeit. **Hier kann die Ablehnung kommen.**
-- **Herausgeber:** Im Zertifikat steht „SignPath Foundation“, nicht der Name des Projekts oder des Nutzers.
-- **Keine proprietären Teile:** Npcap liegt nicht bei, das passt. Alle Komponenten brauchen eine OSI-Lizenz.
-- **Website:** Auf Startseite und Download-Seite ein Abschnitt „Code signing policy“ mit dem Satz aus den Bedingungen, Rollen
-  und Datenschutzangabe. Die Update-Prüfung ist in der README beschrieben und abschaltbar; ob das reicht, beim Antrag klären.
-- **Konten:** Mehr-Faktor-Anmeldung für SignPath und GitHub.
-
 ## 7. Prüfwerkzeuge und CI
 
 - `deny.toml`: **erledigt** (2026-11-02): `targets` um `x86_64-pc-windows-msvc` ergänzt, `BSL-1.0` erlaubt (nur `clipboard-win` und
@@ -413,5 +396,7 @@ Was SignPath verlangt und was das für uns heißt:
    App Control getestet. `dev/release.sh` nimmt den Installer seit 2026-11-03 mit.
 
 **Beginn (Nutzer, 2026-11-02):** Windows wird **vor** dem ersten Release gemacht, weil andere Tester eine Windows-Fassung
-brauchen; MCP ist fertig. Der Haltepunkt aus `PLAN.md` 4.10 galt auch auf dem Windows-Rechner; er ist seit 2026-11-02 aufgehoben. Die Abschnitte 4 und 5 stammen aus der Zeit vor MCP: Beim Beginn die Liste um das ergänzen, was
-seitdem dazugekommen ist.
+brauchen; MCP ist fertig. Der Haltepunkt aus `PLAN.md` 4.10 ist seit 2026-11-02 aufgehoben.
+
+**Noch offen (Stand 2026-11-09):** CI-Job für Windows (Abschnitt 7), Test auf einem sauberen System (Deinstallation, Update über eine
+ältere Version, Start ohne Npcap), MCP-Einrichtung in `docs/windows-tester.md`, MCP-Integrationstests von den echten Einstellungen trennen.

@@ -7,7 +7,7 @@
   const store = D.store;
   const FRAME = /[?&]frame=1/.test(location.search);
   if (FRAME) document.addEventListener('DOMContentLoaded', function () { document.body.classList.add('frame'); });
-  const VERSION = '0.4.0', NEWER = '0.5.0';
+  const VERSION = '0.4.0', NEWER = '0.5.0', NEWER_DATE = '07.11.2026';
 
   /* ---------- Thema ---------- */
   function isDark() {
@@ -30,6 +30,37 @@
   function logoName() { return store.get('logo') || 'm-c'; }   // C gewählt (Nutzer, 2026-11-09)
   function mcp() { return store.get('mcp') || 'on'; }          // off | on | content
   function favs() { return store.get('favs') !== '0'; }
+  // Neue Version: 'launcher' (mit Launcher, Linux) | 'plain' (ohne Launcher oder Windows) | 'none' (aktuell)
+  function upd() { const u = store.get('upd'); return u === 'plain' || u === 'none' ? u : 'launcher'; }
+
+  /* ---------- Hinweis auf eine neue Version (abgestimmt mit dem Entwurf des Launchers, 2026-11-09) ---------- */
+  // Der Hauptknopf: mit Launcher ruft openpacketmon ihn für sich auf, sonst öffnet er die Release-Seite.
+  function updPrimary(sm) {
+    return upd() === 'launcher'
+      ? '<button class="btn primary' + (sm ? ' sm' : '') + '" type="button" data-draft-toast="Entwurf: startet den Launcher mit der Seite von openpacketmon (läuft er schon, zeigt sein Fenster sie). Installiert wird, sobald openpacketmon geschlossen ist.">' + I('arrow-up-circle', 'sm') + 'Aktualisieren</button>'
+      : '<button class="btn primary' + (sm ? ' sm' : '') + '" type="button" data-draft-toast="Entwurf: öffnet die Release-Seite von ' + NEWER + ' auf GitHub">' + I('external', 'sm') + 'Release-Seite öffnen</button>';
+  }
+  function updText() {
+    return upd() === 'launcher'
+      ? 'Der Launcher lädt, prüft und installiert es. openpacketmon muss dafür geschlossen sein; der Launcher wartet darauf.'
+      : 'Das Paket liegt auf der Release-Seite auf GitHub, mit Prüfsummen in <span class="mono">SHA256SUMS</span>.';
+  }
+  function updPop() {
+    if (upd() === 'none') return '';
+    const run = D.mode() !== 'none';
+    return '<div class="updpop" id="updPop" role="dialog" aria-labelledby="updTitle" hidden>' +
+      '<header>' + I('arrow-up-circle') + '<div><h2 id="updTitle">openpacketmon ' + NEWER + ' ist erschienen</h2><p>installiert: ' + VERSION + ' · erschienen am ' + NEWER_DATE + '</p></div>' +
+      '<button class="iconbtn sm" type="button" data-upd-close aria-label="Schließen">' + I('x', 'sm') + '</button></header>' +
+      '<p>' + updText() + '</p>' +
+      (upd() === 'launcher' && run ? '<p class="small muted">Beim Schließen endet die Aufzeichnung. Vorher sichern: Pakete → „Als PCAP speichern“.</p>' : '') +
+      '<footer><a class="btn sm" href="einstellungen.html?notes=1#aktualisierungen">' + I('file', 'sm') + 'Was ist neu?</a>' + updPrimary(true) + '</footer></div>';
+  }
+  function toggleUpdPop(open) {
+    const p = $('#updPop'), b = $('#updBtn'); if (!p || !b) return;
+    const show = open === undefined ? p.hidden : open;
+    p.hidden = !show; b.setAttribute('aria-expanded', String(show));
+    if (show) { const f = p.querySelector('footer .primary'); if (f) f.focus(); }
+  }
 
   /* ---------- Rahmen ---------- */
   const NAV = [
@@ -67,7 +98,7 @@
       '<span class="hide-md">Verworfen <span class="num">0</span></span>';
     // Links darf gekürzt werden, rechts nie: der Hinweis auf DB-IP (CC BY 4.0) bleibt bei jeder Breite sichtbar.
     return '<footer class="statusbar" role="contentinfo"><span class="sl">' + left + mcpHtml + '</span><span class="sp"></span><span class="sr">' +
-      '<a class="upd" href="#" data-draft-toast="Entwurf: öffnet die Release-Seite auf GitHub">' + I('download', 'sm') + ' Version ' + NEWER + ' verfügbar</a><span class="sep">|</span>' +
+      (upd() === 'none' ? '' : '<button class="upd" type="button" id="updBtn" aria-expanded="false" aria-controls="updPop" title="Neue Version: Hinweise und Aktualisieren">' + I('download', 'sm') + ' Version ' + NEWER + ' verfügbar</button><span class="sep">|</span>') +
       '<span class="hide-md">openpacketmon ' + VERSION + '</span>' +
       '<a class="hide-lg" href="#" data-draft-toast="Entwurf: öffnet github.com/tomCSLK/openpacketmon">Quellcode</a>' +
       '<a class="hide-lg" href="#" data-draft-toast="Entwurf: öffnet github.com/GyulyVGC/sniffnet">basiert auf Sniffnet</a>' +
@@ -85,6 +116,8 @@
       '<label class="sr-only" for="pgSel">Seite</label><select id="pgSel">' + PAGES.map(function (p) { return '<option value="' + p[0] + '"' + (p[0] === file ? ' selected' : '') + '>' + p[1] + '</option>'; }).join('') + '</select>' +
       '<span class="sp"></span><span class="ctl"><span class="opt">Aufzeichnung:</span>' +
       [['running', 'läuft'], ['paused', 'pausiert'], ['none', 'keine']].map(function (x) { return '<button type="button" data-mode="' + x[0] + '" aria-pressed="' + (mode === x[0]) + '">' + x[1] + '</button>'; }).join('') +
+      '<span class="opt">Update:</span>' +
+      [['launcher', 'mit Launcher', 'Neue Version, der Launcher ist installiert (Linux)'], ['plain', 'ohne Launcher', 'Neue Version, kein Launcher oder Windows'], ['none', 'keins', 'Installierte Version ist aktuell']].map(function (x) { return '<button type="button" data-upd="' + x[0] + '" title="' + x[2] + '" aria-pressed="' + (upd() === x[0]) + '">' + x[1] + '</button>'; }).join('') +
       '<span class="opt">Thema:</span><button type="button" data-theme-btn="system">System</button><button type="button" data-theme-btn="light">Hell</button><button type="button" data-theme-btn="dark">Dunkel</button></span>' +
       '</div>';
     const moreActive = NAV.some(function (x) { return x[4] && x[0] === active; });
@@ -126,11 +159,12 @@
       '<footer><button class="btn" type="button" data-close>Abbrechen</button><button class="btn danger" type="button" id="stopYes">' + I('stop', 'sm') + 'Beenden</button></footer></div>';
 
     document.body.insertAdjacentHTML('afterbegin', draft + top);
-    document.body.insertAdjacentHTML('beforeend', statusbar() + overlays);
+    document.body.insertAdjacentHTML('beforeend', statusbar() + updPop() + overlays);
     applyTheme(store.get('theme') || 'system');
     $('#pgSel').addEventListener('change', function (e) { location.href = e.target.value; });
     $$('[data-theme-btn]').forEach(function (b) { b.addEventListener('click', function () { applyTheme(b.dataset.themeBtn); }); });
     $$('[data-mode]').forEach(function (b) { b.addEventListener('click', function () { D.setMode(b.dataset.mode); location.reload(); }); });
+    $$('[data-upd]').forEach(function (b) { b.addEventListener('click', function () { store.set('upd', b.dataset.upd); location.reload(); }); });
     $('#themeToggle').addEventListener('click', function () { applyTheme(isDark() ? 'light' : 'dark'); });
     if (window.matchMedia) window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', function () { applyTheme(store.get('theme') || 'system'); });
     $('#stopYes').addEventListener('click', function () { D.setMode('none'); location.href = 'aufzeichnung.html'; });
@@ -144,12 +178,15 @@
       }
       const h = e.target.closest('[data-help]'); if (h) { e.preventDefault(); closeMenus(); openModal('helpModal'); }
       const c2 = e.target.closest('[data-close]'); if (c2) { e.preventDefault(); closeModals(); }
-      const t = e.target.closest('[data-draft-toast]'); if (t) { e.preventDefault(); closeMenus(); toast(t.dataset.draftToast); }
+      if (e.target.closest('#updBtn')) { e.preventDefault(); closeMenus(); toggleUpdPop(); return; }
+      if (e.target.closest('[data-upd-close]')) { e.preventDefault(); toggleUpdPop(false); $('#updBtn').focus(); return; }
+      const t = e.target.closest('[data-draft-toast]'); if (t) { e.preventDefault(); closeMenus(); toggleUpdPop(false); toast(t.dataset.draftToast); }
       if (!e.target.closest('.menu')) closeMenus();
+      if (!e.target.closest('#updPop') || e.target.closest('#updPop a')) toggleUpdPop(false);
     });
     $('#scrim').addEventListener('click', closeModals);
     document.addEventListener('keydown', function (e) {
-      if (e.key === 'Escape') { closeModals(); closeMenus(); }
+      if (e.key === 'Escape') { closeModals(); closeMenus(); if ($('#updPop') && !$('#updPop').hidden) { toggleUpdPop(false); $('#updBtn').focus(); } }
       if (e.altKey && e.key === 'ArrowLeft') { e.preventDefault(); back(); return; }
       if (isTyping(e)) return;
       if (e.key === '/') {
@@ -217,5 +254,6 @@
   function flag(cc) { return cc ? '<span class="tag cc" title="Land">' + cc + '</span>' : ''; }
 
   window.App = { $: $, $$: $$, esc: esc, store: store, shell: shell, toast: toast, openModal: openModal, closeModals: closeModals, back: back,
-    isDark: isDark, logoName: logoName, mcp: mcp, favs: favs, tbar: tbar, star: star, flag: flag, FRAME: FRAME, VERSION: VERSION, NAV: NAV };
+    isDark: isDark, logoName: logoName, mcp: mcp, favs: favs, upd: upd, updPrimary: updPrimary, updText: updText, tbar: tbar, star: star, flag: flag,
+    FRAME: FRAME, VERSION: VERSION, NEWER: NEWER, NEWER_DATE: NEWER_DATE, NAV: NAV };
 })();

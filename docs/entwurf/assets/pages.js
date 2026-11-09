@@ -843,9 +843,36 @@
         '</div></section><p class="muted small">Der Schalter wirkt sofort, ohne Speichern. Unten in der Statusleiste steht, solange Assistenten Zugriff haben (grün) oder Paketinhalte lesen dürfen (orange).</p>';
     }],
     ['aktualisierungen', 'refresh', 'Aktualisierungen', function () {
+      const u = App.upd(), N = App.NEWER, V = App.VERSION;
+      const latest = u === 'none'
+        ? '<span class="mono">' + V + '</span><span class="st ok">' + I('check-circle', 'sm') + 'aktuell</span>'
+        : '<span class="mono">' + N + '</span><span class="muted">erschienen am ' + App.NEWER_DATE + '</span><span class="pill">neu</span>';
+      // Ohne Launcher (oder unter Windows): kurz, wie es von Hand geht.
+      const howto = u !== 'plain' ? '' : '<ol class="steps small">' +
+        '<li><b>Linux:</b> <span class="mono">openpacketmon_' + N + '-1_amd64.deb</span> und <span class="mono">SHA256SUMS</span> von der Release-Seite laden, prüfen und installieren:' +
+          '<div class="codebox" style="margin-top:4px"><code>sha256sum -c --ignore-missing SHA256SUMS &amp;&amp; sudo apt install ./openpacketmon_' + N + '-1_amd64.deb</code><button class="iconbtn sm" type="button" aria-label="Kopieren" data-draft-toast="Befehl kopiert (Entwurf)">' + I('copy', 'sm') + '</button></div></li>' +
+        '<li><b>Windows:</b> <span class="mono">openpacketmon-' + N + '-setup.exe</span> laden und starten (signiert).</li>' +
+        '<li>Danach openpacketmon neu starten. Eine laufende Aufzeichnung endet dabei; vorher als PCAP sichern.</li></ol>';
+      const notes = u === 'none'
+        ? '<h3>Highlights</h3><ul><li>Native interface (egui): capture page, overview with live chart and top lists, connections, hosts, services, programs, notifications and settings; English and German, light and dark</li>' +
+          '<li>Packet list as in Wireshark with packet details, hex dump, display filter, coloring rules, follow stream and PCAP export</li>' +
+          '<li>AI assistants can read the capture over MCP (<code>openpacketmon mcp</code>), off by default</li></ul>' +
+          '<p>The full list of differences from Sniffnet is in the <a href="#" data-draft-toast="Entwurf: öffnet CHANGELOG.md auf GitHub">changelog</a>.</p>'
+        : '<p>New interface in the style of opennetmon and opensecmon.</p>' +
+          '<h3>Changed</h3><ul><li>Header bar instead of the sidebar; the recording stays visible at the top right</li>' +
+          '<li>Status bar with packets, packet store, AI assistant notice and new versions</li><li>Fira Sans and Fira Code instead of Inter, calmer colors in the packet list</li><li>Settings in one place with a sub-navigation</li></ul>' +
+          '<h3>Added</h3><ul><li>“Unusual” card on the overview</li><li>Keyboard shortcuts help (<code>?</code>), <code>/</code> jumps to the filter field</li><li>Bar for the selected packet above the packet list</li><li>Release notes in Settings → Updates</li></ul>' +
+          '<h3>Installation</h3><p><b>Linux:</b> <code>sudo apt install ./openpacketmon_' + N + '-1_amd64.deb</code>. <b>Windows:</b> run <code>openpacketmon-' + N + '-setup.exe</code>. <code>SHA256SUMS</code> holds the checksums.</p>';
       return '<section class="card"><header><h2>Aktualisierungen</h2></header><div class="cbody">' +
-        '<div class="field">' + sw('upd', 'Beim Start nach einer neuen Version suchen', true, true) + '<span class="help">Fragt GitHub nach der neuesten Version von openpacketmon; es werden keine Daten über dein Netz gesendet.</span></div>' +
-        '<div class="notice info" style="margin:0">' + I('download') + '<div><b>Version 0.5.0 verfügbar</b> (installiert: ' + App.VERSION + '). <a href="#" data-draft-toast="Entwurf: öffnet die Release-Seite auf GitHub">Zur Release-Seite</a></div></div></div>' + save + '</section>';
+        '<div class="field">' + sw('upd', 'Beim Start nach einer neuen Version suchen', true, true) + '<span class="help">Fragt GitHub nach der neuesten Version von openpacketmon; es werden keine Daten über dein Netz gesendet. openpacketmon lädt und installiert nichts selbst.</span></div>' +
+        '<dl class="facts" style="margin-bottom:var(--sp-4)"><dt>Installiert</dt><dd class="mono">' + V + '</dd><dt>Neueste Version</dt><dd>' + latest + '</dd>' +
+        '<dt>Zuletzt gesucht</dt><dd>heute, 09:12 (beim Start)</dd></dl>' +
+        (u === 'none' ? '<button class="btn" type="button" data-draft-toast="Entwurf: öffnet die Release-Seite auf GitHub">' + I('external', 'sm') + 'Release-Seite</button>'
+          : '<div class="notice info" style="margin:0">' + I('download') + '<div style="flex:1"><b>openpacketmon ' + N + ' ist erschienen.</b> ' + App.updText() + howto +
+            '<div class="btngroup" style="margin-top:var(--sp-3)">' + App.updPrimary() + (u === 'launcher' ? '<button class="btn" type="button" data-draft-toast="Entwurf: öffnet die Release-Seite auf GitHub">' + I('external', 'sm') + 'Release-Seite</button>' : '') + '</div></div></div>') +
+        '</div>' + save + '</section>' +
+        '<section class="card" id="relnotes"><header><h2>Was ist neu in ' + (u === 'none' ? V : N) + '</h2><span class="hint">Release-Notes von GitHub, englisch wie dort' + (u === 'none' ? '' : '; erfunden') + '</span></header>' +
+        '<div class="cbody relnotes">' + notes + '</div></section>';
     }],
     ['lizenzen', 'file', 'Über und Lizenzen', function () {
       return '<section class="card"><header><h2>Über openpacketmon</h2></header><div class="cbody tight"><dl class="facts">' +
@@ -868,6 +895,8 @@
       $$('.subnav a').forEach(function (a) { if (a.dataset.p === ok) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current'); });
     }
     window.addEventListener('hashchange', show); show();
+    // „Was ist neu?“ aus dem Hinweis auf eine neue Version: gleich zu den Release-Notes
+    if (/[?&]notes=1/.test(location.search) && $('#relnotes')) $('#relnotes').scrollIntoView({ block: 'start' });
     $('#ps').value = App.store.get('ps') || '30';
     $('#ps').addEventListener('change', function () { App.store.set('ps', this.value); });
     $$('#p-anzeige [data-theme-btn]').forEach(function (b) { b.setAttribute('aria-pressed', String(b.dataset.themeBtn === (App.store.get('theme') || 'system'))); b.addEventListener('click', function () { $$('#draftbar [data-theme-btn="' + b.dataset.themeBtn + '"]')[0].click(); $$('#p-anzeige [data-theme-btn]').forEach(function (o) { o.setAttribute('aria-pressed', String(o === b)); }); }); });
@@ -922,7 +951,7 @@
     const sw = [['--bg', 'Hintergrund'], ['--surface', 'Fläche'], ['--surface-2', 'Fläche 2'], ['--border', 'Linie'], ['--text', 'Text'], ['--text-3', 'Text gedämpft'], ['--accent', 'Akzent'], ['--ok', 'In Ordnung'], ['--warn', 'Warnung'], ['--err', 'Fehler'], ['--s1', 'Eingehend'], ['--s2', 'Ausgehend']];
     const rows = [['--row-bad', 'Fehler, Reset, TCP-Probleme'], ['--row-tcp', 'TCP-Auf-/Abbau'], ['--row-dns', 'DNS'], ['--row-local', 'ARP, DHCP, SSDP, NTP'], ['--row-tls', 'TLS'], ['--row-http', 'HTTP'], ['--row-icmp', 'ICMP'], ['--row-udp', 'QUIC, UDP'], ['--cli-bg', 'Stream: Client'], ['--srv-bg', 'Stream: Server'], ['--hl', 'Hex: Auswahl']];
     $('#main').innerHTML = pagehead('openpacketmon – Entwurf der neuen Oberfläche', 'Gestaltung und Farben wie opensecmon und der Entwurf von opennetmon; Inhalt und Funktionen wie openpacketmon ' + App.VERSION + '.') +
-      '<div class="notice info">' + I('info') + '<div><b>Kein Anwendungscode.</b> Klickbare Seiten mit erfundenen Daten; die Anwendung zeichnet weiter mit egui. Oben die Entwurfsleiste: Seite, Zustand der Aufzeichnung („läuft“, „pausiert“, „keine“) und Thema (System, Hell, Dunkel). Läuft die Aufzeichnung, kommen wie im Programm alle 0,3 s neue Pakete dazu.</div></div>' +
+      '<div class="notice info">' + I('info') + '<div><b>Kein Anwendungscode.</b> Klickbare Seiten mit erfundenen Daten; die Anwendung zeichnet weiter mit egui. Oben die Entwurfsleiste: Seite, Zustand der Aufzeichnung („läuft“, „pausiert“, „keine“), neue Version („mit Launcher“, „ohne Launcher“, „keins“) und Thema (System, Hell, Dunkel). Läuft die Aufzeichnung, kommen wie im Programm alle 0,3 s neue Pakete dazu.</div></div>' +
       '<h3 style="margin-bottom:var(--sp-2)">Seiten</h3><div class="cards3" style="margin-bottom:var(--sp-5)">' +
       [['aufzeichnung', 'capture', 'Aufzeichnung', 'Quelle, Filter, Paketspeicher; läuft sie, Zustand und Knöpfe'], ['uebersicht', 'overview', 'Übersicht', 'Kacheln, „Auffällig“, Verkehr pro Sekunde, Top-Listen'], ['verbindungen', 'connections', 'Verbindungen', 'Filter mit Vorschlägen, Seiten, Favoriten'],
         ['verbindung', 'connections', 'Verbindung', 'Fakten, Gegenstelle, Sprünge zu Paketen und Stream'], ['pakete', 'packets', 'Pakete', 'durchgehende Liste mit Live-Folgen, Anzeigefilter, Gehe zu'], ['paket', 'layers', 'Paket', 'Schichten und Bytes, Felder markieren ihre Bytes'],
@@ -934,11 +963,12 @@
       '<li><b>Kopfleiste statt violetter Seitenleiste:</b> die Verkehrsseiten stehen vorn (Übersicht, Verbindungen, Pakete, Statistik, Hosts, Dienste, Programme; bei schmalem Fenster die letzten drei unter „Mehr“, darunter nur Symbole). Benachrichtigungen werden zur Glocke mit Zähler, Einstellungen zum Zahnrad. Die Paketliste bekommt dadurch die volle Breite.</li>' +
       '<li><b>Aufzeichnung immer sichtbar:</b> statt eines Menüpunkts steht rechts oben der Zustand (läuft, pausiert) mit Adapter, Dauer, Pausieren und Beenden; ohne Aufzeichnung ein Knopf „Aufzeichnung starten“.</li>' +
       '<li><b>Statusleiste unten</b> statt des Fußes der Seitenleiste: Pakete, Paketspeicher, verworfene Pakete, Hinweis auf KI-Assistenten (MCP), neue Version, Version, Quellcode, Sniffnet, Lizenzen und der Hinweis auf DB-IP (bleibt immer sichtbar).</li>' +
+      '<li><b>Neue Version:</b> Der Hinweis in der Statusleiste öffnet ein kleines Fenster. Ist der Launcher installiert (Linux), führt „Aktualisieren“ zu ihm; er lädt, prüft und installiert, sobald openpacketmon geschlossen ist. Ohne Launcher und unter Windows öffnet der Knopf die Release-Seite. „Was ist neu?“ zeigt die Release-Notes unter Einstellungen → Aktualisierungen (heute nur ein Link zur Release-Seite).</li>' +
       '<li><b>Farben:</b> graue Flächen mit ruhigem Blau statt Violett, Zustände immer mit Symbol und Text. Die Farben der Paketliste bleiben in ihrer Bedeutung, sind aber leiser getönt und für hell und dunkel abgestimmt; Eingehend Blau, Ausgehend Orange.</li>' +
       '<li><b>Schrift:</b> Fira Sans und Fira Code (Adressen, Zeiten, Hex) statt Inter; dichte Zeilen (Tabellen 34 px, Paketliste 26 px).</li>' +
       '<li><b>Einstellungen</b> als ein Bereich mit Unternavigation; „Lizenzen“ wandert dorthin („Über und Lizenzen“), der Link in der Statusleiste bleibt.</li>' +
-      '<li><b>Neu und optional:</b> „Auffällig“ auf der Übersicht, Tastenkürzel-Hilfe mit „?“, „/“ für das Filterfeld, Leiste über der Paketliste für das gewählte Paket, Rückfrage beim Beenden. Das gibt es heute nicht; lässt sich streichen, ohne den Rest zu ändern.</li>' +
-      '<li><b>Logo:</b> neues Zeichen im Stil der beiden anderen Programme (Seite Logo).</li></ul></div></section>' +
+      '<li><b>Neu:</b> „Auffällig“ auf der Übersicht, Tastenkürzel-Hilfe mit „?“, „/“ für das Filterfeld, Leiste über der Paketliste für das gewählte Paket, Rückfrage beim Beenden. Das gibt es heute nicht; vom Nutzer alle übernommen.</li>' +
+      '<li><b>Logo:</b> neues Zeichen im Stil der beiden anderen Programme, gewählt C „Lupe über Paketen“ (Seite Logo).</li></ul></div></section>' +
       '<h3 style="margin:var(--sp-5) 0 var(--sp-2)">Farben</h3><div class="swatches">' + sw.map(function (x) { return '<div class="sw"><i style="background:var(' + x[0] + ')"></i><div>' + x[1] + '<br><code>' + x[0] + '</code></div></div>'; }).join('') + '</div>' +
       '<h3 style="margin:var(--sp-4) 0 var(--sp-2)">Paketliste, Stream, Hex</h3><div class="swatches">' + rows.map(function (x) { return '<div class="sw"><i style="background:var(' + x[0] + ')"></i><div>' + x[1] + '<br><code>' + x[0] + '</code></div></div>'; }).join('') + '</div>' +
       '<p class="muted small" style="margin-top:var(--sp-5)">Schriften: Fira Sans und Fira Code (Fontsource 5.3.0, SIL OFL 1.1, Lizenztexte in <code>fonts/</code>). Symbole nach Lucide (ISC), für den Entwurf nachgezeichnet. Alle Daten sind erfunden: Adressen aus den Dokumentationsbereichen 192.0.2.0/24, 198.51.100.0/24, 203.0.113.0/24 und 2001:db8::/32, MAC-Adressen 00:00:5e:00:53:xx, AS-Nummern 64496–64511, Namen unter example.com/.net/.org.</p>';

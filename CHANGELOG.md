@@ -8,6 +8,8 @@ The history of Sniffnet itself is in its own changelog: <https://github.com/Gyul
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-11-10
+
 ### Interface
 
 - New look in the style of opensecmon: a top bar with the pages and the capture state instead of the violet sidebar, a

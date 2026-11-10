@@ -103,7 +103,7 @@ Maßgeblich ist `PLAN.md` (oben „Stand“, Abschnitt 5). Kurz (2026-11-10):
 
 - **v0.5.0** ist released (2026-11-10) mit neuer Oberfläche und VoIP, für Linux und mit **signiertem Windows-Installer** (am selben Tag
   hinzugefügt); Test durch den Nutzer steht aus. Unter Windows alle Tests grün; Smart App Control sperrt dort Proc-Macro-DLLs, Abhilfe
-  in `docs/windows.md` oben. Das Fenster unter Windows ist von Hand noch nicht geprüft.
+  in `docs/windows.md` oben. Update von 0.4.0 mit dem Installer beim Nutzer reibungslos; Test läuft.
 - **Neue Oberfläche im Stil von opensecmon** (`PLAN.md` 5.6, `docs/entwurf/`): am 2026-11-10 in egui umgesetzt (Stufen A–D: Farben und
   Schriften, Kopf- und Statusleiste mit Hinweis auf neue Versionen, alle Seiten samt Einstellungen mit Unternavigation und Release-Notes,
   Symbole, Logo C, Programmsymbole, README-Bild), gegen den Entwurf geprüft; Abweichungen in `PLAN.md` 5.6.

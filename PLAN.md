@@ -2,11 +2,12 @@
 
 **Stand: 2026-11-10.**
 
-- **v0.5.0** ist released (2026-11-10, auf Ansage des Nutzers, nur Linux) mit der neuen Oberfläche (5.6) und VoIP (5.7); die `.deb`
+- **v0.5.0** ist released (2026-11-10, auf Ansage des Nutzers, zuerst nur Linux) mit der neuen Oberfläche (5.6) und VoIP (5.7); die `.deb`
   ist bitgleich mit dem Test-Paket 0.5.0 (gleiche Prüfsumme). Test durch den Nutzer steht aus. Unter Windows am selben Tag gebaut und
   getestet (Release-Bau ohne Warnung, alle Tests grün; Smart App Control sperrte Proc-Macro-DLLs, nach Neu-Linken lief alles) und der
   **signierte Windows-Installer zum Release hinzugefügt** (`dev/release.sh --add-windows … --publish`, Release-Notes mit Windows-Absatz;
-  `docs/windows.md` oben unter „v0.5.0“). Das Fenster unter Windows ist von Hand noch nicht geprüft. Repo https://github.com/tomCSLK/openpacketmon öffentlich.
+  `docs/windows.md` oben unter „v0.5.0“). Das Update von 0.4.0 mit dem Installer lief beim Nutzer reibungslos (2026-11-10); der
+  weitere Test läuft. Repo https://github.com/tomCSLK/openpacketmon öffentlich.
 - **v0.4.0** war das erste öffentliche Release (2026-11-02, Linux; signierter Windows-Installer seit 2026-11-03). Oberfläche egui (5.5),
   Mitschnitt-Helfer mit Rechten, MCP-Anbindung (5.4), Windows (5.3, Reste in `docs/windows.md` 8).
 - **Neue Oberfläche im Stil von opensecmon (5.6) umgesetzt** (2026-11-10, Stufen A–D nach dem abgenommenen Entwurf; Abweichungen dort).
@@ -1791,8 +1792,8 @@ Standards (SIP RFC 3261, SDP RFC 8866, RTP/RTCP RFC 3550, Payload-Typen RFC 3551
 1. Neue Oberfläche (5.6): in v0.5.0 released (2026-11-10); Test durch den Nutzer.
 2. VoIP (5.7, „go“ am 2026-11-10): Stufen 1–5 (Zerleger, Filter, Anrufe, Anhören, MCP) in v0.5.0 released; Test mit einem echten Anruf
    (Tonausgabe, Dateidialog, Rufnummern über MCP).
-3. Signierter Windows-Installer für v0.5.0: auf dem Windows-Rechner bauen und mit `dev/release.sh --add-windows … --publish` anhängen,
-   danach die Release-Notes anpassen (`gh release edit v0.5.0 --notes-file …`; sie nennen bis dahin den Installer von v0.4.0).
+3. Windows-Fassung von v0.5.0: signierter Installer seit 2026-11-10 im Release (Prüfsumme in `SHA256SUMS` stimmt); Update von 0.4.0
+   mit dem Installer beim Nutzer reibungslos (2026-11-10); in der Testphase.
 4. Windows-Reste (`docs/windows.md` 8): CI-Job, Test auf sauberem System, MCP-Einrichtung in `docs/windows-tester.md`, MCP-Integrationstests
    unter Windows von den echten Einstellungen trennen.
 5. Rückmeldung des Originals zum Pull Request mit der Korrektur aus 4.8 (Einzelheiten nur in `CLAUDE.local.md`).

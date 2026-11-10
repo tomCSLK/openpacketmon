@@ -263,7 +263,8 @@ die Handle-Liste mit `unsafe`, falls das einmal stört.
 6. IPFIX-Collector: Die Windows-Firewall fragt nach, weil er auf `0.0.0.0:4739` lauscht. Die Oberfläche auf `127.0.0.1` löst
    keine Nachfrage aus.
 7. Sicherheit: Der Sicherheitstest aus `PLAN.md` 4.8 für die geänderten Stellen, vor allem die Rechte des Helfers.
-8. Sauberes System: Installer, Deinstallation, Update über eine ältere Version.
+8. Sauberes System: Installer, Deinstallation, Update über eine ältere Version. Update 0.4.0 → 0.5.0 auf dem Rechner des Nutzers
+   reibungslos (2026-11-10, kein sauberes System).
 9. MCP-Anbindung (`PLAN.md` 5.4): `openpacketmon.exe mcp` mit Claude Code unter Windows. Dabei prüfen, dass nur der Benutzer `mcp-access.json` im
    Ordner der Einstellungen lesen kann: Die Rechte `0600` setzt der Code nur unter Unix. **Geprüft** (2026-11-02, installierte Fassung
    aus dem Installer, Mitschnitt auf einem USB-Ethernet-Adapter, Zugang im Fenster eingeschaltet): Über `openpacketmon.exe mcp` antworten
@@ -432,5 +433,6 @@ Update über eine ältere Version, Start ohne Npcap (Abschnitt 5 Punkt 8).
 **Beginn (Nutzer, 2026-11-02):** Windows wird **vor** dem ersten Release gemacht, weil andere Tester eine Windows-Fassung
 brauchen; MCP ist fertig. Der Haltepunkt aus `PLAN.md` 4.10 ist seit 2026-11-02 aufgehoben.
 
-**Noch offen (Stand 2026-11-10):** Fenster von 0.5.0 unter Windows von Hand prüfen (oben unter „v0.5.0“, Schritt 2), CI-Job für Windows (Abschnitt 7), Test auf einem sauberen System (Deinstallation, Update über eine
+**Noch offen (Stand 2026-11-10):** Test von 0.5.0 unter Windows zu Ende führen (oben unter „v0.5.0“, Schritt 2; das Update von 0.4.0
+mit dem Installer lief beim Nutzer reibungslos), CI-Job für Windows (Abschnitt 7), Test auf einem sauberen System (Deinstallation, Update über eine
 ältere Version, Start ohne Npcap), MCP-Einrichtung in `docs/windows-tester.md`, MCP-Integrationstests von den echten Einstellungen trennen.

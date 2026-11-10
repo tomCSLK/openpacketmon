@@ -11,16 +11,27 @@ Beschreibung, ohne Npcap startet das Programm mit einem Hinweis, die C-Laufzeit 
 am Ende von Abschnitt 8. Die Punkte in Abschnitt 4 stammen aus einer Durchsicht des Codes auf dem Linux-Rechner, ergänzt um das, was unter
 Windows aufgefallen ist.
 
-**v0.5.0 (2026-11-10):** Unter Linux released, **ohne Windows-Installer**; die Release-Notes verweisen bis dahin auf den von v0.4.0. Der
-Code von 0.5.0 (neue Oberfläche nach `PLAN.md` 5.6, VoIP nach 5.7) wurde unter Windows **noch nie gebaut oder getestet**. Neue
+**v0.5.0 (2026-11-10):** Unter Linux released, der signierte Windows-Installer **am selben Tag hinzugefügt** (Schritt 3 unten). Vorher war der
+Code von 0.5.0 (neue Oberfläche nach `PLAN.md` 5.6, VoIP nach 5.7) unter Windows noch nie gebaut oder getestet. Neue
 Abhängigkeiten für Windows gibt es nicht: Ton (`rodio`) und Dateidialog (`rfd`) waren schon in 0.4.0, `openpacketmon.ico` ist neu
 erzeugt, `openpacketmon.iss` hat nur die Signatur dazubekommen. Reihenfolge:
-1. `git pull`, dann `cargo build --release --workspace` und `cargo test --workspace`.
+1. `git pull`, dann `cargo build --release --workspace` und `cargo test --workspace`. **Erledigt (2026-11-10, Stand `18bac7d`):**
+   `cargo check --all-targets` und der Release-Bau ohne Warnung (rustc 1.99.1), alle Tests grün (422 im Hauptprogramm, 6 MCP, 4 + 4 im
+   Helfer, 2 live auf dem Npcap-Loopback, 2 im Paket-Parser; übersprungen nur die gewollten); einzeln dazu auch
+   `the_imported_file_is_free_right_after_stopping` (echte Helfer) und `test_fetch_latest_release_from_github`. Vorher sperrte Smart App
+   Control Proc-Macro-DLLs (oben unter „Smart App Control“, „Proc-Macro-DLLs“); nach einmal Neu-Linken lief alles. Das fertige,
+   unsignierte `target\release\openpacketmon.exe` sperrt Smart App Control beim Start; das Fenster also mit der signierten Fassung prüfen
+   (`dev\build-installer.ps1 -CertSha1 …` signiert die Programme in `target\release` vor dem Verpacken).
 2. Das Fenster kurz prüfen: neue Oberfläche, Statistik → Anrufe mit einer Aufnahme, Anhören (Ton über WASAPI), Speichern als WAV mit dem
    Dateidialog, Hinweis auf neue Versionen in der Statusleiste.
 3. Installer bauen und signieren (Abschnitt 6.1), dann in Git Bash `dev/release.sh --add-windows
    target/installer/openpacketmon-0.5.0-setup.exe --publish`; danach die Release-Notes anpassen (`gh release edit v0.5.0 --notes-file …`,
-   Windows-Absatz wie bei v0.4.0).
+   Windows-Absatz wie bei v0.4.0). **Gebaut und signiert (2026-11-10, Stand `18bac7d`):** `target\installer\openpacketmon-0.5.0-setup.exe`,
+   10 646 952 Bytes, SHA-256 `3fe5fc71bd6def75f45f3ceab9400b3975e602e942166d74ce7896e913baf65e`; Programme und Installer von
+   `signtool verify /pa /all` bestätigt, das signierte `target\release\openpacketmon.exe` startet unter Smart App Control (`--version`,
+   `--list-adapters`). **Veröffentlicht (Nutzer, 2026-11-10):** mit `dev/release.sh --add-windows … --publish` zum Release `v0.5.0`
+   hinzugefügt, `SHA256SUMS` jetzt mit drei Zeilen, alles wieder geladen und geprüft; Release-Notes mit Windows-Absatz statt des Verweises
+   auf v0.4.0. Schritt 2 (Fenster von Hand) war bis dahin nicht bestätigt.
 
 Muss dabei Programmcode geändert werden, passt der Installer nicht mehr zum Tag `v0.5.0` (`--add-windows` lässt seit dem Tag nur Änderungen
 an `*.md`, `docs/`, `dev/`, `resources/packaging/` und `.github/` zu). Dann braucht es ein neues Release, etwa 0.5.1; die Version nennt der
@@ -83,6 +94,14 @@ und Build-Skripte von Abhängigkeiten (beim ersten Release-Build `crc32fast`; Ab
 `Microsoft-Windows-CodeIntegrity/Operational`, IDs 3033/3077). Es bewertet jede Datei einzeln; neu linken hilft (z. B. Zeitstempel von
 `src/main.rs` setzen, dann erneut `cargo test`). Für den Installer heißt das: Bei Testern mit Smart App Control kann ein unsigniertes
 Programm ganz blockiert sein, nicht nur von SmartScreen gewarnt (Abschnitt 6).
+**Proc-Macro-DLLs (2026-11-10):** Auch die DLLs der Proc-Makros in `target\<profil>\deps\*.dll`, die rustc beim Übersetzen lädt, werden
+geblockt, und zwar auch ältere, die vorher durchgelassen wurden (`windows_implement-….dll` vom 2026-11-02, beim signierten Bau am 2026-11-03
+noch in Ordnung). Cargo meldet dann irreführend `error[E0463]: can't find crate for …` (etwa `accesskit_windows`, `wgpu`, `serde`,
+`pnet_packet`), dazwischen manchmal `LoadLibraryExW failed … (os error 4551)`. Abhilfe: die Einträge mit ID 3033 seit dem Start des Baus
+im Ereignisprotokoll lesen, genau diese DLLs löschen und neu bauen; der Linker schreibt sie dabei leicht anders, und Smart App Control
+bewertet sie neu (2026-11-10: im Release `rmcp_macros`, `windows_implement`, im Debug-Profil `serde_derive`, `pnet_macros`; je ein zweiter
+Lauf genügte). `cargo clean -p <crate>` für die Bibliothek, die „nicht gefunden“ wird, hilft nicht, gesperrt ist das Makro dahinter.
+`cargo-deny.exe` (selbst gebaut, unsigniert) ist seit 2026-11-08 ganz gesperrt; `cargo deny` läuft in der CI.
 
 **Feste Vorgaben:** Npcap wird **nie mitgeliefert**, der Nutzer installiert es selbst (proprietäre Lizenz). Wireshark-Code
 bleibt tabu. Die Arbeitsregeln in `CLAUDE.md` gelten unverändert. Die Arbeit beginnt **vor dem ersten Release** (vorgezogen
@@ -413,5 +432,5 @@ Update über eine ältere Version, Start ohne Npcap (Abschnitt 5 Punkt 8).
 **Beginn (Nutzer, 2026-11-02):** Windows wird **vor** dem ersten Release gemacht, weil andere Tester eine Windows-Fassung
 brauchen; MCP ist fertig. Der Haltepunkt aus `PLAN.md` 4.10 ist seit 2026-11-02 aufgehoben.
 
-**Noch offen (Stand 2026-11-10):** Build, Test und signierter Installer für v0.5.0 (oben unter „v0.5.0“), CI-Job für Windows (Abschnitt 7), Test auf einem sauberen System (Deinstallation, Update über eine
+**Noch offen (Stand 2026-11-10):** Fenster von 0.5.0 unter Windows von Hand prüfen (oben unter „v0.5.0“, Schritt 2), CI-Job für Windows (Abschnitt 7), Test auf einem sauberen System (Deinstallation, Update über eine
 ältere Version, Start ohne Npcap), MCP-Einrichtung in `docs/windows-tester.md`, MCP-Integrationstests von den echten Einstellungen trennen.

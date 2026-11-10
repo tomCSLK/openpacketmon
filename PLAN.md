@@ -3,9 +3,10 @@
 **Stand: 2026-11-10.**
 
 - **v0.5.0** ist released (2026-11-10, auf Ansage des Nutzers, nur Linux) mit der neuen Oberfläche (5.6) und VoIP (5.7); die `.deb`
-  ist bitgleich mit dem Test-Paket 0.5.0 (gleiche Prüfsumme). Der signierte Windows-Installer fehlt noch (auf dem Windows-Rechner bauen,
-  dann `dev/release.sh --add-windows`, `docs/windows.md` 6.1); die Release-Notes verweisen bis dahin auf den von v0.4.0. Test durch den
-  Nutzer steht aus. Repo https://github.com/tomCSLK/openpacketmon öffentlich.
+  ist bitgleich mit dem Test-Paket 0.5.0 (gleiche Prüfsumme). Test durch den Nutzer steht aus. Unter Windows am selben Tag gebaut und
+  getestet (Release-Bau ohne Warnung, alle Tests grün; Smart App Control sperrte Proc-Macro-DLLs, nach Neu-Linken lief alles) und der
+  **signierte Windows-Installer zum Release hinzugefügt** (`dev/release.sh --add-windows … --publish`, Release-Notes mit Windows-Absatz;
+  `docs/windows.md` oben unter „v0.5.0“). Das Fenster unter Windows ist von Hand noch nicht geprüft. Repo https://github.com/tomCSLK/openpacketmon öffentlich.
 - **v0.4.0** war das erste öffentliche Release (2026-11-02, Linux; signierter Windows-Installer seit 2026-11-03). Oberfläche egui (5.5),
   Mitschnitt-Helfer mit Rechten, MCP-Anbindung (5.4), Windows (5.3, Reste in `docs/windows.md` 8).
 - **Neue Oberfläche im Stil von opensecmon (5.6) umgesetzt** (2026-11-10, Stufen A–D nach dem abgenommenen Entwurf; Abweichungen dort).

@@ -4,8 +4,8 @@ Sprache: Deutsch. **openpacketmon** („Packet Monitoring“) ist ein Fork und d
 (https://github.com/GyulyVGC/sniffnet), einem Netzwerkverkehrs-Monitor in Rust: Verkehr nach Hosts, Ländern, Diensten und Programmen bis zum
 einzelnen Paket, mit Paketliste, Zerlegern, Anzeigefilter und Statistik („kleines Wireshark“). Native Oberfläche mit **egui**, Linux und Windows.
 Repo `tomCSLK/openpacketmon`, **öffentlich** seit 2026-11-02, Lizenz **MIT OR Apache-2.0** wie das Original. Name seit 2026-10-28.
-Logo-Originale außerhalb des Repos (`~/Bilder/openpacketmon_Logo_v2.jpeg`, `openpacketmon_icon_v2.jpeg`); mit der neuen Oberfläche wird es durch
-Logo C „Lupe über Paketen“ ersetzt (`PLAN.md` 5.6).
+Logo seit der neuen Oberfläche: Zeichen C „Lupe über Paketen“ (`resources/icons/logo-mark.svg`); Programmsymbole und README-Bild erzeugt
+`dev/make-icons.py`. Die alten Logo-Originale liegen außerhalb des Repos (`~/Bilder/openpacketmon_Logo_v2.jpeg`, `openpacketmon_icon_v2.jpeg`).
 
 ## Wo steht was
 
@@ -35,9 +35,10 @@ Fassung bis 2026-11-09 (mit dem Verlauf der Browser-Oberfläche) steht in der Gi
   und Bilder). Wireshark-Muster: Fenster schließen beendet das Programm, mit Rückfrage bei laufender Aufzeichnung. Unter Windows zeichnet es mit
   DirectX 12, sonst OpenGL (`WGPU_BACKEND` gilt weiter).
 - `src/mcp/` – **`openpacketmon mcp`** (stdio, `rmcp`) fragt das offene Fenster über `127.0.0.1` ab; Fenster und Client weisen sich per
-  HMAC-SHA256 aus, Token in `mcp-access.json` (`0600`), standardmäßig aus. Sieben Lesewerkzeuge ohne Nutzdaten, dazu `follow_stream` und
-  `packet_bytes` nur mit dem Schalter „Paketinhalte erlauben“. **Alle Antworten laufen durch `finish` in `tools.rs`** (Bereinigung in
-  `privacy.rs`: Cookies, Anmeldeköpfe, URL-Queries, Geheimnisse auch in Bytes durch `x`). Paketinhalte sind ungeprüfte Eingaben für das
+  HMAC-SHA256 aus, Token in `mcp-access.json` (`0600`), standardmäßig aus. Acht Lesewerkzeuge ohne Nutzdaten (darunter `calls`), dazu
+  `follow_stream` und `packet_bytes` nur mit dem Schalter „Paketinhalte erlauben“. **Alle Antworten laufen durch `finish` in `tools.rs`**
+  (Bereinigung in `privacy.rs`: Cookies, Anmeldeköpfe, URL-Queries, SRTP-Schlüssel, Geheimnisse auch in Bytes durch `x`; Rufnummern bis
+  auf die letzten zwei Ziffern, in Texten wie in Bytes; RTP-Nutzdaten, also Ton, nie). Paketinhalte sind ungeprüfte Eingaben für das
   Sprachmodell. `README.md` „opens no network port“ gilt nur, solange der Zugang aus ist.
 - `src/mmdb/` – Geodaten DB-IP Lite (CC BY 4.0) auf Klick nach `~/.local/share/openpacketmon/geo` (Windows `%LOCALAPPDATA%\openpacketmon\geo`),
   sonst `/var/lib/GeoIP` oder eigener Pfad. `src/npcap.rs` – `wpcap.dll` verzögert laden (Windows). `src/utils/check_updates.rs` – Update-Prüfung
@@ -45,7 +46,7 @@ Fassung bis 2026-11-09 (mit dem Verlauf der Browser-Oberfläche) steht in der Gi
 - `locales/de`, `locales/en` – alle Texte (Fluent); `lib/sniffnet-packet-parser` aus dem Original; `resources/packaging/` (`.deb`, Inno Setup);
   `resources/test/` (IPinfo-Beispieldaten, CC BY 4.0).
 - `dev/` – `build-deb.sh`, `release.sh`, `build-installer.ps1` (Windows), `third-party-licenses.py`, `check-notices.sh`, `update-services.py`
-  (IANA-Dienstliste, CC0), `make-ico.py`.
+  (IANA-Dienstliste, CC0), `make-icons.py` (Programmsymbole, README-Bild; Pillow), danach `make-ico.py`.
 
 ## Arbeitsregeln
 
@@ -58,8 +59,9 @@ Fassung bis 2026-11-09 (mit dem Verlauf der Browser-Oberfläche) steht in der Gi
   dort, nie in Commits, Issues oder öffentlichen Dateien, bis das Original ihn behoben hat; öffentlich nur „ein Befund aus 4.8“.
 - Den geplanten Launcher (eigenes, noch nicht öffentliches Projekt) in öffentlichen Dateien nur „der geplante Launcher“ nennen; Name, Aufruf
   und Pfad stehen in `CLAUDE.local.md`.
-- Oberfläche: Farben und Aufbau in `src/gui/theme.rs`, Seitendaten in `src/view/`, Zeichnen in `src/gui/`, Texte nur über `locales/` (jeder
-  Text in `de` und `en`). Heute violett wie die alte Oberfläche von opennetmon; die neue Gestaltung aus `docs/entwurf/` erst nach „go“ (`PLAN.md` 5.6).
+- Oberfläche: Farben und Aufbau in `src/gui/theme.rs`, Seitendaten in `src/view/`, Zeichnen in `src/gui/`, Bausteine in `src/gui/widgets.rs`,
+  Texte nur über `locales/` (jeder Text in `de` und `en`). Gestaltung nach `docs/entwurf/` (grau mit `#1c5ea8`, Fira Sans/Code); neue Seiten
+  gegen Bildschirmfotos des Entwurfs prüfen (`PLAN.md` 5.6).
 - **Wireshark ist GPL:** daraus nie Code, Zerleger oder Filtergrammatik übernehmen.
 - Lizenz- und Copyright-Hinweise des Originals nie entfernen. Wer eine bisher **unveränderte** Datei des Originals ändert (oder Code daraus in
   eine neue Datei übernimmt), setzt oben die zwei Zeilen „Modified for openpacketmon (2026), see NOTICE. Based on `<pfad>` of Sniffnet …“ (wie
@@ -99,15 +101,20 @@ Fassung bis 2026-11-09 (mit dem Verlauf der Browser-Oberfläche) steht in der Gi
 
 Maßgeblich ist `PLAN.md` (oben „Stand“, Abschnitt 5). Kurz (2026-11-10):
 
-- **v0.4.0** ist released (2026-11-02, Linux; signierter Windows-Installer seit 2026-11-03).
-- **Neue Oberfläche im Stil von opensecmon** (`PLAN.md` 5.6, `docs/entwurf/`): Entwurf abgenommen (Kopfleiste, Aufzeichnung rechts oben,
-  Statusleiste, grau mit `#1c5ea8`, Fira Sans/Code, Logo C, 1280 × 820, mindestens 760 × 480). Die **Ergänzung zu den Updates** (Hinweis auf
-  neue Versionen mit und ohne Launcher, Release-Notes unter Einstellungen → Aktualisierungen, abgestimmt mit dem Entwurf des Launchers) ist am
-  2026-11-09 eingebaut und **abgenommen**. Umsetzung in egui in vier Stufen nach „go“.
+- **v0.4.0** ist released (2026-11-02, Linux; signierter Windows-Installer seit 2026-11-03). **Test-Paket 0.5.0** (2026-11-10) mit
+  neuer Oberfläche und VoIP, Test durch den Nutzer steht aus.
+- **Neue Oberfläche im Stil von opensecmon** (`PLAN.md` 5.6, `docs/entwurf/`): am 2026-11-10 in egui umgesetzt (Stufen A–D: Farben und
+  Schriften, Kopf- und Statusleiste mit Hinweis auf neue Versionen, alle Seiten samt Einstellungen mit Unternavigation und Release-Notes,
+  Symbole, Logo C, Programmsymbole, README-Bild), gegen den Entwurf geprüft; Abweichungen in `PLAN.md` 5.6.
 - **VoIP** (`PLAN.md` 5.7): SIP/SDP/RTP/RTCP in Paketliste und Filter, unter Statistik der Reiter „Anrufe“ (Ablauf, Sprachqualität, Anhören
-  von G.711 mit Hinweis auf § 201 StGB; nicht in der Kopfleiste, weil selten gebraucht), Entwurf **abgenommen** (2026-11-10, samt leicht
-  verschobenen Grenzen der Kopfleiste). Umsetzung nach „go“, Zerleger und Filter zuerst; keine echten Mitschnitte oder Rufnummern ins Repo, Ton
-  nie über MCP, Rufnummern über MCP bis auf die letzten zwei Ziffern gekürzt.
+  von G.711 mit Hinweis auf § 201 StGB; nicht in der Kopfleiste, weil selten gebraucht), Entwurf **abgenommen** (2026-11-10). „go“ am
+  2026-11-10. **Stufen 1–5 umgesetzt** (Zerleger `src/dissect/sip.rs`, `rtp.rs`, Zuordnung `src/engine/analysis/voip.rs`, Filter,
+  Zeilenfarbe, Protokollhierarchie; Seitendaten `src/view/calls.rs` mit Testaufnahme `calls/tests.rs`, Seiten `src/gui/pages/calls.rs`,
+  Einstellungen → Anrufe; Anhören: G.711 und WAV in `src/view/calls/audio.rs`, Player und Dialog zu § 201 in
+  `src/gui/pages/calls/player.rs`; MCP-Werkzeug `calls`, Rufnummern gekürzt mit `Numbers` in `src/mcp/privacy.rs`; Bildtest
+  `GUI_SHOTS_ONLY=voip`); als Nächstes der Test mit einem echten Anruf. Echte Tonausgabe und Dateidialog sind nur von Hand zu
+  prüfen. Keine echten Mitschnitte oder Rufnummern ins Repo, Ton nie über MCP, Rufnummern über MCP bis auf die letzten zwei
+  Ziffern gekürzt.
 - Windows-Reste (`docs/windows.md` 8): CI-Job, Test auf sauberem System, MCP-Einrichtung für Tester, MCP-Tests unter Windows von den echten
   Einstellungen trennen (`confy` ignoriert dort `XDG_CONFIG_HOME`).
 - Pull Request mit der Korrektur des Befunds beim Original offen (`CLAUDE.local.md`).

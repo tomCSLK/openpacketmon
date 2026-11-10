@@ -8,6 +8,27 @@ The history of Sniffnet itself is in its own changelog: <https://github.com/Gyul
 
 ## [Unreleased]
 
+### Interface
+
+- New look in the style of opensecmon: a top bar with the pages and the capture state instead of the violet sidebar, a
+  status bar, grey with a calm blue, the fonts Fira Sans and Fira Code instead of Inter, new symbols after Lucide and a new
+  logo (a magnifier over packets) with new program icons
+- Settings with their own navigation; the release notes of the installed version under Settings → Updates, and a note in
+  the status bar when a new version is out
+
+### Calls (VoIP)
+
+- SIP over UDP and TCP (port 5060, and on other ports by its first line), SDP, RTP and RTCP in the packet list, the packet
+  details and the display filter (`sip`, `rtp`, `rtcp`, `sip.method`, `sip.from`, `rtp.ssrc`, `voip.call_id` …); RTP is found
+  by the session description and, unless turned off, by its form
+- Statistics → Calls lists the calls with state, sides, duration, codec and voice quality (loss and jitter after RFC 3550);
+  the page of a call shows its facts, its flow as a ladder and its voice streams, and a bad connection also shows on the
+  overview
+- Listening to G.711 calls (A-law and µ-law), one side or both, and saving them as WAV, after a one-time note on the
+  confidentiality of the spoken word (§ 201 of the German criminal code)
+- AI assistants get the tool `calls` (list, flow, quality), never the voice; phone numbers keep only their last two digits
+  in all answers and packet contents, and keys of SRTP are replaced by `x`
+
 ## [0.4.0] - 2026-11-02
 
 First public version. This list describes what differs from Sniffnet.

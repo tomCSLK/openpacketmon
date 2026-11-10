@@ -26,14 +26,27 @@ pub(super) fn is_http(data: &[u8], at: usize) -> bool {
     rest.starts_with(b"HTTP/1.") || METHODS.iter().any(|m| rest.starts_with(m))
 }
 
-/// The lines of a message head: (line, range of the line without the line break)
-fn lines(data: &[u8], payload: &Range<usize>) -> (Vec<(String, Range<usize>)>, Option<usize>) {
+/// The lines of a message head: (line, range of the line without the line break), and where the
+/// body starts after the empty line
+pub(super) fn lines(
+    data: &[u8],
+    payload: &Range<usize>,
+) -> (Vec<(String, Range<usize>)>, Option<usize>) {
+    lines_as(data, payload, text)
+}
+
+/// [`lines`] read with `decode`
+pub(super) fn lines_as(
+    data: &[u8],
+    payload: &Range<usize>,
+    decode: fn(&[u8]) -> String,
+) -> (Vec<(String, Range<usize>)>, Option<usize>) {
     let mut out = Vec::new();
     let mut pos = payload.start;
     while pos < payload.end && out.len() <= MAX_HEADERS {
         let Some(nl) = data[pos..payload.end].iter().position(|b| *b == b'\n') else {
             // the head continues in the next segment
-            out.push((text(&data[pos..payload.end]), pos..payload.end));
+            out.push((decode(&data[pos..payload.end]), pos..payload.end));
             return (out, None);
         };
         let mut end = pos + nl;
@@ -43,13 +56,14 @@ fn lines(data: &[u8], payload: &Range<usize>) -> (Vec<(String, Range<usize>)>, O
         if end == pos {
             return (out, Some(pos + nl + 1));
         }
-        out.push((text(&data[pos..end]), pos..end));
+        out.push((decode(&data[pos..end]), pos..end));
         pos += nl + 1;
     }
     (out, None)
 }
 
-fn header<'a>(headers: &'a [(String, Range<usize>)], name: &str) -> Option<&'a str> {
+/// The value of the first header line with this name (without regard to case)
+pub(super) fn header<'a>(headers: &'a [(String, Range<usize>)], name: &str) -> Option<&'a str> {
     headers.iter().skip(1).find_map(|(line, _)| {
         let (n, v) = line.split_once(':')?;
         n.trim().eq_ignore_ascii_case(name).then_some(v.trim())

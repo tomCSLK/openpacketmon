@@ -579,7 +579,7 @@ mod tests {
         let fixture = Fixture::new("arguments");
         fixture.access.apply(true);
         let help = ask(&fixture.path(), FILTER_HELP, json!({ "connections": true })).unwrap();
-        assert!(help["examples"].to_string().contains("program contains"));
+        assert!(help["examples"].to_string().contains("program == firefox"));
         let wrong = ask(&fixture.path(), FILTER_HELP, json!({ "connections": 1 }));
         assert!(matches!(wrong, Err(AskError::Tool(_))));
     }

@@ -11,12 +11,12 @@ use sniffnet_packet_parser::{LinkType, Protocol};
 
 use crate::dissect::{self, Dissection, Field, Layer};
 use crate::engine::Engine;
-use crate::engine::analysis::{self, PacketAnalysis};
+use crate::engine::analysis::voip::Mark;
+use crate::engine::analysis::{self, Note};
 use crate::engine::packets::{PacketStore, SharedPacketStore, StoredPacket};
 use crate::engine::state::EngineState;
 use crate::filter::{self, ErrorKind, Filter};
 use crate::networking::types::address_port_pair::AddressPortPair;
-use crate::networking::types::traffic_direction::TrafficDirection;
 use crate::utils::types::timestamp::Timestamp;
 use crate::view::filter_index::FilterIndex;
 use crate::view::format;
@@ -165,21 +165,45 @@ pub fn filtered_connection(
     filter: &str,
 ) -> Option<(String, AddressPortPair)> {
     let key = filtered_conversation(engine.info_traffic.map.keys(), filter)?;
-    Some((
+    Some((connection_label(key), *key))
+}
+
+/// A connection in a line (`connLabel`): "TCP 192.0.2.20:39874 → 198.51.100.140:80", without
+/// ports "ICMP 192.0.2.20 → 192.0.2.1"
+pub fn connection_label(key: &AddressPortPair) -> String {
+    if key.src_port.is_some() || key.dst_port.is_some() {
         format!(
-            "{} ↔ {}",
+            "{} {} → {}",
+            key.protocol,
             format::socket(&key.src_ip, key.src_port),
             format::socket(&key.dst_ip, key.dst_port)
-        ),
-        *key,
-    ))
+        )
+    } else {
+        format!("{} {} → {}", key.protocol, key.src_ip, key.dst_ip)
+    }
+}
+
+/// The connection whose packets a display filter selects (`connNote`)
+pub struct ConnectionNote {
+    /// [`connection_label`]
+    pub label: String,
+    pub key: AddressPortPair,
+    /// A packet of the connection whose stream can be followed (TCP and UDP)
+    pub stream: Option<u64>,
+}
+
+/// The note for the connection a display filter selects, if it selects one
+pub fn connection_note(engine: &EngineState, filter: &str) -> Option<ConnectionNote> {
+    let (label, key) = filtered_connection(engine, filter)?;
+    let stream = matches!(key.protocol, Protocol::Tcp | Protocol::Udp)
+        .then(|| crate::view::connections::first_packet(engine, &key))
+        .flatten();
+    Some(ConnectionNote { label, key, stream })
 }
 
 /// A filter that cannot be read
 pub(crate) struct FilterFault {
     pub message: String,
-    /// It is the connection filter, not the display filter
-    pub connections: bool,
 }
 
 /// The packets a page is about: all, those of a display filter, those of the connections a
@@ -202,11 +226,9 @@ impl Selection {
         let (display, connections) = (display.trim(), connections.trim());
         let selected = Filter::parse_connections(connections).map_err(|e| FilterFault {
             message: filter_error(t, &e),
-            connections: true,
         })?;
         let filter = Filter::parse(display).map_err(|e| FilterFault {
             message: filter_error(t, &e),
-            connections: false,
         })?;
         Ok(Self {
             display: filter.map(|filter| (display.to_owned(), filter)),
@@ -237,6 +259,11 @@ impl Selection {
         }
     }
 
+    /// How many connections the connection filter selects, `None` without one
+    pub(crate) fn connection_count(&self) -> Option<usize> {
+        self.connections.as_ref().map(|(_, keys)| keys.len())
+    }
+
     /// The numbers of the selected packets, `None` for all of them
     pub(crate) fn numbers(
         &self,
@@ -246,6 +273,21 @@ impl Selection {
         (self.display.is_some() || self.connections.is_some())
             .then(|| self.with_numbers(index, store, |m| m.iter().copied().collect()))
     }
+}
+
+/// The time a packet arrived, in the local time zone as other packet analyzers write it
+/// (`Nov  9, 2026 12:08:31.402117 CET`)
+fn arrival_time(ts: Timestamp) -> String {
+    let Ok(at) = jiff::Timestamp::new(ts.secs(), 0) else {
+        return String::new();
+    };
+    let zoned = at.to_zoned(jiff::tz::TimeZone::system());
+    format!(
+        "{}.{:06} {}",
+        zoned.strftime("%b %e, %Y %H:%M:%S"),
+        ts.usecs().clamp(0, 999_999),
+        zoned.strftime("%Z")
+    )
 }
 
 /// Seconds since the first packet kept, as in other packet analyzers (`12.345678`)
@@ -260,6 +302,7 @@ fn relative_time(ts: Timestamp, first: Option<Timestamp>) -> String {
 }
 
 /// A packet in the list
+#[derive(Clone)]
 pub struct PacketRow {
     pub number: u64,
     pub time: String,
@@ -268,9 +311,12 @@ pub struct PacketRow {
     pub protocol: &'static str,
     pub length: u32,
     pub info: String,
-    pub outgoing: Option<bool>,
+    /// The connection of the packet (for "Connection" and "Stream" of the selected one)
+    pub connection: Option<AddressPortPair>,
     /// Class of the coloring rule, empty for none
     pub color: &'static str,
+    /// The call of the packet (for "Anruf" of the selected one)
+    pub call: Option<crate::view::calls::CallKey>,
 }
 
 fn link_type_name(link_type: LinkType) -> &'static str {
@@ -405,7 +451,7 @@ fn pick(m: &Matching, w: Window) -> Picked {
 }
 
 /// The records of the analysis of these packets, analyzing them first if needed
-fn analyzed(store: &SharedPacketStore, numbers: &[u64]) -> HashMap<u64, PacketAnalysis> {
+fn analyzed(store: &SharedPacketStore, numbers: &[u64]) -> HashMap<u64, Note> {
     let Some(last) = numbers.iter().max() else {
         return HashMap::new();
     };
@@ -413,13 +459,20 @@ fn analyzed(store: &SharedPacketStore, numbers: &[u64]) -> HashMap<u64, PacketAn
     let analysis = store.analysis();
     numbers
         .iter()
-        .filter_map(|n| analysis.get(*n).map(|r| (*n, *r)))
+        .filter_map(|n| analysis.note(*n).map(|r| (*n, r)))
         .collect()
 }
 
 /// The rows of these packets (those dropped meanwhile are left out)
 fn rows(store: &SharedPacketStore, numbers: &[u64]) -> Vec<PacketRow> {
     let records = analyzed(store, numbers);
+    let calls: HashMap<u64, crate::view::calls::CallKey> = {
+        let analysis = store.analysis();
+        numbers
+            .iter()
+            .filter_map(|n| crate::view::calls::key_of(&analysis, *n).map(|k| (*n, k)))
+            .collect()
+    };
     let store = store.lock();
     let first = store.first_timestamp();
     numbers
@@ -427,8 +480,8 @@ fn rows(store: &SharedPacketStore, numbers: &[u64]) -> Vec<PacketRow> {
         .filter_map(|n| store.get(*n))
         .map(|p| {
             let mut d = dissect_stored(&store, p).d;
-            if let Some(record) = records.get(&p.number) {
-                analysis::annotate(record, &mut d);
+            if let Some(note) = records.get(&p.number) {
+                analysis::annotate(note, &p.data, &mut d);
             }
             let color = filter::color(&filter_packet(p, &d)).unwrap_or("");
             PacketRow {
@@ -439,90 +492,59 @@ fn rows(store: &SharedPacketStore, numbers: &[u64]) -> Vec<PacketRow> {
                 protocol: d.protocol,
                 length: p.orig_len,
                 info: d.info,
-                outgoing: p
-                    .conn
-                    .as_ref()
-                    .map(|(_, dir)| *dir == TrafficDirection::Outgoing),
+                connection: p.conn.as_ref().map(|(key, _)| *key),
                 color,
+                call: calls.get(&p.number).copied(),
             }
         })
         .collect()
 }
 
-/// What the store holds: packets, memory, link type …
-fn foot_text(t: Lang, store: &SharedPacketStore) -> String {
-    let store = store.lock();
-    let mut parts = vec![
-        t.get1(
-            "packets-kept",
-            "count",
-            format::count(t, store.len() as u128),
-        ),
-        format::bytes(t, store.bytes() as u128),
-        link_type_name(store.link_type()).to_owned(),
-    ];
-    if store.dropped() > 0 {
-        parts.push(t.get1(
-            "packets-dropped",
-            "count",
-            format::count(t, u128::from(store.dropped())),
-        ));
-    }
-    if store.headers_only() {
-        parts.push(t.get("packets-headers-only"));
-    }
-    parts.join(" · ")
-}
-
 pub const FILTER_EXAMPLES: [&str; 8] = [
     "dns",
-    "tls.sni contains amazon",
-    "ip.addr == 192.168.1.20 and not arp",
-    "tcp.port in {80 443} and tcp.flags.syn",
-    "domain contains google",
-    "frame.len > 1000",
+    "tls.sni contains example",
+    "ip.addr == 192.0.2.0/24",
     "tcp.analysis.flags",
-    "dns.time > 100ms",
+    "http.request.method == GET",
+    "tcp.port in {80 443}",
+    "sip or rtp",
+    "not arp and not mdns",
 ];
-
-/// The names the display filter knows besides the protocols
-pub fn filter_field_names() -> Vec<&'static str> {
-    filter::FIELDS
-        .iter()
-        .map(|(name, _, _)| *name)
-        .chain(["frame.number", "frame.len", "frame.cap_len"])
-        .collect()
-}
 
 /// What surrounds the rows of the list
 pub struct PacketList {
     /// Why no packets are kept (store off, IPFIX); empty if they are
     pub unavailable: String,
-    /// The connection the display filter selects: its two ends and its key
-    pub connection: Option<(String, AddressPortPair)>,
+    /// The connection the display filter selects
+    pub connection: Option<ConnectionNote>,
+    /// How many connections the connection filter selects
+    pub connections: Option<usize>,
     pub error: Option<FilterFault>,
-    /// The list can be shown (packets kept, filters valid)
-    pub list: bool,
-    pub foot: Option<String>,
+    /// Packets are kept
+    pub store: bool,
 }
 
 /// The state of the list for a display and a connection filter
 pub fn packet_list(t: Lang, engine: &Engine, display: &str, connections: &str) -> PacketList {
-    let (unavailable, store, connection, error) = {
+    let (unavailable, store, connection, selection) = {
         let engine = engine.lock();
         (
             unavailable(t, &engine),
-            engine.packets.clone(),
-            filtered_connection(&engine, display),
-            Selection::read(t, &engine, display, connections).err(),
+            engine.packets.is_some(),
+            connection_note(&engine, display),
+            Selection::read(t, &engine, display, connections),
         )
+    };
+    let (count, error) = match selection {
+        Ok(selection) => (selection.connection_count(), None),
+        Err(error) => (None, Some(error)),
     };
     PacketList {
         unavailable,
         connection,
-        list: store.is_some() && error.is_none(),
+        connections: count,
         error,
-        foot: store.as_ref().map(|s| foot_text(t, s)),
+        store,
     }
 }
 
@@ -537,7 +559,11 @@ pub struct RowBlock {
     pub goto: Option<(usize, u64)>,
     /// Where the anchor packet is now
     pub anchor: Option<usize>,
-    pub foot: String,
+    /// Packets in the store, and older ones dropped because of its limits
+    pub kept: usize,
+    pub dropped: u64,
+    /// The numbers of the oldest and of the newest packet kept
+    pub numbers: (u64, u64),
 }
 
 /// The rows of a window of the list; `None` without packets or with a wrong filter
@@ -559,13 +585,21 @@ pub fn row_block(
     let store = store?;
     let selection = selection.ok()?;
     let picked = with_matching(index, &store, &selection, |m| pick(m, window));
+    let (kept, dropped, numbers) = {
+        let s = store.lock();
+        let last = s.last_number();
+        let first = s.iter().next().map_or(last, |p| p.number);
+        (s.len(), s.dropped(), (first, last))
+    };
     Some(RowBlock {
         total: picked.total,
         from: picked.from,
         rows: rows(&store, &picked.numbers),
         goto: picked.goto,
         anchor: picked.anchor,
-        foot: foot_text(t, &store),
+        kept,
+        dropped,
+        numbers,
     })
 }
 
@@ -619,39 +653,61 @@ fn hex_dump(data: &[u8]) -> Vec<HexLine> {
 const RELATED_SEARCH: usize = 20_000;
 
 /// The record of the analysis of a packet and the packets related to it: the segment it
-/// acknowledges, the query it answers, and the other way round
-fn related_packets(
-    t: Lang,
-    store: &SharedPacketStore,
-    n: u64,
-) -> (Option<PacketAnalysis>, Vec<(String, u64)>) {
+/// acknowledges, the query or request it answers, the SIP message that negotiated its RTP, and
+/// the other way round
+fn related_packets(t: Lang, store: &SharedPacketStore, n: u64) -> (Option<Note>, Vec<Related>) {
     let last = store.lock().last_number();
     analysis::advance(store, n.saturating_add(RELATED_SEARCH as u64).min(last));
     let analysis = store.analysis();
-    let Some(record) = analysis.get(n).copied() else {
+    let Some(note) = analysis.note(n) else {
         return (None, Vec::new());
     };
-    let ms = |us: u32| format::millis(t, f64::from(us));
-    let mut related = Vec::new();
+    let record = note.record;
+    let related = |lead: String, number: u64, us: Option<u32>, of: Of| Related {
+        lead,
+        number,
+        after: us.map_or_else(String::new, |us| {
+            t.get1("packet-after", "time", format::millis(t, f64::from(us)))
+        }),
+        of,
+        layer: 0,
+    };
+    let mut found = Vec::new();
     if let Some((acked, rtt)) = record.acks {
-        related.push((
-            t.get2("packet-acks", "packet", acked, "time", ms(rtt)),
-            acked,
-        ));
+        found.push(related(t.get("packet-acks"), acked, Some(rtt), Of::Tcp));
     }
     if let Some((query, time)) = record.dns {
-        related.push((
-            t.get2("packet-answers", "packet", query, "time", ms(time)),
-            query,
-        ));
+        found.push(related(t.get("packet-answers"), query, Some(time), Of::Dns));
     }
+    let request = match record.voip {
+        Some(Mark::Sip {
+            answers: Some((request, time)),
+            ..
+        }) => {
+            found.push(related(
+                t.get("packet-answers"),
+                request,
+                Some(time),
+                Of::Sip,
+            ));
+            false
+        }
+        Some(Mark::Sip { status: None, .. }) => true,
+        _ => false,
+    };
+    if let Some(setup) = note.voip.as_ref().and_then(|v| v.media.as_ref()?.setup) {
+        found.push(related(t.get("packet-sdp-setup"), setup, None, Of::Rtp));
+    }
+    let mut answers = 0;
     for (number, later) in analysis.after(n).take(RELATED_SEARCH) {
         if let Some((acked, rtt)) = later.acks
             && acked == n
         {
-            related.push((
-                t.get2("packet-acked-by", "packet", number, "time", ms(rtt)),
+            found.push(related(
+                t.get("packet-acked-by"),
                 number,
+                Some(rtt),
+                Of::Tcp,
             ));
             // only one packet acknowledges a segment
             break;
@@ -659,14 +715,68 @@ fn related_packets(
         if let Some((query, time)) = later.dns
             && query == n
         {
-            related.push((
-                t.get2("packet-answered-by", "packet", number, "time", ms(time)),
+            found.push(related(
+                t.get("packet-answered-by"),
                 number,
+                Some(time),
+                Of::Dns,
             ));
             break;
         }
+        if request
+            && let Some(Mark::Sip {
+                answers: Some((asked, time)),
+                status: Some(status),
+                ..
+            }) = later.voip
+            && asked == n
+        {
+            let lead = t.get1("packet-sip-answer", "status", status);
+            found.push(related(lead, number, Some(time), Of::Sip));
+            answers += 1;
+            if answers >= MAX_ANSWERS {
+                break;
+            }
+        }
     }
-    (Some(record), related)
+    (Some(note), found)
+}
+
+/// Answers to a SIP request shown at most (provisional ones, the final one, ones sent again)
+const MAX_ANSWERS: usize = 20;
+
+/// The layer a related packet is shown in
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum Of {
+    Tcp,
+    Dns,
+    Sip,
+    Rtp,
+}
+
+/// A packet this one answers or acknowledges, or that answers it (`.rel`): "→ acknowledged in
+/// packet 1206 (after 18.4 ms)"
+pub struct Related {
+    /// "→ acknowledged in packet"
+    pub lead: String,
+    pub number: u64,
+    /// "(after 18.4 ms)"
+    pub after: String,
+    /// The protocol it is about
+    of: Of,
+    /// The layer it is shown in
+    pub layer: usize,
+}
+
+impl Related {
+    /// The whole line
+    pub fn text(&self) -> String {
+        if self.after.is_empty() {
+            format!("{} {}", self.lead, self.number)
+        } else {
+            format!("{} {} {}", self.lead, self.number, self.after)
+        }
+    }
 }
 
 /// Text for the clipboard. It comes from the network, and where it is pasted a control character
@@ -685,7 +795,7 @@ pub fn field_value(field: &Field) -> String {
 /// A field as one line, for the clipboard
 pub fn field_line(field: &Field) -> String {
     if field.value.is_empty() {
-        field.name.to_owned()
+        field.name.to_string()
     } else {
         format!("{}: {}", field.name, field_value(field))
     }
@@ -781,44 +891,74 @@ pub struct PacketDetail {
     /// The neighbors in the store
     pub prev: Option<u64>,
     pub next: Option<u64>,
-    /// Packets this one answers or acknowledges, or that answer it: label and number
-    pub related: Vec<(String, u64)>,
+    /// Packets this one answers or acknowledges, or that answer it
+    pub related: Vec<Related>,
+    /// The call the packet belongs to, and its name
+    pub call: Option<(crate::view::calls::CallKey, String)>,
 }
 
 /// The details of packet `n`, if it is kept
 pub fn packet_detail(t: Lang, engine: &Engine, n: u64) -> Option<PacketDetail> {
     let shared = engine.lock().packets.clone()?;
-    let (record, related) = related_packets(t, &shared, n);
+    let (note, related) = related_packets(t, &shared, n);
+    let call = crate::view::calls::call_of(t, engine, n);
     let store = shared.lock();
     let packet = store.get(n)?;
     let link_type = store.link_type();
     let Dissected { mut d, more, used } = dissect_stored(&store, packet);
-    if let Some(record) = &record {
-        analysis::annotate(record, &mut d);
+    if let Some(note) = &note {
+        analysis::annotate(note, &packet.data, &mut d);
+        found_by_form(t, note, &mut d);
     }
     let captured = packet.data.len();
+    let mut fields = vec![
+        Field::new("Arrival Time", arrival_time(packet.timestamp), 0..0),
+        Field::new(
+            "Time since first packet",
+            format!(
+                "{} seconds",
+                relative_time(packet.timestamp, store.first_timestamp())
+            ),
+            0..0,
+        ),
+        Field::new("Frame Length", format!("{} bytes", packet.orig_len), 0..0),
+    ];
+    fields.push(match store.interface() {
+        Some(name) => Field::new("Interface", name.to_owned(), 0..0),
+        None => Field::new("Link type", link_type_name(link_type).to_owned(), 0..0),
+    });
     let frame = Layer {
         title: format!(
-            "Frame {}: {} bytes on wire, {captured} bytes captured",
-            packet.number, packet.orig_len
+            "Frame {}: {} bytes on wire ({} bits), {captured} bytes captured",
+            packet.number,
+            packet.orig_len,
+            u64::from(packet.orig_len) * 8
         ),
         range: 0..captured,
-        fields: vec![
-            Field::new(
-                "Time since the first packet",
-                format!(
-                    "{} s",
-                    relative_time(packet.timestamp, store.first_timestamp())
-                ),
-                0..0,
-            ),
-            Field::new("Frame length", format!("{} bytes", packet.orig_len), 0..0),
-            Field::new("Capture length", format!("{captured} bytes"), 0..0),
-            Field::new("Link type", link_type_name(link_type).to_owned(), 0..0),
-        ],
+        fields,
     };
     let mut layers = vec![frame];
     layers.extend(d.layers);
+    let mut related = related;
+    for r in &mut related {
+        let titles: &[&str] = match r.of {
+            Of::Dns => &[
+                "Domain Name System",
+                "Multicast Domain",
+                "Link-local Multicast",
+            ],
+            Of::Tcp => &["Transmission Control Protocol"],
+            Of::Sip => &["Session Initiation Protocol"],
+            Of::Rtp => &[
+                "Real-Time Transport Protocol",
+                "Real-time Transport Control",
+            ],
+        };
+        r.layer = layers
+            .iter()
+            .rposition(|l| titles.iter().any(|t| l.title.starts_with(t)))
+            .unwrap_or(layers.len() - 1);
+    }
     let neighbor = |n: u64| store.get(n).map(|_| n);
     Some(PacketDetail {
         number: packet.number,
@@ -853,7 +993,74 @@ pub fn packet_detail(t: Lang, engine: &Engine, n: u64) -> Option<PacketDetail> {
         prev: n.checked_sub(1).and_then(neighbor),
         next: neighbor(n + 1),
         related,
+        call,
     })
+}
+
+/// Says how RTP found without SIP was found, and that a setting decides it
+fn found_by_form(t: Lang, note: &Note, d: &mut Dissection) {
+    let by_form = note
+        .voip
+        .as_ref()
+        .and_then(|v| v.media.as_ref())
+        .is_some_and(|m| !m.rtcp && m.setup.is_none());
+    if by_form
+        && let Some(layer) = d
+            .layers
+            .iter_mut()
+            .find(|l| l.title == "Real-Time Transport Protocol")
+    {
+        let at = layer.range.end..layer.range.end;
+        layer.fields.push(Field::new(
+            t.get("packet-rtp-found"),
+            t.get("packet-rtp-found-how"),
+            at,
+        ));
+    }
+}
+
+/// The packets before and after packet `n` among those the filters of the list select (all kept
+/// packets without a filter or with one that cannot be read), for paging through the details
+pub fn neighbors(
+    t: Lang,
+    engine: &Engine,
+    index: &FilterIndex,
+    display: &str,
+    connections: &str,
+    n: u64,
+) -> (Option<u64>, Option<u64>) {
+    let (store, selection) = {
+        let engine = engine.lock();
+        (
+            engine.packets.clone(),
+            Selection::read(t, &engine, display, connections),
+        )
+    };
+    let Some(store) = store else {
+        return (None, None);
+    };
+    match selection {
+        Ok(selection) if selection.display.is_some() || selection.connections.is_some() => {
+            selection.with_numbers(index, &store, |numbers| {
+                let at = numbers.partition_point(|&m| m < n);
+                let prev = at.checked_sub(1).and_then(|i| numbers.get(i)).copied();
+                let after = if numbers.get(at) == Some(&n) {
+                    at + 1
+                } else {
+                    at
+                };
+                (prev, numbers.get(after).copied())
+            })
+        }
+        _ => {
+            let store = store.lock();
+            let kept = |m: u64| store.get(m).map(|_| m);
+            (
+                n.checked_sub(1).and_then(kept),
+                n.checked_add(1).and_then(kept),
+            )
+        }
+    }
 }
 
 /// A PCAP file with the kept packets
@@ -906,6 +1113,8 @@ fn pcap_name() -> String {
 #[cfg(test)]
 mod tests {
     use serial_test::serial;
+
+    use crate::networking::types::traffic_direction::TrafficDirection;
 
     use crate::config::conf::Conf;
     use crate::engine::Engine;
@@ -1100,6 +1309,34 @@ mod tests {
     }
 
     #[test]
+    fn the_index_waits_until_a_flow_is_known_as_rtp() {
+        use crate::config::packet_store::PacketStoreConf;
+        use crate::dissect::tests::{ETH, rtp_bytes, udp_between};
+
+        let store = SharedPacketStore::new(PacketStoreConf::default(), ETH);
+        let index = FilterIndex::default();
+        let filter = Filter::parse("rtp").unwrap().unwrap();
+        let ts = Timestamp::new(1, 0);
+        let push = |i: u16| {
+            let m = rtp_bytes(111, 100 + i, u32::from(i) * 960, 0x9b2e_7714, false, 80);
+            let p = udp_between([192, 0, 2, 20], 52714, [198, 51, 100, 7], 10000, &m);
+            store.lock().push(ts, 134, p.into(), None);
+        };
+        let matches = || -> Vec<u64> {
+            index.with_matches(&store, "rtp", &filter, |m| m.iter().copied().collect())
+        };
+        for i in 0..5 {
+            push(i);
+        }
+        // not decided yet: the packets wait
+        assert!(matches().is_empty());
+        for i in 5..12 {
+            push(i);
+        }
+        assert_eq!(matches(), (1..=12).collect::<Vec<u64>>());
+    }
+
+    #[test]
     fn the_index_follows_the_connections_of_a_filter() {
         use crate::config::packet_store::PacketStoreConf;
         use crate::dissect::tests::{ETH, tcp_packet};
@@ -1256,12 +1493,10 @@ mod tests {
             "{}",
             fault.message
         );
-        assert!(!fault.connections);
-        assert!(!list.list);
 
         // the connection filter has its own fields
         let list = packet_list(Lang::En, &engine, "", "country ==");
-        assert!(list.error.unwrap().connections);
+        assert!(list.error.is_some());
         assert!(
             packet_list(Lang::En, &engine, "", "country == US")
                 .error

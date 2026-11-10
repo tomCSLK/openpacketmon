@@ -14,7 +14,6 @@ use crate::networking::types::program_lookup::ProgramLookup;
 use crate::networking::types::service::Service;
 use crate::report::types::sort_type::SortType;
 use serde::{Deserialize, Serialize};
-use std::cmp::min;
 use std::collections::HashSet;
 use std::net::IpAddr;
 
@@ -234,8 +233,8 @@ fn get_host_entries(
 
     sorted_vec.sort_by(|&(_, a), &(_, b)| a.data_info.compare(&b.data_info, sort_type, data_repr));
 
-    let n_entry = min(sorted_vec.len(), 30);
-    sorted_vec[0..n_entry]
+    // all of them: the list of the page searches and cuts them itself
+    sorted_vec
         .iter()
         .map(|&(host, data_info_host)| {
             FavoriteItem::Host((host.to_owned(), data_info_host.to_owned()))
@@ -256,8 +255,8 @@ fn get_service_entries(
 
     sorted_vec.sort_by(|&(_, a), &(_, b)| a.compare(b, sort_type, data_repr));
 
-    let n_entry = min(sorted_vec.len(), 30);
-    sorted_vec[0..n_entry]
+    // all of them: the list of the page searches and cuts them itself
+    sorted_vec
         .iter()
         .map(|&(service, data_info)| FavoriteItem::Service((*service, *data_info)))
         .collect()
@@ -310,8 +309,8 @@ fn get_program_entries(
         a.compare(b, sort_type, data_repr)
     });
 
-    let n_entry = min(sorted_vec.len(), 30);
-    sorted_vec[0..n_entry]
+    // all of them: the list of the page searches and cuts them itself
+    sorted_vec
         .iter()
         .map(|&(program, data_info)| FavoriteItem::Program((program.to_owned(), *data_info)))
         .collect()

@@ -74,11 +74,162 @@ fn wait_for(what: &str, done: impl Fn() -> bool) {
 }
 
 fn engine_with(rows: usize) -> Fixture {
+    engine_reading((rows > 0).then(|| sample_file(rows)))
+}
+
+/// A made-up call with SIP, RTP both ways and RTCP, a stream of RTP without SIP, and a
+/// registration, between other packets; times in microseconds
+fn call_file() -> PathBuf {
+    use crate::dissect::tests::{rtcp_report, rtp_bytes, sdp_offer, sip_message, udp_between};
+    let phone = [192, 0, 2, 20];
+    let provider = [203, 0, 113, 60];
+    let media = [203, 0, 113, 61];
+    let id = "3f2a9c1e7b54@192.0.2.20";
+    let sip = |out: bool, first: &str, cseq: &str, extra: &[(&str, &str)], sdp: Option<&str>| {
+        let mut headers = vec![
+            (
+                "Via",
+                "SIP/2.0/UDP 192.0.2.20:5060;branch=z9hG4bK3f9a1c;rport",
+            ),
+            (
+                "From",
+                "\"Anna Beispiel\" <sip:anna@sip.example.net>;tag=c81d07",
+            ),
+            ("To", "<sip:support@example.com>"),
+            ("Call-ID", id),
+            ("CSeq", cseq),
+        ];
+        headers.extend_from_slice(extra);
+        headers.push(if out {
+            ("User-Agent", "Linphone/5.2 (belle-sip)")
+        } else {
+            ("Server", "Beispiel-SBC/3.1")
+        });
+        let m = sip_message(first, &headers, sdp);
+        if out {
+            udp_between(phone, 5060, provider, 5060, &m)
+        } else {
+            udp_between(provider, 5060, phone, 5060, &m)
+        }
+    };
+    let offer = sdp_offer("192.0.2.20", 7078, &[8, 0, 101]);
+    let answer = sdp_offer("203.0.113.61", 31456, &[8, 101]);
+    let contact = [("Contact", "<sip:anna@192.0.2.20:5060>")];
+    let mut packets: Vec<(u64, Vec<u8>)> = vec![
+        (
+            0,
+            frame([192, 168, 1, 10], [192, 168, 1, 1], 50_000, 53, false, 30),
+        ),
+        (
+            1_000,
+            sip(
+                true,
+                "INVITE sip:support@example.com SIP/2.0",
+                "1 INVITE",
+                &contact,
+                Some(&offer),
+            ),
+        ),
+        (
+            41_300,
+            sip(false, "SIP/2.0 100 Trying", "1 INVITE", &[], None),
+        ),
+        (
+            612_800,
+            sip(false, "SIP/2.0 180 Ringing", "1 INVITE", &[], None),
+        ),
+        (
+            4_200_500,
+            sip(false, "SIP/2.0 200 OK", "1 INVITE", &contact, Some(&answer)),
+        ),
+        (
+            4_212_000,
+            sip(
+                true,
+                "ACK sip:support@example.com SIP/2.0",
+                "1 ACK",
+                &[],
+                None,
+            ),
+        ),
+    ];
+    let start = 4_220_000_u64;
+    for i in 0..60_u16 {
+        let t = start + u64::from(i) * 20_000;
+        let out = rtp_bytes(8, 21_043 + i, u32::from(i) * 160, 0x5e1f_02a7, i == 0, 160);
+        let back = rtp_bytes(
+            8,
+            3_310 + i,
+            92_400_160 + u32::from(i) * 160,
+            0x0b77_c3d1,
+            i == 0,
+            160,
+        );
+        packets.push((t, udp_between(phone, 7078, media, 31_456, &out)));
+        packets.push((t + 7_300, udp_between(media, 31_456, phone, 7078, &back)));
+        if i == 30 {
+            let report = rtcp_report(0x5e1f_02a7, 0x0b77_c3d1, "anna@192.0.2.20");
+            packets.push((t + 9_000, udp_between(phone, 7079, media, 31_457, &report)));
+        }
+        // a video conference in the browser: RTP without SIP
+        if i % 3 == 0 {
+            let m = rtp_bytes(
+                111,
+                40_981 + i / 3,
+                2_830_080 + u32::from(i) * 320,
+                0x9b2e_7714,
+                i == 0,
+                140,
+            );
+            packets.push((
+                t + 11_000,
+                udp_between(phone, 52_714, [198, 51, 100, 7], 10_000, &m),
+            ));
+        }
+    }
+    packets.push((
+        5_500_000,
+        sip(
+            true,
+            "BYE sip:support@example.com SIP/2.0",
+            "2 BYE",
+            &[],
+            None,
+        ),
+    ));
+    packets.push((5_540_200, sip(false, "SIP/2.0 200 OK", "2 BYE", &[], None)));
+    let dir = std::env::temp_dir().join(format!("openpacketmon-gui-call-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    let path = dir.join("call.pcap");
+    let mut out = Vec::new();
+    out.extend_from_slice(&0xa1b2_c3d4_u32.to_le_bytes());
+    out.extend_from_slice(&2_u16.to_le_bytes());
+    out.extend_from_slice(&4_u16.to_le_bytes());
+    out.extend_from_slice(&[0; 8]);
+    out.extend_from_slice(&65_535_u32.to_le_bytes());
+    out.extend_from_slice(&1_u32.to_le_bytes());
+    for (us, data) in &packets {
+        let len = u32::try_from(data.len()).unwrap();
+        out.extend_from_slice(
+            &u32::try_from(1_794_225_600 + us / 1_000_000)
+                .unwrap()
+                .to_le_bytes(),
+        );
+        out.extend_from_slice(&u32::try_from(us % 1_000_000).unwrap().to_le_bytes());
+        out.extend_from_slice(&len.to_le_bytes());
+        out.extend_from_slice(&len.to_le_bytes());
+        out.extend_from_slice(data);
+    }
+    std::fs::write(&path, out).unwrap();
+    path
+}
+
+/// An engine that has read this capture file (none: an engine without a capture)
+fn engine_reading(path: Option<PathBuf>) -> Fixture {
     let runtime = tokio::runtime::Runtime::new().unwrap();
     let engine = Engine::new(Conf::default(), runtime.handle().clone());
     let mut dir = None;
-    if rows > 0 {
-        let path = sample_file(rows);
+    if let Some(path) = path {
         dir = path.parent().map(Path::to_path_buf);
         {
             let mut state = engine.lock();
@@ -129,6 +280,143 @@ fn window_of_size(
     harness
 }
 
+/// The pages of a made-up call: the packet list with `sip or rtp`, the details of SIP, RTP
+/// (with SDP and without SIP) and RTCP, the statistics
+fn call_shots(folder: &Path) {
+    let call = engine_reading(Some(call_file()));
+    for (theme, suffix) in [(Theme::Light, "light"), (Theme::Dark, "dark")] {
+        let mut harness = window(&call, theme, Lang::De);
+        harness.state_mut().go(Page::Packets {
+            filter: "sip or rtp or rtcp".to_owned(),
+            connections: String::new(),
+            goto: Some(1),
+        });
+        shot(&mut harness, folder, &format!("voip-packets-{suffix}"));
+        harness.state_mut().go(Page::Packets {
+            filter: String::new(),
+            connections: String::new(),
+            goto: Some(1),
+        });
+        shot(&mut harness, folder, &format!("voip-all-{suffix}"));
+        for (name, n) in [
+            ("invite", 2),
+            ("ok", 5),
+            ("rtp", 7),
+            ("rtcp", 79),
+            ("rtp-form", 16),
+        ] {
+            harness.state_mut().go(Page::Packet(n));
+            shot(&mut harness, folder, &format!("voip-{name}-{suffix}"));
+        }
+        harness.state_mut().go(Page::Statistics {
+            filter: String::new(),
+            connections: String::new(),
+        });
+        harness.set_size(egui::vec2(1280.0, 1300.0));
+        shot(&mut harness, folder, &format!("voip-statistics-{suffix}"));
+        harness.set_size(egui::vec2(1280.0, 820.0));
+    }
+    calls_shots(folder);
+}
+
+/// The pages of the draft's calls: the list, every kind of call, the settings, the overview
+fn calls_shots(folder: &Path) {
+    let fixture = crate::view::calls::tests::engine_with_calls();
+    let engine = &fixture.engine;
+    let list = crate::view::calls::call_list(Lang::De, engine);
+    let key = |state: crate::view::calls::State, to: &str| {
+        list.rows
+            .iter()
+            .find(|r| r.status.state == state && (to.is_empty() || r.to.name == to))
+            .map(|r| r.key)
+            .unwrap()
+    };
+    use crate::view::calls::State as S;
+    let pages = [
+        ("ended", key(S::Ended, "support@example.com"), 2_200.0),
+        ("bad", key(S::Ended, "Anna Beispiel"), 2_200.0),
+        ("rejected", key(S::Rejected, ""), 1_300.0),
+        ("missed", key(S::Missed, ""), 1_300.0),
+        ("running", key(S::Running, ""), 1_800.0),
+        ("rtp", key(S::Rtp, ""), 1_300.0),
+    ];
+    let wrap = Fixture {
+        _runtime: tokio::runtime::Runtime::new().unwrap(),
+        engine: engine.clone(),
+        dir: None,
+    };
+    for (theme, suffix) in [(Theme::Light, "light"), (Theme::Dark, "dark")] {
+        let mut harness = window_of_size(&wrap, theme, Lang::De, 1_000.0);
+        harness.state_mut().go(Page::Calls);
+        shot(&mut harness, folder, &format!("voip-calls-{suffix}"));
+        for (name, key, height) in pages {
+            harness.set_size(egui::vec2(1280.0, height));
+            harness.state_mut().go(Page::Call(key));
+            if matches!(name, "ended" | "bad" | "running") {
+                wait_for_audio(&mut harness, key);
+            }
+            shot(&mut harness, folder, &format!("voip-call-{name}-{suffix}"));
+        }
+        // the player halfway through, only the sent side, and the note on § 201 before listening
+        harness.set_size(egui::vec2(1280.0, 1000.0));
+        harness.state_mut().go(Page::Call(pages[1].1));
+        wait_for_audio(&mut harness, pages[1].1);
+        harness
+            .state_mut()
+            .pages
+            .calls
+            .player
+            .show_at(26.0, crate::view::calls::audio::Channel::Sent);
+        shot(&mut harness, folder, &format!("voip-player-{suffix}"));
+        harness.state_mut().pages.calls.player.ask = Some(pages::calls::player::Ask::Play);
+        shot(&mut harness, folder, &format!("voip-law-{suffix}"));
+        harness.state_mut().pages.calls.player.ask = None;
+        harness.set_size(egui::vec2(1280.0, 1000.0));
+        harness.state_mut().go(Page::Settings(SettingsPanel::Calls));
+        shot(&mut harness, folder, &format!("voip-settings-{suffix}"));
+        harness.state_mut().go(Page::Overview);
+        shot(&mut harness, folder, &format!("voip-overview-{suffix}"));
+        harness.state_mut().go(Page::Statistics {
+            filter: String::new(),
+            connections: String::new(),
+        });
+        shot(&mut harness, folder, &format!("voip-protocols-{suffix}"));
+        // narrow windows hide columns
+        harness.set_size(egui::vec2(980.0, 1000.0));
+        harness.state_mut().go(Page::Calls);
+        shot(&mut harness, folder, &format!("voip-calls-narrow-{suffix}"));
+        // from 900 px down the names stand above the waveforms
+        harness.set_size(egui::vec2(860.0, 2_600.0));
+        harness.state_mut().go(Page::Call(pages[0].1));
+        wait_for_audio(&mut harness, pages[0].1);
+        shot(&mut harness, folder, &format!("voip-call-narrow-{suffix}"));
+    }
+    // English
+    let mut harness = window_of_size(&wrap, Theme::Light, Lang::En, 1_000.0);
+    harness.state_mut().go(Page::Calls);
+    shot(&mut harness, folder, "voip-calls-en");
+    harness.set_size(egui::vec2(1280.0, 2_200.0));
+    harness.state_mut().go(Page::Call(pages[1].1));
+    shot(&mut harness, folder, "voip-call-bad-en");
+    // without calls
+    let empty = engine_with(40);
+    let mut harness = window_of_size(&empty, Theme::Light, Lang::De, 1_000.0);
+    harness.state_mut().go(Page::Calls);
+    shot(&mut harness, folder, "voip-calls-empty");
+}
+
+/// Runs frames until the voice of the call in view is loaded
+fn wait_for_audio(harness: &mut Harness<'static, App>, call: crate::view::calls::CallKey) {
+    for _ in 0..400 {
+        harness.step();
+        if harness.state().pages.calls.player.has_audio(call) {
+            return;
+        }
+        std::thread::sleep(Duration::from_millis(25));
+    }
+    panic!("the voice of the call was not loaded");
+}
+
 /// Runs frames until the background jobs have delivered
 fn settle(harness: &mut Harness<'static, App>) {
     for _ in 0..12 {
@@ -139,6 +427,10 @@ fn settle(harness: &mut Harness<'static, App>) {
 }
 
 fn shot(harness: &mut Harness<'static, App>, folder: &Path, name: &str) {
+    // `GUI_SHOTS_ONLY=overview` takes only the pictures whose name contains the word
+    if std::env::var("GUI_SHOTS_ONLY").is_ok_and(|only| !name.contains(&only)) {
+        return;
+    }
     settle(harness);
     let image = harness.render().unwrap();
     image.save(folder.join(format!("{name}.png"))).unwrap();
@@ -149,16 +441,15 @@ fn shot(harness: &mut Harness<'static, App>, folder: &Path, name: &str) {
 fn the_access_for_assistants_is_turned_on_in_the_settings() {
     let fixture = engine_with(0);
     let mut harness = window_of_size(&fixture, Theme::Light, Lang::En, 2_000.0);
-    harness.state_mut().page = Page::Settings;
+    harness.state_mut().page = Page::Settings(SettingsPanel::Assistants);
     settle(&mut harness);
     assert!(!fixture.engine.lock().conf.mcp.enabled);
     assert_eq!(harness.state().mcp.status(), crate::mcp::Status::Off);
 
+    // the switch takes effect at once, without saving
     harness
         .get_by_label("Allow AI assistants to access openpacketmon")
         .click();
-    harness.step();
-    harness.get_by_label("Save").click();
     settle(&mut harness);
     assert!(fixture.engine.lock().conf.mcp.enabled);
     // this window has no place for the file of the access, so it says it could not set it up
@@ -171,11 +462,12 @@ fn the_access_for_assistants_is_turned_on_in_the_settings() {
 #[serial]
 fn the_content_of_packets_is_allowed_until_the_access_closes() {
     let fixture = engine_with(0);
-    let mut harness = window_of_size(&fixture, Theme::Light, Lang::En, 2_000.0);
+    // the whole page in the window: a click does not scroll to what lies below it
+    let mut harness = window_of_size(&fixture, Theme::Light, Lang::En, 2_400.0);
     let dir = std::env::temp_dir().join(format!("openpacketmon-gui-mcp-{}", std::process::id()));
     let mcp = crate::mcp::Access::new(fixture.engine.clone(), Some(dir.join("access.json")));
     harness.state_mut().mcp = mcp.clone();
-    harness.state_mut().page = Page::Settings;
+    harness.state_mut().page = Page::Settings(SettingsPanel::Assistants);
     settle(&mut harness);
     let label = |harness: &Harness<'static, App>, id: &str| harness.state().t.get(id);
     assert!(
@@ -184,38 +476,41 @@ fn the_content_of_packets_is_allowed_until_the_access_closes() {
             .is_none()
     );
 
-    // saving takes over the language of the settings, so every label is asked for anew
+    // both switches take effect at once; the second one is there only while the first is on
     for (click, content) in [
         (&["settings-mcp-enabled", "settings-mcp-content"][..], true),
         (&["settings-mcp-content"][..], false),
     ] {
         for id in click {
             harness.get_by_label(&label(&harness, id)).click();
-            harness.step();
+            settle(&mut harness);
         }
-        harness.get_by_label(&label(&harness, "save")).click();
-        settle(&mut harness);
         assert!(matches!(mcp.status(), crate::mcp::Status::Active { .. }));
         assert_eq!(mcp.content_allowed(), content);
-        let note = if content {
-            "mcp-open-content"
+        let (note, state) = if content {
+            ("mcp-open-content", "settings-mcp-content-on")
         } else {
-            "mcp-open"
+            ("mcp-open", "settings-mcp-on")
         };
         let _ = harness.get_by_label(&label(&harness, note));
+        let _ = harness.get_by_label(&label(&harness, state));
     }
 
     harness
         .get_by_label(&label(&harness, "settings-mcp-enabled"))
         .click();
-    harness.step();
-    harness.get_by_label(&label(&harness, "save")).click();
     settle(&mut harness);
     assert_eq!(mcp.status(), crate::mcp::Status::Off);
     assert!(!mcp.content_allowed());
+    assert!(!fixture.engine.lock().conf.mcp.enabled);
     assert!(
         harness
             .query_by_label(&label(&harness, "mcp-open"))
+            .is_none()
+    );
+    assert!(
+        harness
+            .query_by_label(&label(&harness, "settings-mcp-content"))
             .is_none()
     );
     remove_test_dir(&dir);
@@ -227,6 +522,10 @@ fn the_content_of_packets_is_allowed_until_the_access_closes() {
 fn shots() {
     let folder = PathBuf::from(std::env::var("GUI_SHOTS").unwrap());
     std::fs::create_dir_all(&folder).unwrap();
+    if std::env::var("GUI_SHOTS_ONLY").is_ok_and(|only| only.contains("voip")) {
+        call_shots(&folder);
+        return;
+    }
     let idle = engine_with(0);
     let busy = engine_with(2_000);
     for (theme, suffix) in [(Theme::Light, "light"), (Theme::Dark, "dark")] {
@@ -237,6 +536,22 @@ fn shots() {
         }
         let mut harness = window(&idle, theme, Lang::De);
         shot(&mut harness, &folder, &format!("capture-{suffix}"));
+        if std::env::var("GUI_SHOTS_ONLY").is_ok_and(|only| only.contains("capture")) {
+            // made-up packets of the last 30 seconds, to see the curves
+            for (i, preview) in idle.engine.lock().previews.iter_mut().enumerate() {
+                if !preview.no_ip && i != 1 {
+                    preview.packets = (0..30_u128)
+                        .map(|k| (k * 7 + i as u128 * 5) % 11 * (40 / (i as u128 + 1)) + 20)
+                        .collect();
+                }
+            }
+            harness.set_size(egui::vec2(1280.0, 1150.0));
+            shot(&mut harness, &folder, &format!("capture-tall-{suffix}"));
+            harness.get_by_label("Aufzeichnungsdatei").click();
+            shot(&mut harness, &folder, &format!("capture-file-{suffix}"));
+            harness.get_by_label("IPFIX-Kollektor").click();
+            shot(&mut harness, &folder, &format!("capture-ipfix-{suffix}"));
+        }
 
         let mut harness = window(&busy, theme, Lang::De);
         harness.state_mut().page = Page::Capture;
@@ -248,7 +563,6 @@ fn shots() {
             goto: None,
         });
         shot(&mut harness, &folder, &format!("packets-{suffix}"));
-        settle(&mut harness);
         shot(&mut harness, &folder, &format!("packets2-{suffix}"));
 
         harness.state_mut().go(Page::Packets {
@@ -307,12 +621,11 @@ fn shots() {
                 },
             ),
             ("notifications", Page::Notifications),
-            ("settings", Page::Settings),
-            ("licenses", Page::Licenses),
+            ("settings", Page::Settings(SettingsPanel::Display)),
+            ("licenses", Page::Settings(SettingsPanel::About)),
         ];
         for (name, page) in pages {
             harness.state_mut().go(page);
-            settle(&mut harness);
             shot(&mut harness, &folder, &format!("{name}-{suffix}"));
         }
     }
@@ -326,15 +639,97 @@ fn shots() {
     harness.get_by_label("Hilfe zum Anzeigefilter").click();
     shot(&mut harness, &folder, "packets-help");
 
+    // notifications of favorites (made up)
+    {
+        use crate::config::favorite::FavoriteItem;
+        use crate::networking::types::data_info::DataInfo;
+        use crate::notifications::types::logged_notification::LoggedNotification;
+        let note = |favorite: FavoriteItem, time: &str| LoggedNotification {
+            favorite,
+            timestamp: format!("2026/11/10 {time}"),
+        };
+        let program = crate::networking::types::program::Program::NamePath((
+            "thunderbird".to_owned(),
+            "/usr/lib/thunderbird/thunderbird".to_owned(),
+        ));
+        let mut state = busy.engine.lock();
+        state.logged_notifications.set_notifications(
+            [
+                note(
+                    FavoriteItem::Program((program, DataInfo::new_for_tests(40, 0, 61_300, 0))),
+                    "14:43:55",
+                ),
+                note(
+                    FavoriteItem::Address((
+                        "203.0.113.44".parse().unwrap(),
+                        DataInfo::new_for_tests(20, 0, 23_800, 0),
+                    )),
+                    "14:46:12",
+                ),
+            ]
+            .into(),
+        );
+    }
+    let mut harness = window(&busy, Theme::Light, Lang::De);
+    harness.state_mut().go(Page::Notifications);
+    shot(&mut harness, &folder, "notifications-list");
+    busy.engine.lock().clear_notifications();
+
     // what lies below the first screen
     let mut harness = window_of_size(&busy, Theme::Light, Lang::De, 1600.0);
+    harness.state_mut().go(Page::Overview);
+    shot(&mut harness, &folder, "overview-tall");
     harness.state_mut().go(Page::Statistics {
         filter: String::new(),
         connections: String::new(),
     });
     shot(&mut harness, &folder, "statistics-tall");
-    harness.state_mut().go(Page::Settings);
-    shot(&mut harness, &folder, "settings-tall");
+    // a newer version with made-up release notes, as in the draft
+    let release = |version: &str, notes: &str| crate::utils::check_updates::Release {
+        version: version.to_owned(),
+        published: "2026-11-07T10:00:00Z".parse().ok(),
+        notes: notes.to_owned(),
+        checked: jiff::Timestamp::now(),
+    };
+    busy.engine.lock().update_status =
+        crate::utils::check_updates::UpdateStatus::UpdateAvailable(release(
+            "9.9.0",
+            "New interface in the style of opennetmon and opensecmon.\n\n### Changed\n\
+             - Header bar instead of the sidebar; the recording stays visible at the top right\n\
+             - Settings in one place with a sub-navigation\n\n### Added\n\
+             - Keyboard shortcuts help (`?`), `/` jumps to the filter field\n\
+             - Release notes in Settings → Updates\n\n### Installation\n\
+             **Linux:** `sudo apt install ./openpacketmon_9.9.0-1_amd64.deb`. See the \
+             [changelog](https://github.com/tomCSLK/openpacketmon/blob/main/CHANGELOG.md).",
+        ));
+    for panel in SettingsPanel::ALL {
+        harness.state_mut().go(Page::Settings(panel));
+        shot(
+            &mut harness,
+            &folder,
+            &format!("settings-{panel:?}").to_lowercase(),
+        );
+    }
+    busy.engine.lock().update_status =
+        crate::utils::check_updates::UpdateStatus::UpToDate(release(
+            VERSION,
+            "### Highlights\n- Native interface (egui)\n- Packet list as in Wireshark",
+        ));
+    harness.state_mut().go(Page::Overview);
+    harness
+        .state_mut()
+        .go(Page::Settings(SettingsPanel::Updates));
+    shot(&mut harness, &folder, "settings-updates-current");
+    busy.engine.lock().update_status = crate::utils::check_updates::UpdateStatus::Unknown;
+    // the navigation of the settings below 1024 and below 900 px
+    for width in [960.0, 760.0] {
+        harness.set_size(egui::vec2(width, 900.0));
+        harness.state_mut().go(Page::Settings(SettingsPanel::Geo));
+        harness
+            .state_mut()
+            .go(Page::Settings(SettingsPanel::Notifications));
+        shot(&mut harness, &folder, &format!("settings-narrow-{width}"));
+    }
 
     // while assistants have access, and read packet contents
     let access = folder.join("mcp-access");
@@ -345,7 +740,9 @@ fn shots() {
         mcp.apply(true);
         mcp.allow_content(true);
         harness.state_mut().mcp = mcp.clone();
-        harness.state_mut().go(Page::Settings);
+        harness
+            .state_mut()
+            .go(Page::Settings(SettingsPanel::Assistants));
         let name = if theme == Theme::Light {
             "light"
         } else {
@@ -362,7 +759,7 @@ fn shots() {
     let mut harness = window(&busy, Theme::Dark, Lang::En);
     for (name, page) in [
         ("overview", Page::Overview),
-        ("settings", Page::Settings),
+        ("settings", Page::Settings(SettingsPanel::Display)),
         (
             "statistics",
             Page::Statistics {
@@ -377,13 +774,15 @@ fn shots() {
     }
 }
 
-/// The right edge of the content of a window of 1280 points
-const CONTENT_RIGHT: f32 = 1_262.0;
+/// The right edge of the toolbar of a filter in a window of 1280 points: the page ends 24 px
+/// before the edge of the window, the card has its line and 12 px inside (`.toolbar`)
+const TOOLBAR_RIGHT: f32 = 1_243.0;
 
-/// However long the texts of the buttons are, the row of a filter ends where the page ends
+/// However long the texts are, the toolbar of a filter ends where its card ends: with "Apply",
+/// on the packet list with the field to go to a packet
 #[test]
 #[serial]
-fn the_rows_of_the_filters_end_at_the_edge_of_the_page() {
+fn the_rows_of_the_filters_end_at_the_edge_of_the_card() {
     let packets = |filter: &str, connections: &str| Page::Packets {
         filter: filter.to_owned(),
         connections: connections.to_owned(),
@@ -397,27 +796,31 @@ fn the_rows_of_the_filters_end_at_the_edge_of_the_page() {
         filter: filter.to_owned(),
     };
     let fixture = engine_with(200);
-    for (lang, apply, reset) in [
-        (Lang::De, "Anwenden", "Zurücksetzen"),
-        (Lang::En, "Apply", "Reset"),
+    for (lang, apply, goto) in [
+        (Lang::De, "Anwenden", "Gehe zu Paket"),
+        (Lang::En, "Apply", "Go to packet"),
     ] {
         let mut harness = window(&fixture, Theme::Light, lang);
         for (page, last) in [
-            (packets("", ""), apply),
-            (packets("tcp", ""), reset),
-            (packets("tcp", "port == 443"), reset),
+            (packets("", ""), goto),
+            (packets("tcp", ""), goto),
+            (packets("tcp", "port == 443"), goto),
             (statistics("", ""), apply),
-            (statistics("tcp", ""), reset),
-            (statistics("tcp", "port == 443"), reset),
+            (statistics("tcp", ""), apply),
+            (statistics("tcp", "port == 443"), apply),
             (connections(""), apply),
-            (connections("port == 443"), reset),
+            (connections("port == 443"), apply),
         ] {
             let name = format!("{page:?}");
             harness.state_mut().go(page);
             settle(&mut harness);
-            let right = harness.get_by_label(last).rect().right();
+            let mut right = harness.get_by_label(last).rect().right();
+            if last == goto {
+                // the label, 6 px, then the field of 92 px
+                right += 6.0 + 92.0;
+            }
             assert!(
-                (right - CONTENT_RIGHT).abs() <= 1.0,
+                (right - TOOLBAR_RIGHT).abs() <= 1.0,
                 "{last} on {name} ends at {right}",
             );
         }
@@ -425,10 +828,10 @@ fn the_rows_of_the_filters_end_at_the_edge_of_the_page() {
         for sort in 0..3 {
             harness.state_mut().pages.connections.set_sort(sort);
             settle(&mut harness);
-            let right = harness.get_by_label(reset).rect().right();
+            let right = harness.get_by_label(apply).rect().right();
             assert!(
-                (right - CONTENT_RIGHT).abs() <= 1.0,
-                "{reset} with order {sort} ends at {right}",
+                (right - TOOLBAR_RIGHT).abs() <= 1.0,
+                "{apply} with order {sort} ends at {right}",
             );
         }
     }
@@ -440,13 +843,12 @@ fn the_rows_of_the_filters_end_at_the_edge_of_the_page() {
 fn every_top_list_of_the_overview_opens_its_entries() {
     let fixture = engine_with(200);
     wait_for("the capture has no hosts", || {
-        !crate::view::overview::overview(Lang::En, &fixture.engine.lock())
+        !crate::view::overview::overview(Lang::En, &fixture.engine)
             .hosts
             .is_empty()
     });
     let entries = {
-        let state = fixture.engine.lock();
-        let view = crate::view::overview::overview(Lang::En, &state);
+        let view = crate::view::overview::overview(Lang::En, &fixture.engine);
         [&view.hosts, &view.services].map(|rows| (rows[0].label.clone(), rows[0].jump.clone()))
     };
     let mut harness = window_of_size(&fixture, Theme::Light, Lang::En, 1_400.0);
@@ -597,19 +999,40 @@ fn the_keys_move_the_packet_list() {
         goto: None,
     });
     settle(&mut harness);
+    // a file that has been read starts at its first packet
+    assert_eq!(row_at_top(&harness), 0);
 
+    // the arrows select a packet, Enter opens it (`keydown` of the draft)
     harness.key_press(egui::Key::ArrowDown);
     settle(&mut harness);
-    assert_eq!(row_at_top(&harness), 1);
+    assert_eq!(harness.state().pages.packets.selected(), Some(1));
+    harness.key_press(egui::Key::ArrowDown);
+    settle(&mut harness);
+    assert_eq!(harness.state().pages.packets.selected(), Some(2));
+    let _ = harness.get_by_label("Paket 2");
+    harness.key_press(egui::Key::Enter);
+    settle(&mut harness);
+    assert_eq!(harness.state().page, Page::Packet(2));
+    harness.state_mut().back();
+    settle(&mut harness);
+    assert_eq!(harness.state().pages.packets.selected(), Some(2));
+
     harness.key_press(egui::Key::PageDown);
     settle(&mut harness);
     let page = harness.state().pages.packets.visible() - 1;
-    assert_eq!(row_at_top(&harness), 1 + page);
+    assert_eq!(row_at_top(&harness), page);
 
-    harness.key_press_modifiers(egui::Modifiers::COMMAND, egui::Key::End);
+    // End goes to the newest packets and leaves the selection
+    harness.key_press(egui::Key::End);
     settle(&mut harness);
     let top = row_at_top(&harness);
-    assert!(top + page >= 1_999, "row {top} at the top");
+    // without the bar of the selected packet the list is longer
+    let visible = harness.state().pages.packets.visible();
+    assert!(
+        top + visible >= 2_000,
+        "row {top} at the top, {visible} in view"
+    );
+    assert_eq!(harness.state().pages.packets.selected(), None);
 
     // back from the details, the list is where it was
     harness.state_mut().go(Page::Packet(1_990));
@@ -618,9 +1041,52 @@ fn the_keys_move_the_packet_list() {
     settle(&mut harness);
     assert_eq!(row_at_top(&harness), top);
 
-    harness.key_press_modifiers(egui::Modifiers::COMMAND, egui::Key::Home);
+    harness.key_press(egui::Key::Home);
     settle(&mut harness);
     assert_eq!(row_at_top(&harness), 0);
+}
+
+#[test]
+#[serial]
+fn the_details_page_through_the_packets_of_the_list() {
+    let fixture = engine_with(200);
+    let mut harness = window(&fixture, Theme::Light, Lang::De);
+    harness.state_mut().go(Page::Packets {
+        filter: "frame.number in {3 7 9}".to_owned(),
+        connections: String::new(),
+        goto: None,
+    });
+    settle(&mut harness);
+    harness.state_mut().go(Page::Packet(7));
+    settle(&mut harness);
+    // the arrows and the buttons go to the neighbors in the list, not in the capture
+    harness.key_press(egui::Key::ArrowRight);
+    settle(&mut harness);
+    assert_eq!(harness.state().page, Page::Packet(9));
+    harness.key_press(egui::Key::ArrowRight);
+    settle(&mut harness);
+    assert_eq!(harness.state().page, Page::Packet(9));
+    harness.get_by_label("Vorheriges").click();
+    settle(&mut harness);
+    assert_eq!(harness.state().page, Page::Packet(7));
+    harness.key_press(egui::Key::ArrowLeft);
+    settle(&mut harness);
+    assert_eq!(harness.state().page, Page::Packet(3));
+
+    // the crumb goes back to the list, which shows the packet last seen
+    let crumb = harness
+        .get_all_by_label("Pakete")
+        .find(|node| (60.0..95.0).contains(&node.rect().top()))
+        .unwrap();
+    crumb.click();
+    settle(&mut harness);
+    assert!(matches!(
+        &harness.state().page,
+        Page::Packets { goto: Some(3), .. }
+    ));
+    assert_eq!(harness.state().pages.packets.selected(), Some(3));
+    // it went back, it did not open the list once more
+    assert_eq!(harness.state().history.len(), 1);
 }
 
 #[test]
@@ -669,7 +1135,7 @@ fn going_to_a_packet_finds_it_and_stops_at_the_end_of_the_list() {
     settle(&mut harness);
     let top = row_at_top(&harness);
     assert!((900..1_000).contains(&top), "row {top} at the top");
-    assert_eq!(harness.state().pages.packets.target(), Some(1_000));
+    assert_eq!(harness.state().pages.packets.selected(), Some(1_000));
 
     // the last packet: never past the end, that would show an empty area
     harness.state_mut().go(packets(Some(2_000)));
@@ -679,7 +1145,7 @@ fn going_to_a_packet_finds_it_and_stops_at_the_end_of_the_list() {
     let visible = harness.state().pages.packets.visible();
     assert!(top + visible >= 2_000, "row {top}, {visible} in view");
     assert!(top + visible <= 2_002, "row {top}, {visible} in view");
-    assert_eq!(harness.state().pages.packets.target(), Some(2_000));
+    assert_eq!(harness.state().pages.packets.selected(), Some(2_000));
 }
 
 #[test]
@@ -691,7 +1157,7 @@ fn the_way_back_retraces_the_steps() {
     assert_eq!(harness.state().page, Page::Capture);
     harness.get_by_label("Einstellungen").click();
     harness.run_steps(2);
-    assert_eq!(harness.state().page, Page::Settings);
+    assert_eq!(harness.state().page, Page::Settings(SettingsPanel::Display));
     harness.state_mut().back();
     assert_eq!(harness.state().page, Page::Capture);
     assert!(!harness.state().can_go_back());
@@ -794,9 +1260,14 @@ fn a_capture_that_ends_with_an_error_says_so_on_every_page() {
             "helper gone".to_owned(),
         ));
     }
-    std::thread::sleep(Duration::from_millis(350));
-    settle(&mut harness);
-    settle(&mut harness);
+    // the state of the capture is read every 300 ms; under load it may take longer
+    for _ in 0..50 {
+        std::thread::sleep(Duration::from_millis(100));
+        settle(&mut harness);
+        if harness.query_by_label_contains("helper gone").is_some() {
+            break;
+        }
+    }
     assert!(harness.query_by_label_contains("helper gone").is_some());
 }
 

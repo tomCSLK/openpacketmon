@@ -1,7 +1,8 @@
 //! Analysis of the stored packets across packets: TCP sequence and acknowledgment analysis
 //! (retransmissions, segments out of order or not captured, duplicate ACKs, zero windows,
 //! keep-alives, window updates), round trip times of ACKs and handshakes, DNS response times,
-//! and the protocol path of every packet for the protocol hierarchy.
+//! SIP transactions and the RTP and RTCP of calls ([`voip`]), and the protocol path of every
+//! packet for the protocol hierarchy.
 //!
 //! Written for openpacketmon from the TCP specification (RFC 9293); the rules are simple
 //! heuristics of our own, like other packet analyzers have them.
@@ -15,6 +16,7 @@ use std::net::IpAddr;
 
 use crate::dissect::{self, Dissection, Field, Value};
 use crate::engine::packets::{SharedPacketStore, StoredPacket};
+use crate::networking::types::traffic_direction::TrafficDirection;
 
 /// The findings of the TCP analysis, as bits of [`PacketAnalysis::flags`]
 pub mod flag {
@@ -116,6 +118,17 @@ pub struct PacketAnalysis {
     pub handshake: Option<u32>,
     /// This DNS response answers the query in this packet, after so many microseconds
     pub dns: Option<(u64, u32)>,
+    /// The packet was sent by this computer (for the chart of the statistics)
+    pub outgoing: bool,
+    /// SIP, RTP or RTCP
+    pub voip: Option<voip::Mark>,
+}
+
+/// The record of a packet with what [`annotate`] needs to know besides
+#[derive(Clone, Debug)]
+pub struct Note {
+    pub record: PacketAnalysis,
+    pub voip: Option<voip::Info>,
 }
 
 /// The analysis of the packets of one store
@@ -130,6 +143,7 @@ pub struct Analysis {
     queries: HashMap<QueryKey, (u64, i64)>,
     paths: Vec<Vec<&'static str>>,
     path_ids: HashMap<Vec<&'static str>, u16>,
+    voip: voip::Voip,
 }
 
 /// The two ends of a TCP connection, the lower one first
@@ -191,6 +205,20 @@ impl Analysis {
         self.records.get(index)
     }
 
+    /// The record of a packet with what [`annotate`] needs to know besides
+    pub fn note(&self, number: u64) -> Option<Note> {
+        let record = *self.get(number)?;
+        Some(Note {
+            record,
+            voip: self.voip.info(record.voip),
+        })
+    }
+
+    fn get_mut(&mut self, number: u64) -> Option<&mut PacketAnalysis> {
+        let index = usize::try_from(number.checked_sub(self.first)?).ok()?;
+        self.records.get_mut(index)
+    }
+
     /// The records after the one of this packet, with their packet numbers
     pub fn after(&self, number: u64) -> impl Iterator<Item = (u64, &PacketAnalysis)> {
         let skip = usize::try_from(number.saturating_add(1).saturating_sub(self.first))
@@ -202,6 +230,11 @@ impl Analysis {
             .map(|(i, r)| (self.first + i as u64, r))
     }
 
+    /// What the analysis of calls found
+    pub fn voip(&self) -> &voip::Voip {
+        &self.voip
+    }
+
     /// The protocols of the packets (`eth`, `ip`, `tcp`, `tls`), by [`PacketAnalysis::path`]
     pub fn paths(&self) -> &[Vec<&'static str>] {
         &self.paths
@@ -209,9 +242,9 @@ impl Analysis {
 
     /// Analyzes `packet`, dissected as `d`, if it has not been analyzed yet, and returns its
     /// record; packets must come in capture order (earlier ones that were skipped are gone)
-    pub fn feed(&mut self, packet: &StoredPacket, d: &Dissection) -> Option<PacketAnalysis> {
+    pub fn feed(&mut self, packet: &StoredPacket, d: &Dissection) -> Option<Note> {
         if packet.number <= self.done {
-            return self.get(packet.number).copied();
+            return self.note(packet.number);
         }
         if packet.number != self.done + 1 || self.records.is_empty() {
             // the packets in between were dropped from the store before anyone looked
@@ -225,7 +258,7 @@ impl Analysis {
         let record = self.analyze(packet, d);
         self.records.push_back(record);
         self.done = packet.number;
-        Some(record)
+        self.note(packet.number)
     }
 
     /// Forgets the records of the packets before this number (dropped from the store)
@@ -238,19 +271,65 @@ impl Analysis {
     fn analyze(&mut self, packet: &StoredPacket, d: &Dissection) -> PacketAnalysis {
         let time = packet.timestamp.to_usecs().unwrap_or(0);
         let mut record = PacketAnalysis {
-            path: self.path(&d.protocols),
             len: packet.orig_len,
             time,
+            outgoing: packet
+                .conn
+                .as_ref()
+                .is_some_and(|(_, d)| *d == TrafficDirection::Outgoing),
             ..PacketAnalysis::default()
         };
         let Some((src, dst)) = addresses(d) else {
+            record.path = self.path(&d.protocols);
             return record;
         };
         if let Some(segment) = Segment::read(d) {
             self.tcp(packet.number, time, src, dst, &segment, &mut record);
         }
         self.dns(packet.number, time, src, dst, d, &mut record);
+        let found = self
+            .voip
+            .feed(packet.number, time, (src, dst), d, &packet.data);
+        record.voip = found.mark;
+        record.path = self.media_path(&d.protocols, found.mark);
+        for n in found.dropped {
+            if let Some(r) = self.get_mut(n)
+                && r.voip == Some(voip::Mark::Candidate)
+            {
+                r.voip = None;
+            }
+        }
+        for n in found.confirmed {
+            let Some(path) = self.get(n).map(|r| r.path) else {
+                continue;
+            };
+            let protocols = self
+                .paths
+                .get(usize::from(path))
+                .cloned()
+                .unwrap_or_default();
+            let path = self.media_path(&protocols, found.mark);
+            if let Some(r) = self.get_mut(n) {
+                r.voip = found.mark;
+                r.path = path;
+            }
+        }
         record
+    }
+
+    /// The path of a packet's protocols, with RTP or RTCP when it carries them
+    fn media_path(&mut self, protocols: &[&'static str], mark: Option<voip::Mark>) -> u16 {
+        match mark {
+            Some(voip::Mark::Media { rtcp, .. }) => {
+                let mut with = protocols.to_vec();
+                let name = if rtcp { "rtcp" } else { "rtp" };
+                if !with.contains(&name) {
+                    with.push(name);
+                }
+                self.path(&with)
+            }
+            _ => self.path(protocols),
+        }
     }
 
     /// The index of a list of protocols in [`Self::paths`]
@@ -590,9 +669,14 @@ pub fn advance(store: &SharedPacketStore, upto: u64) {
     }
 }
 
-/// Adds what the analysis found to a dissection: values for the display filter, a note in front
-/// of the info and fields in the TCP and DNS layers
-pub fn annotate(record: &PacketAnalysis, d: &mut Dissection) {
+/// Adds what the analysis found to a dissection of the packet with these bytes: values for the
+/// display filter, a note in front of the info, fields in the TCP and DNS layers, and the layers
+/// of RTP and RTCP
+pub fn annotate(note: &Note, data: &[u8], d: &mut Dissection) {
+    if let Some(info) = &note.voip {
+        voip::annotate(info, data, d);
+    }
+    let record = &note.record;
     let found: Vec<(&'static str, &'static str)> = FLAGS
         .iter()
         .filter(|(bit, _, _)| record.flags & bit != 0)
@@ -605,9 +689,6 @@ pub fn annotate(record: &PacketAnalysis, d: &mut Dissection) {
         d.values.push((key, Value::Num(1)));
     }
     let mut fields = Vec::new();
-    for (_, label) in &found {
-        fields.push((*label, String::new()));
-    }
     if let Some((n, rtt)) = record.acks {
         d.values.push(("tcp.analysis.acks_frame", Value::Num(n)));
         d.values
@@ -620,24 +701,32 @@ pub fn annotate(record: &PacketAnalysis, d: &mut Dissection) {
             .push(("tcp.analysis.handshake", Value::Num(u64::from(us))));
         fields.push(("Handshake time (SYN to ACK)", seconds(us)));
     }
+    let labels: Vec<&str> = found.iter().map(|(_, l)| *l).collect();
     if !found.is_empty() {
-        let labels: Vec<&str> = found.iter().map(|(_, l)| *l).collect();
         d.info = format!("[{}] {}", labels.join(", "), d.info);
     }
-    if !fields.is_empty()
-        && let Some(layer) = d
-            .layers
-            .iter_mut()
-            .find(|l| l.title.starts_with("Transmission Control Protocol"))
+    if let Some(layer) = d
+        .layers
+        .iter_mut()
+        .find(|l| l.title.starts_with("Transmission Control Protocol"))
     {
-        let at = layer.range.end..layer.range.end;
-        let children = fields
-            .into_iter()
-            .map(|(name, value)| Field::new(name, value, at.clone()))
-            .collect();
-        layer
-            .fields
-            .push(Field::new("[SEQ/ACK analysis]", "", at).with_children(children));
+        // what the analysis found, on the header of the segment (`.warnf` for problems)
+        if !labels.is_empty() {
+            layer.fields.push(
+                Field::new("TCP analysis", labels.join(", "), layer.range.clone())
+                    .warn(record.flags & flag::PROBLEMS != 0),
+            );
+        }
+        if !fields.is_empty() {
+            let at = layer.range.end..layer.range.end;
+            let children = fields
+                .into_iter()
+                .map(|(name, value)| Field::new(name, value, at.clone()))
+                .collect();
+            layer
+                .fields
+                .push(Field::new("[SEQ/ACK analysis]", "", at).with_children(children));
+        }
     }
     if let Some((n, us)) = record.dns {
         d.values.push(("dns.response_to", Value::Num(n)));
@@ -664,3 +753,4 @@ pub fn annotate(record: &PacketAnalysis, d: &mut Dissection) {
 
 #[cfg(test)]
 mod tests;
+pub mod voip;

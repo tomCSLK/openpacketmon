@@ -51,9 +51,10 @@ impl Source {
 }
 
 /// The protocols, by the names the dissection notes
-pub const PROTOCOLS: [&str; 23] = [
+pub const PROTOCOLS: [&str; 27] = [
     "eth", "vlan", "sll", "loopback", "arp", "ip", "ipv6", "tcp", "udp", "icmp", "icmpv6", "igmp",
-    "dns", "mdns", "llmnr", "dhcp", "dhcpv6", "tls", "http", "ssdp", "ntp", "quic", "frame",
+    "dns", "mdns", "llmnr", "dhcp", "dhcpv6", "tls", "http", "ssdp", "ntp", "quic", "sip", "sdp",
+    "rtp", "rtcp", "frame",
 ];
 
 use Kind::{Ip, Mac, Num, Text, Time};
@@ -198,6 +199,20 @@ pub const FIELDS: &[(&str, &[&str], Kind)] = &[
     ("quic.version", &["quic.version"], Num),
     ("quic.type", &["quic.type"], Text),
     ("quic.dcid", &["quic.dcid"], Text),
+    ("sip.method", &["sip.method"], Text),
+    ("sip.status_code", &["sip.status_code"], Num),
+    ("sip.call_id", &["sip.call_id"], Text),
+    ("sip.from", &["sip.from"], Text),
+    ("sip.to", &["sip.to"], Text),
+    ("sip.cseq.seq", &["sip.cseq.seq"], Num),
+    ("sip.cseq.method", &["sip.cseq.method"], Text),
+    ("rtp.ssrc", &["rtp.ssrc"], Text),
+    ("rtp.seq", &["rtp.seq"], Num),
+    ("rtp.p_type", &["rtp.p_type"], Num),
+    ("rtp.timestamp", &["rtp.timestamp"], Num),
+    ("rtp.marker", &["rtp.marker"], Num),
+    ("rtcp.pt", &["rtcp.pt"], Num),
+    ("voip.call_id", &["voip.call_id"], Text),
 ];
 
 /// The source of a name (lowercase)

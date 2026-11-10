@@ -48,6 +48,8 @@ pub struct PacketStore {
     /// Time of the first packet of the capture (also when it has been dropped), for relative times
     first_timestamp: Option<Timestamp>,
     link_type: LinkType,
+    /// The network adapter of a live capture, `None` for a file
+    interface: Option<String>,
 }
 
 /// The store shared by the capture thread and the user interface, with the analysis of its
@@ -64,6 +66,12 @@ impl SharedPacketStore {
             packets: Arc::new(Mutex::new(PacketStore::new(conf, link_type))),
             analysis: Arc::default(),
         }
+    }
+
+    /// The store of a live capture on a network adapter
+    pub fn with_interface(self, interface: Option<String>) -> Self {
+        self.lock().interface = interface;
+        self
     }
 
     /// The analysis of the packets; it may lock the store meanwhile, but not the other way round
@@ -90,6 +98,7 @@ impl PacketStore {
             next_number: 1,
             first_timestamp: None,
             link_type,
+            interface: None,
         }
     }
 
@@ -130,6 +139,7 @@ impl PacketStore {
     }
 
     /// Bytes of the packets in the store
+    #[cfg(test)]
     pub fn bytes(&self) -> usize {
         self.bytes
     }
@@ -151,6 +161,11 @@ impl PacketStore {
 
     pub fn link_type(&self) -> LinkType {
         self.link_type
+    }
+
+    /// The network adapter of a live capture, `None` for a file
+    pub fn interface(&self) -> Option<&str> {
+        self.interface.as_deref()
     }
 
     pub fn first_timestamp(&self) -> Option<Timestamp> {

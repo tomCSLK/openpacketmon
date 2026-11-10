@@ -429,6 +429,11 @@ pub fn is_local_connection(address_to_lookup: &IpAddr, my_interface_addresses: &
     ret_val
 }
 
+/// The service the IANA registry names for a port and transport protocol
+pub fn service_of_port(port: u16, protocol: Protocol) -> Option<Service> {
+    SERVICES.get(&ServiceQuery(port, protocol)).copied()
+}
+
 pub fn get_address_to_lookup(key: &AddressPortPair, traffic_direction: TrafficDirection) -> IpAddr {
     match traffic_direction {
         TrafficDirection::Outgoing => key.dst_ip,

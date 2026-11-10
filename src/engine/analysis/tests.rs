@@ -85,7 +85,7 @@ fn run(packets: Vec<(u32, Vec<u8>)>) -> Vec<PacketAnalysis> {
                 conn: None,
             };
             let d = dissect::dissect(&packet.data, ETH);
-            analysis.feed(&packet, &d).unwrap()
+            analysis.feed(&packet, &d).unwrap().record
         })
         .collect()
 }
@@ -238,7 +238,11 @@ fn findings_go_to_the_filter_the_info_and_the_layers() {
     let records = run(packets.clone());
     let annotated = |i: usize| {
         let mut d = dissect::dissect(&packets[i].1, ETH);
-        annotate(&records[i], &mut d);
+        let note = Note {
+            record: records[i],
+            voip: None,
+        };
+        annotate(&note, &packets[i].1, &mut d);
         d
     };
     let matches = |text: &str, d: &Dissection| {
@@ -305,4 +309,416 @@ fn records_follow_the_store() {
         analysis.paths()[usize::from(analysis.get(10).unwrap().path)],
         ["eth", "ip", "udp", "dns"]
     );
+}
+
+// ---- VoIP --------------------------------------------------------------------------------------
+
+mod calls {
+    use super::*;
+    use crate::dissect::tests::{rtcp_report, rtp_bytes, sdp_offer, sip_message, udp_between};
+    use voip::Mark;
+
+    const PHONE: [u8; 4] = [192, 0, 2, 20];
+    const PROVIDER: [u8; 4] = [203, 0, 113, 60];
+    const MEDIA: [u8; 4] = [203, 0, 113, 61];
+    const CALL_ID: &str = "3f2a9c1e7b54@192.0.2.20";
+
+    fn sip(
+        from: [u8; 4],
+        to: [u8; 4],
+        first: &str,
+        cseq: &str,
+        call: &str,
+        sdp: Option<&str>,
+    ) -> Vec<u8> {
+        let m = sip_message(
+            first,
+            &[
+                ("From", "<sip:anna@sip.example.net>;tag=c81d07"),
+                ("To", "<sip:support@example.com>"),
+                ("Call-ID", call),
+                ("CSeq", cseq),
+            ],
+            sdp,
+        );
+        udp_between(from, 5060, to, 5060, &m)
+    }
+
+    /// Analyzes packets given with their time in milliseconds
+    fn analyze(packets: &[(u32, Vec<u8>)]) -> Analysis {
+        let mut analysis = Analysis::default();
+        for (i, (ms, data)) in packets.iter().enumerate() {
+            let packet = StoredPacket {
+                number: i as u64 + 1,
+                timestamp: Timestamp::new(1000, i64::from(*ms) * 1000),
+                orig_len: u32::try_from(data.len()).unwrap(),
+                data: Arc::from(data.as_slice()),
+                conn: None,
+            };
+            let d = dissect::dissect(&packet.data, ETH);
+            analysis.feed(&packet, &d);
+        }
+        analysis
+    }
+
+    fn mark(analysis: &Analysis, n: u64) -> Option<Mark> {
+        analysis.get(n).unwrap().voip
+    }
+
+    /// A packet dissected with what the analysis found
+    fn annotated(analysis: &Analysis, data: &[u8], n: u64) -> Dissection {
+        let mut d = dissect::dissect(data, ETH);
+        annotate(&analysis.note(n).unwrap(), data, &mut d);
+        d
+    }
+
+    fn call_id(d: &Dissection) -> Option<&str> {
+        d.values.iter().find_map(|(k, v)| match v {
+            Value::Text(t) if *k == "voip.call_id" => Some(t.as_str()),
+            _ => None,
+        })
+    }
+
+    fn call() -> Vec<(u32, Vec<u8>)> {
+        let offer = sdp_offer("192.0.2.20", 7078, &[8, 0, 101]);
+        let answer = sdp_offer("203.0.113.61", 31456, &[8, 101]);
+        vec![
+            (
+                0,
+                sip(
+                    PHONE,
+                    PROVIDER,
+                    "INVITE sip:support@example.com SIP/2.0",
+                    "1 INVITE",
+                    CALL_ID,
+                    Some(&offer),
+                ),
+            ),
+            (
+                40,
+                sip(
+                    PROVIDER,
+                    PHONE,
+                    "SIP/2.0 100 Trying",
+                    "1 INVITE",
+                    CALL_ID,
+                    None,
+                ),
+            ),
+            (
+                2000,
+                sip(
+                    PROVIDER,
+                    PHONE,
+                    "SIP/2.0 200 OK",
+                    "1 INVITE",
+                    CALL_ID,
+                    Some(&answer),
+                ),
+            ),
+            (
+                2010,
+                sip(
+                    PHONE,
+                    PROVIDER,
+                    "ACK sip:support@example.com SIP/2.0",
+                    "1 ACK",
+                    CALL_ID,
+                    None,
+                ),
+            ),
+            (
+                2020,
+                udp_between(
+                    PHONE,
+                    7078,
+                    MEDIA,
+                    31456,
+                    &rtp_bytes(8, 100, 0, 0x5e1f_02a7, true, 160),
+                ),
+            ),
+            (
+                2030,
+                udp_between(
+                    MEDIA,
+                    31456,
+                    PHONE,
+                    7078,
+                    &rtp_bytes(8, 900, 0, 0x0b77_c3d1, true, 160),
+                ),
+            ),
+            (
+                3000,
+                udp_between(
+                    PHONE,
+                    7079,
+                    MEDIA,
+                    31457,
+                    &rtcp_report(0x5e1f_02a7, 0x0b77_c3d1, "anna@192.0.2.20"),
+                ),
+            ),
+            (
+                5000,
+                sip(
+                    PHONE,
+                    PROVIDER,
+                    "BYE sip:support@example.com SIP/2.0",
+                    "2 BYE",
+                    CALL_ID,
+                    None,
+                ),
+            ),
+            (
+                5040,
+                sip(PROVIDER, PHONE, "SIP/2.0 200 OK", "2 BYE", CALL_ID, None),
+            ),
+            (
+                6000,
+                sip(
+                    PHONE,
+                    PROVIDER,
+                    "REGISTER sip:sip.example.net SIP/2.0",
+                    "1 REGISTER",
+                    "reg@192.0.2.20",
+                    None,
+                ),
+            ),
+            (
+                6050,
+                sip(
+                    PROVIDER,
+                    PHONE,
+                    "SIP/2.0 200 OK",
+                    "1 REGISTER",
+                    "reg@192.0.2.20",
+                    None,
+                ),
+            ),
+        ]
+    }
+
+    #[test]
+    fn a_call_ties_its_sip_messages_and_its_rtp_together() {
+        let packets = call();
+        let a = analyze(&packets);
+        let sip = |call, answers, status| {
+            Some(Mark::Sip {
+                call,
+                answers,
+                status,
+            })
+        };
+        assert_eq!(mark(&a, 1), sip(Some(0), None, None));
+        assert_eq!(mark(&a, 2), sip(Some(0), Some((1, 40_000)), Some(100)));
+        assert_eq!(mark(&a, 3), sip(Some(0), Some((1, 2_000_000)), Some(200)));
+        assert_eq!(mark(&a, 4), sip(Some(0), None, None));
+        // RTP to the address of the answer, back to the one of the offer, RTCP next to it
+        assert_eq!(
+            mark(&a, 5),
+            Some(Mark::Media {
+                media: 1,
+                rtcp: false
+            })
+        );
+        assert_eq!(
+            mark(&a, 6),
+            Some(Mark::Media {
+                media: 0,
+                rtcp: false
+            })
+        );
+        assert_eq!(
+            mark(&a, 7),
+            Some(Mark::Media {
+                media: 1,
+                rtcp: true
+            })
+        );
+        assert_eq!(mark(&a, 8), sip(Some(0), None, None));
+        assert_eq!(mark(&a, 9), sip(Some(0), Some((8, 40_000)), Some(200)));
+        // a registration is no call
+        assert_eq!(mark(&a, 10), sip(None, None, None));
+        assert_eq!(mark(&a, 11), sip(None, Some((10, 50_000)), Some(200)));
+
+        let rtp = annotated(&a, &packets[4].1, 5);
+        assert_eq!(rtp.protocol, "RTP");
+        assert!(
+            rtp.info
+                .starts_with("PT=ITU-T G.711 PCMA, SSRC=0x5E1F02A7, Seq=100")
+        );
+        assert_eq!(call_id(&rtp), Some(CALL_ID));
+        let note = a.note(5).unwrap();
+        assert_eq!(note.voip.unwrap().media.unwrap().setup, Some(3));
+        let rtcp = annotated(&a, &packets[6].1, 7);
+        assert_eq!(rtcp.protocol, "RTCP");
+        assert_eq!(call_id(&rtcp), Some(CALL_ID));
+        assert_eq!(call_id(&annotated(&a, &packets[0].1, 1)), Some(CALL_ID));
+        assert_eq!(call_id(&annotated(&a, &packets[9].1, 10)), None);
+        // the protocol hierarchy counts RTP and RTCP
+        let path = |n| a.paths()[usize::from(a.get(n).unwrap().path)].clone();
+        assert_eq!(path(5).last(), Some(&"rtp"));
+        assert_eq!(path(7).last(), Some(&"rtcp"));
+        assert_eq!(path(1).last(), Some(&"sdp"));
+    }
+
+    #[test]
+    fn the_filter_finds_calls_and_their_streams() {
+        let packets = call();
+        let a = analyze(&packets);
+        let matching = |text: &str| -> Vec<u64> {
+            let filter = Filter::parse(text).unwrap().unwrap();
+            (1..=packets.len() as u64)
+                .filter(|n| {
+                    let data = &packets[usize::try_from(*n).unwrap() - 1].1;
+                    let d = annotated(&a, data, *n);
+                    filter.matches(&crate::filter::Packet {
+                        number: *n,
+                        len: 100,
+                        captured: data.len(),
+                        d: &d,
+                    })
+                })
+                .collect()
+        };
+        assert_eq!(matching("sip or rtp"), [1, 2, 3, 4, 5, 6, 8, 9, 10, 11]);
+        assert_eq!(matching("rtcp"), [7]);
+        assert_eq!(matching("sdp"), [1, 3]);
+        assert_eq!(
+            matching(&format!("voip.call_id == \"{CALL_ID}\"")),
+            [1, 2, 3, 4, 5, 6, 7, 8, 9]
+        );
+        assert_eq!(matching("sip.method == INVITE"), [1]);
+        assert_eq!(matching("sip.status_code >= 200"), [3, 9, 11]);
+        assert_eq!(
+            matching("sip.from contains anna"),
+            [1, 2, 3, 4, 8, 9, 10, 11]
+        );
+        assert_eq!(matching("rtp.ssrc == 0x5E1F02A7"), [5]);
+        assert_eq!(matching("rtp.ssrc in {0x5e1f02a7 0x0b77c3d1}"), [5, 6]);
+        assert_eq!(matching("rtp.p_type == 8 and rtp.seq > 500"), [6]);
+        // the rows of calls have a color of their own
+        for n in [1, 5, 7] {
+            let data = &packets[usize::try_from(n).unwrap() - 1].1;
+            let d = annotated(&a, data, n);
+            let packet = crate::filter::Packet {
+                number: n,
+                len: 100,
+                captured: data.len(),
+                d: &d,
+            };
+            assert_eq!(crate::filter::color(&packet), Some("voip"), "packet {n}");
+        }
+    }
+
+    /// A flow of RTP without SIP (a video conference in a browser), from port 52714 to 10000
+    fn stream(from: u16, count: u16) -> Vec<Vec<u8>> {
+        (0..count)
+            .map(|i| {
+                let m = rtp_bytes(111, from + i, u32::from(i) * 960, 0x9b2e_7714, i == 0, 120);
+                udp_between(PHONE, 52714, [198, 51, 100, 7], 10000, &m)
+            })
+            .collect()
+    }
+
+    #[test]
+    fn rtp_without_sip_is_found_by_its_form() {
+        let mut packets: Vec<(u32, Vec<u8>)> = Vec::new();
+        for (i, rtp) in stream(40981, 12).into_iter().enumerate() {
+            let ms = u32::try_from(i).unwrap() * 20;
+            packets.push((ms, rtp));
+            // a flow of another kind whose first byte looks like RTP: its SSRC changes
+            let other = rtp_bytes(8, 1, 0, u32::try_from(i).unwrap(), false, 20);
+            packets.push((
+                ms + 5,
+                udp_between(PHONE, 40000, [198, 51, 100, 8], 40000, &other),
+            ));
+        }
+        // its RTCP on the next ports, and a datagram there that is not
+        packets.push((
+            300,
+            udp_between(
+                PHONE,
+                52715,
+                [198, 51, 100, 7],
+                10001,
+                &rtcp_report(0x9b2e_7714, 1, "x"),
+            ),
+        ));
+        packets.push((
+            310,
+            udp_between(
+                PHONE,
+                52715,
+                [198, 51, 100, 7],
+                10001,
+                &[0x81, 200, 0, 9, 1, 2, 3],
+            ),
+        ));
+        let a = analyze(&packets);
+        let media = Some(Mark::Media {
+            media: 0,
+            rtcp: false,
+        });
+        // the first nine were decided with the tenth
+        for n in (1..=23).step_by(2) {
+            assert_eq!(mark(&a, n), media, "packet {n}");
+        }
+        for n in (2..=22).step_by(2) {
+            assert_eq!(mark(&a, n), None, "packet {n}");
+        }
+        assert_eq!(mark(&a, 24), Some(Mark::Candidate));
+        assert_eq!(
+            mark(&a, 25),
+            Some(Mark::Media {
+                media: 0,
+                rtcp: true
+            })
+        );
+        assert_eq!(mark(&a, 26), None);
+        let note = a.note(1).unwrap().voip.unwrap();
+        assert_eq!(note.call_id, None);
+        assert_eq!(note.media.unwrap().setup, None);
+        let first = annotated(&a, &packets[0].1, 1);
+        assert_eq!(first.protocol, "RTP");
+        assert!(
+            first
+                .info
+                .starts_with("PT=dynamic (111), SSRC=0x9B2E7714, Seq=40981")
+        );
+        assert_eq!(
+            a.paths()[usize::from(a.get(1).unwrap().path)].last(),
+            Some(&"rtp")
+        );
+    }
+
+    #[test]
+    fn a_flow_that_breaks_off_is_no_rtp() {
+        let mut packets: Vec<(u32, Vec<u8>)> = stream(100, 9).into_iter().map(|p| (0, p)).collect();
+        // a jump of the sequence number starts anew
+        packets.extend(stream(500, 9).into_iter().map(|p| (0, p)));
+        let a = analyze(&packets);
+        for n in 1..=9 {
+            assert_eq!(mark(&a, n), None, "packet {n}");
+        }
+        for n in 10..=18 {
+            assert_eq!(mark(&a, n), Some(Mark::Candidate), "packet {n}");
+        }
+        // well-known ports are left alone
+        let low: Vec<(u32, Vec<u8>)> = (0..12)
+            .map(|i| {
+                (
+                    0,
+                    udp_between(
+                        PHONE,
+                        5004,
+                        [198, 51, 100, 7],
+                        999,
+                        &rtp_bytes(0, i, 0, 5, false, 20),
+                    ),
+                )
+            })
+            .collect();
+        let a = analyze(&low);
+        assert!((1..=12).all(|n| mark(&a, n).is_none()));
+    }
 }

@@ -11,7 +11,6 @@ use crate::networking::types::capture_context::{
 use crate::networking::types::data_representation::DataRepr;
 use crate::view::format;
 use crate::view::i18n::Lang;
-use crate::view::settings::packets_max_choices;
 
 /// A network adapter in the selection
 pub struct AdapterRow {
@@ -21,30 +20,46 @@ pub struct AdapterRow {
     pub label: String,
     /// Shown below, may be empty
     pub desc: String,
-    pub addresses: String,
+    /// One per line
+    pub addresses: Vec<String>,
     pub selected: bool,
-    /// Packets seen in the last 30 seconds
-    pub packets: String,
     /// No IP traffic on this adapter: shown greyed out, cannot be chosen
     pub no_ip: bool,
 }
 
-/// The running capture, shown instead of the selection
+/// How the running capture is doing (the state in the head of its card)
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RunState {
+    Running,
+    Paused,
+    /// A file read to its end
+    Finished,
+    Failed,
+}
+
+/// The running capture, shown instead of the selection (`pageCapture` of the draft)
 pub struct RunningCapture {
-    pub kind: String,
-    pub name: String,
-    pub state: String,
-    pub frozen: bool,
-    pub filter: String,
-    pub export: Option<String>,
+    pub state: RunState,
+    /// The text below the title: where and since when
+    pub subtitle: String,
+    /// "Dauer 12:08 min"
+    pub duration: String,
+    /// The adapter, file or address, in bold
+    pub source: String,
+    /// The description of the adapter, after the name
+    pub source_desc: String,
     /// Link type of the adapter or file (Ethernet, Linux cooked capture …)
     pub link_type: Option<String>,
     /// Addresses an IPFIX collector bound to the unspecified address listens on
     pub listening: Vec<String>,
-    /// Packets dropped by the adapter and by openpacketmon (buffer full)
-    pub dropped: Option<(String, String)>,
+    /// The BPF filter, empty without one; `None` for sources without filters
+    pub filter: Option<String>,
     /// What the packet store keeps (not shown for IPFIX, which has no packets)
     pub packet_store: Option<String>,
+    /// The PCAP file written, empty without one; `None` for sources that write none
+    pub export: Option<String>,
+    /// Packets dropped by the adapter and by openpacketmon (buffer full)
+    pub dropped: Option<(String, String)>,
 }
 
 /// What the packet store keeps
@@ -68,7 +83,8 @@ pub struct CaptureSetup {
     pub export_dir: String,
     pub export_name: String,
     pub packets: PacketChoice,
-    pub packets_max: Vec<(String, usize, bool)>,
+    /// What each choice of the packet store keeps, with the most packets of the settings
+    pub packets_lines: [String; 3],
 }
 
 pub fn capture_setup(t: Lang, state: &EngineState) -> CaptureSetup {
@@ -89,10 +105,8 @@ pub fn capture_setup(t: Lang, state: &EngineState) -> CaptureSetup {
                 .get_addresses()
                 .iter()
                 .map(|a| a.addr.to_string())
-                .collect::<Vec<_>>()
-                .join(", "),
+                .collect(),
             selected: *p.device.get_name() == selected_device,
-            packets: format::count(t, p.tot_packets()),
             no_ip: p.no_ip,
         })
         .collect();
@@ -113,66 +127,83 @@ pub fn capture_setup(t: Lang, state: &EngineState) -> CaptureSetup {
             c if c.headers_only => PacketChoice::Headers,
             _ => PacketChoice::Full,
         },
-        packets_max: packets_max_choices(t, conf.packet_store),
+        packets_lines: {
+            let max = format::count(t, conf.packet_store.max_packets() as u128);
+            [
+                t.get1("capture-packets-full-max", "max", max.as_str()),
+                t.get1("capture-packets-headers-max", "max", max.as_str()),
+                t.get("capture-packets-none"),
+            ]
+        },
     }
 }
 
-/// Kind of the capture source, as shown to the user
-pub fn source_kind(t: Lang, source: &CaptureSource) -> String {
-    t.get(match source {
-        CaptureSource::Device(_) => "source-device",
-        CaptureSource::File(_) => "source-file",
-        CaptureSource::Ipfix(_) => "source-ipfix",
-    })
+/// How the running capture is doing
+fn run_state(state: &EngineState) -> RunState {
+    if state.capture_error.is_some() {
+        RunState::Failed
+    } else if state.traffic_history.no_more_packets() {
+        RunState::Finished
+    } else if state.frozen {
+        RunState::Paused
+    } else {
+        RunState::Running
+    }
 }
 
-/// State of the running capture, as shown to the user
-pub fn capture_state(t: Lang, state: &EngineState) -> String {
-    t.get(if state.capture_error.is_some() {
-        "capture-state-error"
-    } else if state.traffic_history.no_more_packets() {
-        "capture-state-finished"
-    } else if state.frozen {
-        "capture-state-paused"
-    } else {
-        "capture-state-running"
-    })
+/// The name of a link type as the draft writes it (`Ethernet`): its description, else its name
+fn link_name(link: LinkType) -> String {
+    let text = link.description();
+    text.split_once(" (")
+        .and_then(|(_, desc)| desc.strip_suffix(')'))
+        .map_or_else(|| text.clone(), str::to_owned)
 }
 
 fn running_capture(t: Lang, state: &EngineState) -> RunningCapture {
     let source = &state.capture_source;
+    let head = crate::view::overview::capture_head(state);
+    let (subtitle, duration) = head.map_or_else(Default::default, |h| {
+        let id = match source {
+            CaptureSource::Device(_) => "capture-sub-adapter",
+            CaptureSource::File(_) => "capture-sub-file",
+            CaptureSource::Ipfix(_) => "capture-sub-ipfix",
+        };
+        let subtitle = t.fmt(
+            id,
+            &[
+                ("name", h.name.clone().into()),
+                ("time", h.since.clone().into()),
+            ],
+        );
+        let duration = t.get1("capture-duration", "duration", h.duration.as_str());
+        (subtitle, duration)
+    });
+    let (source_name, source_desc) = match source {
+        CaptureSource::Device(device) => (device.display_name(), device.display_desc()),
+        _ => (source.display_name(), String::new()),
+    };
     RunningCapture {
-        kind: source_kind(t, source),
-        name: source.display_name(),
-        state: capture_state(t, state),
-        frozen: state.frozen,
-        filter: if source.supports_filters() && state.conf.filters.is_some_filter_active() {
-            state.conf.filters.bpf().to_owned()
-        } else {
-            String::new()
-        },
-        export: if source.supports_export_pcap() {
-            state.conf.export_pcap.full_path()
-        } else {
-            None
-        },
-        link_type: source.get_link_type().map(LinkType::description),
+        state: run_state(state),
+        subtitle,
+        duration,
+        source: source_name,
+        source_desc,
+        link_type: source.get_link_type().map(link_name),
         listening: source
             .get_ipfix_unspecified_bound_addresses()
             .iter()
             .map(|a| a.addr.to_string())
             .collect(),
-        dropped: state.info_traffic.dropped_packets.map(|dropped| {
-            let packets = DataRepr::packets(false);
-            let data = state.info_traffic.tot_data_info;
-            (
-                format::count(t, dropped.by_adapter(packets, data)),
-                format::count(t, dropped.by_sniffnet(packets, data)),
-            )
+        filter: source.supports_filters().then(|| {
+            if state.conf.filters.is_some_filter_active() {
+                state.conf.filters.bpf().to_owned()
+            } else {
+                String::new()
+            }
         }),
         packet_store: (!matches!(source, CaptureSource::Ipfix(_))).then(|| {
             state.packets.as_ref().map_or_else(
-                || t.get("capture-packets-off"),
+                || t.get("capture-packets-none"),
                 |store| {
                     let store = store.lock();
                     t.get1(
@@ -185,6 +216,17 @@ fn running_capture(t: Lang, state: &EngineState) -> RunningCapture {
                         format::count(t, store.max_packets() as u128),
                     )
                 },
+            )
+        }),
+        export: source
+            .supports_export_pcap()
+            .then(|| state.conf.export_pcap.full_path().unwrap_or_default()),
+        dropped: state.info_traffic.dropped_packets.map(|dropped| {
+            let packets = DataRepr::packets(false);
+            let data = state.info_traffic.tot_data_info;
+            (
+                format::count(t, dropped.by_adapter(packets, data)),
+                format::count(t, dropped.by_sniffnet(packets, data)),
             )
         }),
     }
@@ -203,8 +245,6 @@ pub struct StartRequest {
     pub export_name: String,
     /// What the packet store keeps, left as it is without a choice
     pub packets: Option<PacketChoice>,
-    /// Left as it is if it is not one of the choices
-    pub packets_max: usize,
 }
 
 /// Puts the choices into the settings; returns the message id of a problem found before starting
@@ -263,9 +303,6 @@ fn apply_packet_store(conf: &mut PacketStoreConf, request: &StartRequest) {
         Some(PacketChoice::Off) => conf.enabled = false,
         None => {}
     }
-    if PacketStoreConf::MAX_PACKETS_CHOICES.contains(&request.packets_max) {
-        conf.max_packets = request.packets_max;
-    }
 }
 
 /// Why a capture did not start: the problem found before starting, or the error of the capture
@@ -321,7 +358,6 @@ mod tests {
             export_dir: String::new(),
             export_name: String::new(),
             packets,
-            packets_max: 10_000,
         }
     }
 
@@ -335,7 +371,6 @@ mod tests {
         );
         let conf = engine.lock().conf.packet_store;
         assert!(conf.enabled && conf.headers_only && !conf.full_packets());
-        assert_eq!(conf.max_packets, 10_000);
 
         apply_start(&mut engine.lock(), &request(Some(PacketChoice::Off)));
         assert!(!engine.lock().conf.packet_store.enabled);

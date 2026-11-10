@@ -11,10 +11,13 @@ mod dns;
 mod link;
 mod misc;
 mod net;
+pub mod rtp;
+pub mod sip;
 mod text;
 mod tls;
 mod transport;
 
+use std::borrow::Cow;
 use std::fmt::Write;
 use std::ops::Range;
 
@@ -22,21 +25,35 @@ use sniffnet_packet_parser::LinkType;
 
 /// A value of a layer, with the bytes it was read from
 pub struct Field {
-    pub name: &'static str,
+    /// The usual English name, or a name read from the packet (a SIP header)
+    pub name: Cow<'static, str>,
     pub value: String,
     pub range: Range<usize>,
     /// Details of the value (the single TCP flags, for example)
     pub children: Vec<Field>,
+    /// The value tells of a problem (`.warnf`)
+    pub warn: bool,
 }
 
 impl Field {
-    pub(crate) fn new(name: &'static str, value: impl Into<String>, range: Range<usize>) -> Self {
+    pub(crate) fn new(
+        name: impl Into<Cow<'static, str>>,
+        value: impl Into<String>,
+        range: Range<usize>,
+    ) -> Self {
         Self {
-            name,
+            name: name.into(),
             value: value.into(),
             range,
             children: Vec::new(),
+            warn: false,
         }
+    }
+
+    /// Marks the value as telling of a problem
+    pub(crate) fn warn(mut self, warn: bool) -> Self {
+        self.warn = warn;
+        self
     }
 
     pub(crate) fn with_children(mut self, children: Vec<Field>) -> Self {
@@ -74,6 +91,25 @@ pub struct Dissection {
     pub values: Vec<(&'static str, Value)>,
     /// The protocols found, by their filter names (`eth`, `ip`, `tcp`, `dns` …)
     pub protocols: Vec<&'static str>,
+    /// The media a session description of SIP offers, for the analysis that finds RTP by them
+    pub sdp: Vec<SdpMedia>,
+}
+
+/// A media stream offered in a session description (`m=` with its `c=` and attributes)
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct SdpMedia {
+    /// `audio`, `video` …
+    pub kind: String,
+    /// Where the stream is to be sent: the address of `c=`
+    pub addr: Option<std::net::IpAddr>,
+    pub port: u16,
+    /// The port of RTCP: `a=rtcp`, the same as the port with `a=rtcp-mux`, else the next one
+    pub rtcp_port: u16,
+    /// A profile with SRTP (`RTP/SAVP`, `RTP/SAVPF` …): the payload is encrypted
+    pub srtp: bool,
+    /// The payload types offered and their names from `a=rtpmap` (`PCMA/8000`; empty for static
+    /// types without one)
+    pub formats: Vec<(u8, String)>,
 }
 
 /// A value of a packet for the display filter
@@ -124,7 +160,14 @@ impl Dissection {
             transport: None,
             values: Vec::new(),
             protocols: Vec::new(),
+            sdp: Vec::new(),
         }
+    }
+
+    /// Ports and payload of a UDP datagram whose payload no protocol claimed (plain data)
+    pub fn plain_udp(&self) -> Option<(u16, u16, Range<usize>)> {
+        let t = self.transport.as_ref().filter(|t| !t.tcp)?;
+        (self.protocol == "UDP").then(|| (t.sport, t.dport, t.payload.clone()))
     }
 
     /// Adds a value for the display filter
@@ -255,6 +298,39 @@ fn layers(data: &[u8], link_type: LinkType, more: &[u8], app: bool) -> Dissectio
     d
 }
 
+/// Reads the payload of a UDP datagram as RTP or RTCP, as the analysis found it (from the SDP of
+/// SIP, or by its form): its layer takes the place of the plain data
+pub fn media(data: &[u8], d: &mut Dissection, note: &rtp::MediaNote) {
+    let Some((_, _, payload)) = d.plain_udp() else {
+        return;
+    };
+    let payload_end = payload.end.min(data.len());
+    let payload = payload.start..payload_end;
+    let data_layer = d
+        .layers
+        .iter()
+        .rposition(|l| l.range == payload && l.title.starts_with("Data ("));
+    let mut read = Dissection::new();
+    let ok = if note.rtcp {
+        rtp::rtcp(data, payload.clone(), note.clock, &mut read)
+    } else {
+        rtp::rtp(data, payload.clone(), note, &mut read)
+    };
+    if !ok {
+        return;
+    }
+    if let Some(i) = data_layer {
+        d.layers.remove(i);
+    }
+    d.layers.extend(read.layers);
+    d.protocol = read.protocol;
+    d.info = read.info;
+    d.values.extend(read.values);
+    for protocol in read.protocols {
+        d.has(protocol);
+    }
+}
+
 /// The number of a DNS record type by its name (`AAAA` → 28), for the display filter
 pub fn dns_type_number(name: &str) -> Option<u16> {
     (1..=300).find(|t| dns::type_name(*t).eq_ignore_ascii_case(name))
@@ -289,6 +365,29 @@ pub fn transport_payload(data: &[u8], link_type: LinkType) -> Option<Payload> {
         seq: t.seq,
         range: t.payload,
     })
+}
+
+/// The two ends of a UDP datagram and its captured payload, without reading the payload
+pub fn udp_ends(
+    data: &[u8],
+    link_type: LinkType,
+) -> Option<(std::net::SocketAddr, std::net::SocketAddr, Range<usize>)> {
+    let d = layers(data, link_type, &[], false);
+    let t = d.transport.as_ref().filter(|t| !t.tcp)?;
+    let ip = |keys: [&str; 2]| {
+        d.values.iter().rev().find_map(|(k, v)| match v {
+            Value::Ip(a) if keys.contains(k) => Some(*a),
+            _ => None,
+        })
+    };
+    let src = ip(["ip.src", "ipv6.src"])?;
+    let dst = ip(["ip.dst", "ipv6.dst"])?;
+    let end = t.payload.end.min(data.len());
+    Some((
+        (src, t.sport).into(),
+        (dst, t.dport).into(),
+        t.payload.start.min(end)..end,
+    ))
 }
 
 /// The captured part of the payload of a TCP segment or UDP datagram, also when the rest was not

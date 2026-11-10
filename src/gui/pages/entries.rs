@@ -1,19 +1,20 @@
-//! Hosts, services and programs: the list with traffic bars and favorites.
+//! Hosts, services and programs (`pageEntries` of the draft): the list with search, order, unit,
+//! favorites and traffic bars.
 
 use std::time::Duration;
 
-use eframe::egui::{self, Align, Layout, RichText, TextEdit, Ui};
-use egui_extras::{Column, TableBuilder};
+use eframe::egui::{self, Align, Layout, Rect, RichText, Ui};
 
 use crate::config::favorite::{Favorite, FavoriteKey};
 use crate::gui::load::Loader;
 use crate::gui::pages::head;
-use crate::gui::theme::palette;
-use crate::gui::widgets;
-use crate::gui::{App, Page, icons};
+use crate::gui::theme::{self, palette};
+use crate::gui::widgets::{self, Col, TableSpec, Width};
+use crate::gui::{App, Page, SettingsPanel};
 use crate::networking::types::data_representation::DataUnit;
+use crate::report::types::sort_type::SortType;
 use crate::view::Jump;
-use crate::view::entries::{EntryList, EntryRow, entry_list};
+use crate::view::entries::{EntryList, EntryRow, entry_list, kind_code};
 use crate::view::i18n::Lang;
 
 /// What was clicked in a list
@@ -36,137 +37,18 @@ impl Action {
     }
 }
 
-pub const ROW_H: f32 = 40.0;
+/// A row with a second line (`--row-h` and `.sub`)
+const ROW_H: f32 = 45.0;
+/// The orders of the list: largest, smallest, newest first
+const SORTS: [SortType; 3] = [SortType::Descending, SortType::Ascending, SortType::Neutral];
 
-/// The rows; `compact` leaves out incoming and outgoing for a narrow card
-pub fn table(
-    ui: &mut Ui,
-    id: &str,
-    t: Lang,
-    rows: &[EntryRow],
-    compact: bool,
-    scroll: bool,
-) -> Option<Action> {
-    let p = palette(ui.ctx());
-    let stars = rows.iter().any(EntryRow::favorable);
-    let mut action = None;
-    ui.spacing_mut().item_spacing = egui::vec2(8.0, 0.0);
-    let mut builder = TableBuilder::new(ui)
-        .id_salt(id)
-        .vscroll(scroll)
-        .auto_shrink(false)
-        .animate_scrolling(false)
-        .max_scroll_height(f32::INFINITY)
-        .min_scrolled_height(0.0)
-        .cell_layout(Layout::left_to_right(Align::Center));
-    if stars {
-        builder = builder.column(Column::exact(28.0));
-    }
-    builder = builder.column(Column::remainder().at_least(90.0).clip(true));
-    builder = builder.column(Column::exact(if compact { 64.0 } else { 150.0 }));
-    if !compact {
-        builder = builder
-            .column(Column::exact(96.0))
-            .column(Column::exact(96.0));
-    }
-    builder = builder.column(Column::exact(if compact { 82.0 } else { 96.0 }));
-    builder
-        .header(26.0, |mut header| {
-            let mut head = |text: String, right: bool| {
-                header.col(|ui| {
-                    let text = RichText::new(text).small().color(p.muted);
-                    if right {
-                        ui.with_layout(Layout::right_to_left(Align::Center), |ui| ui.label(text));
-                    } else {
-                        ui.label(text);
-                    }
-                });
-            };
-            if stars {
-                head(String::new(), false);
-            }
-            head(t.get("entry-name"), false);
-            head(t.get("entry-traffic"), false);
-            if !compact {
-                head(t.get("entry-in"), true);
-                head(t.get("entry-out"), true);
-            }
-            head(t.get("entry-total"), true);
-        })
-        .body(|body| {
-            body.rows(ROW_H, rows.len(), |mut row| {
-                let r = &rows[row.index()];
-                if stars {
-                    row.col(|ui| {
-                        let Some(key) = &r.key else {
-                            return;
-                        };
-                        let (icon, color, text) = if r.favorite {
-                            (icons::STAR_ON, p.warn, t.get("favorite-remove"))
-                        } else {
-                            (icons::STAR, p.faint, t.get("favorite-add"))
-                        };
-                        if widgets::icon_button(ui, icon, color, &text).clicked() {
-                            action = Some(Action::Favorite(key.clone(), !r.favorite));
-                        }
-                    });
-                }
-                row.col(|ui| {
-                    ui.vertical(|ui| {
-                        ui.spacing_mut().item_spacing.y = 0.0;
-                        ui.spacing_mut().interact_size.y = 18.0;
-                        ui.horizontal(|ui| {
-                            let link = egui::Link::new(RichText::new(&r.label).color(p.accent));
-                            if ui.add(link).clicked() {
-                                action = Some(Action::Open(r.jump.clone()));
-                            }
-                            for tag in &r.tags {
-                                widgets::tag(ui, tag, p.neutral_soft, p.muted);
-                            }
-                        });
-                        if !r.sub.is_empty() {
-                            ui.add(
-                                egui::Label::new(RichText::new(&r.sub).small().color(p.muted))
-                                    .truncate(),
-                            );
-                        }
-                    });
-                });
-                row.col(|ui| {
-                    let width = ui.available_width();
-                    #[allow(clippy::cast_precision_loss)] // percent
-                    widgets::share_bar(
-                        ui,
-                        width,
-                        r.bar_in as f32,
-                        r.bar_out as f32,
-                        p.accent,
-                        p.ok,
-                    );
-                });
-                let number = |ui: &mut Ui, text: &str, strong: bool| {
-                    ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                        let text = RichText::new(text).monospace();
-                        ui.label(if strong { text.strong() } else { text });
-                    });
-                };
-                if !compact {
-                    row.col(|ui| number(ui, &r.incoming, false));
-                    row.col(|ui| number(ui, &r.outgoing, false));
-                }
-                row.col(|ui| number(ui, &r.total, true));
-            });
-        });
-    action
-}
-
-type Key = (Favorite, bool, bool, String, usize, DataUnit);
+type Key = (Favorite, usize, bool, String, usize, DataUnit);
 
 #[derive(Default)]
 pub struct State {
-    list: Loader<Key, EntryList>,
+    pub list: Loader<Key, EntryList>,
     text: String,
-    ascending: bool,
+    sort: usize,
     only_favorites: bool,
 }
 
@@ -197,11 +79,20 @@ pub fn set_unit(app: &mut App, index: usize) {
 pub fn show(app: &mut App, ui: &mut Ui, kind: Favorite) {
     let ctx = ui.ctx().clone();
     let t = app.t;
+    let code = kind_code(kind);
+    let title = t.get(&format!("nav-{code}s"));
+    if !app.live.running {
+        head(ui, &title, None, |_| {});
+        if widgets::no_capture(ui, t) {
+            app.go(Page::Capture);
+        }
+        return;
+    }
     let state = &mut app.pages.entries;
     let key = (
         kind,
-        state.ascending,
-        state.only_favorites,
+        state.sort,
+        state.only_favorites && kind != Favorite::Service,
         state.text.trim().to_owned(),
         app.live.capture_id,
         app.live.unit,
@@ -209,96 +100,99 @@ pub fn show(app: &mut App, ui: &mut Ui, kind: Favorite) {
     state.list.poll();
     let engine = app.engine.clone();
     let job_key = key.clone();
-    let every = app.live.running.then_some(Duration::from_secs(1));
-    state.list.load(&ctx, &key, every, move || {
-        entry_list(
-            t,
-            &engine.lock(),
-            job_key.0,
-            job_key.1,
-            job_key.2,
-            &job_key.3,
-        )
-    });
-    let (title, subtitle) = app
-        .pages
-        .entries
+    state
         .list
-        .value()
-        .map_or_else(Default::default, |l| (l.title.clone(), l.subtitle.clone()));
-    let mut unit = None;
-    let index = unit_index(app.live.unit);
-    head(app, ui, &title, Some(&subtitle), |ui| {
-        unit = widgets::segmented(ui, &unit_labels(t), index);
-    });
-    let mut go = None;
-    if !app.live.running {
-        widgets::notice(ui, |ui| {
-            ui.label(t.get("no-capture"));
-            if widgets::link(ui, t.get("no-capture-start")).clicked() {
-                go = Some(Page::Capture);
-            }
+        .load(&ctx, &key, Some(Duration::from_secs(1)), move || {
+            entry_list(
+                t,
+                &engine.lock(),
+                job_key.0,
+                SORTS[job_key.1],
+                job_key.2,
+                &job_key.3,
+            )
         });
-    }
+    head(
+        ui,
+        &title,
+        Some(&t.get(&format!("{code}s-subtitle"))),
+        |_| {},
+    );
+    let mut go = None;
     if kind == Favorite::Host && app.live.status.geo_missing {
         widgets::notice(ui, |ui| {
             ui.label(t.get("geo-missing"));
             if widgets::link(ui, t.get("geo-missing-link")).clicked() {
-                go = Some(Page::Settings);
+                go = Some(Page::Settings(SettingsPanel::Geo));
             }
         });
     }
+    let unit_at = unit_index(app.live.unit);
     let state = &mut app.pages.entries;
+    let mut unit = None;
+    let mut new_sort = None;
     let mut action = None;
-    if let Some(list) = state.list.value() {
-        if list.unsupported {
-            widgets::notice_text(ui, &t.get("programs-unsupported"));
-        }
-        let shown = list.rows.len();
-        let total = list.total;
-        let (text, ascending, only) = (
-            &mut state.text,
-            &mut state.ascending,
-            &mut state.only_favorites,
-        );
-        widgets::flush_card(
-            ui,
-            &t.get1("entries-count", "count", total),
-            |ui| {
-                if kind != Favorite::Service {
-                    ui.checkbox(only, t.get("only-favorites"));
-                }
-                let labels = [t.get("sort-desc"), t.get("sort-asc")];
-                let mut at = usize::from(*ascending);
-                egui::ComboBox::from_id_salt("entries-sort")
-                    .selected_text(labels[at].clone())
-                    .show_index(ui, &mut at, labels.len(), |i| labels[i].clone());
-                *ascending = at == 1;
-                ui.add(
-                    TextEdit::singleline(text)
-                        .hint_text(t.get("entries-filter"))
-                        .desired_width(180.0),
+    let list = state.list.value_of(&key).or(state.list.value());
+    widgets::bare_card(ui, |ui| {
+        widgets::toolbar(ui, |ui| {
+            let id = egui::Id::NULL.with(("entries-search", code));
+            widgets::input(
+                ui,
+                &mut state.text,
+                id,
+                egui::vec2(240.0, 28.0),
+                false,
+                &t.get("entries-filter"),
+            );
+            let labels = [t.get("sort-desc"), t.get("sort-asc"), t.get("sort-recent")];
+            new_sort = widgets::select(ui, &labels, state.sort, true);
+            unit = widgets::segmented_sized(ui, &unit_labels(t), unit_at, true);
+            if kind != Favorite::Service {
+                widgets::switch(
+                    ui,
+                    &mut state.only_favorites,
+                    &t.get("only-favorites"),
+                    false,
                 );
-            },
-            |ui| {
-                if list.rows.is_empty() {
-                    widgets::empty(ui, &t.get("entries-empty"));
-                    return;
-                }
-                if total > shown {
-                    ui.horizontal(|ui| {
-                        ui.add_space(14.0);
-                        widgets::hint(
-                            ui,
-                            &t.get2("entries-truncated", "shown", shown, "total", total),
-                        );
-                    });
-                }
-                action = widgets::table_area(ui, None, |ui| {
-                    table(ui, "entries", t, &list.rows, false, true)
-                });
-            },
+            }
+            if let Some(list) = list {
+                widgets::toolbar_sum(ui, &t.get1("entries-count", "count", list.total));
+            }
+        });
+        let Some(list) = list else {
+            return;
+        };
+        action = table(ui, t, &list.rows, kind != Favorite::Service);
+        if list.rows.is_empty() {
+            widgets::empty(ui, &t.get("entries-none"));
+        }
+    });
+    if let Some(list) = list
+        && list.total > list.rows.len()
+    {
+        widgets::hint(
+            ui,
+            &t.get2(
+                "entries-truncated",
+                "shown",
+                list.rows.len(),
+                "total",
+                list.total,
+            ),
         );
+    }
+    // below the card (`p.muted.small`)
+    let note = match kind {
+        Favorite::Program => Some(t.get("programs-unsupported")),
+        Favorite::Service => Some(t.get("services-note")),
+        Favorite::Host => None,
+    };
+    if let Some(note) = note {
+        let p = palette(ui.ctx());
+        ui.label(widgets::small(note).color(p.text_3));
+    }
+    if let Some(sort) = new_sort {
+        app.pages.entries.sort = sort;
     }
     if let Some(index) = unit {
         set_unit(app, index);
@@ -308,4 +202,128 @@ pub fn show(app: &mut App, ui: &mut Ui, kind: Favorite) {
     } else if let Some(page) = go {
         app.go(page);
     }
+}
+
+/// The table of the list (`#etbl`): the star (not for services), the name with its country and
+/// second line, the traffic as a bar, incoming, outgoing, total and the number of connections
+fn table(ui: &mut Ui, t: Lang, rows: &[EntryRow], stars: bool) -> Option<Action> {
+    let p = palette(ui.ctx());
+    let narrow = ui.ctx().content_rect().width() < 900.0;
+    let mut cols = Vec::new();
+    if stars {
+        cols.push(Col::new("", Width::Px(48.0)));
+    }
+    cols.extend([
+        Col::new(t.get("entry-name"), Width::Rest(160.0)),
+        Col::new(t.get("entry-traffic"), Width::Share(0.22)),
+        Col::num(t.get("entry-in"), Width::Px(130.0)),
+        Col::num(t.get("entry-out"), Width::Px(135.0)),
+        Col::num(t.get("entry-total"), Width::Px(120.0)),
+    ]);
+    if !narrow {
+        cols.push(Col::num(t.get("entry-connections"), Width::Px(162.0)));
+    }
+    let mut spec = TableSpec::new("entries", cols, ROW_H, rows.len());
+    spec.click = true;
+    let mut action = None;
+    let mut opened = None;
+    let out = widgets::table(ui, &spec, |ui, r, c| {
+        let row = &rows[r];
+        let c = if stars { c } else { c + 1 };
+        match c {
+            0 => {
+                let Some(key) = &row.key else {
+                    return;
+                };
+                let text = if row.favorite {
+                    t.get("favorite-remove")
+                } else {
+                    t.get("favorite-add")
+                };
+                if widgets::star(ui, row.favorite, &text).clicked() {
+                    action = Some(Action::Favorite(key.clone(), !row.favorite));
+                }
+            }
+            1 => {
+                if name_cell(ui, row) {
+                    opened = Some(r);
+                }
+            }
+            2 => {
+                let width = ui.available_width();
+                widgets::tbar(
+                    ui,
+                    width,
+                    8.0,
+                    (row.bar_in + row.bar_out) / 100.0,
+                    row.bar_in,
+                    row.bar_out,
+                );
+            }
+            3 => {
+                ui.label(widgets::mono(&row.incoming));
+            }
+            4 => {
+                ui.label(widgets::mono(&row.outgoing));
+            }
+            5 => {
+                ui.label(
+                    RichText::new(&row.total)
+                        .font(theme::mono_semibold_font(theme::FS_SM))
+                        .color(p.text),
+                );
+            }
+            _ => {
+                ui.label(widgets::mono(&row.connections));
+            }
+        }
+    });
+    if action.is_some() {
+        return action;
+    }
+    out.clicked
+        .or(opened)
+        .map(|r| Action::Open(rows[r].jump.clone()))
+}
+
+/// The name (`td.name`): a link with the country after it, the second line below
+fn name_cell(ui: &mut Ui, row: &EntryRow) -> bool {
+    let p = palette(ui.ctx());
+    let rect = ui.max_rect();
+    let lines = if row.sub.is_empty() { 1.0 } else { 2.0 };
+    let block = widgets::LH_BASE + (lines - 1.0) * theme::FS_XS * 1.3;
+    let top = rect.center().y - block / 2.0;
+    let mut first = ui.new_child(
+        egui::UiBuilder::new()
+            .max_rect(Rect::from_min_size(
+                egui::pos2(rect.left(), top),
+                egui::vec2(rect.width(), widgets::LH_BASE),
+            ))
+            .layout(Layout::left_to_right(Align::Center)),
+    );
+    first.spacing_mut().item_spacing.x = 4.0;
+    let name = RichText::new(&row.label)
+        .font(theme::medium_font(theme::FS_BASE))
+        .color(p.accent);
+    let clicked = widgets::link_text(&mut first, name).clicked();
+    if !row.cc.is_empty() {
+        widgets::tag_cc(&mut first, &row.cc);
+    }
+    if !row.sub.is_empty() {
+        let mut second = ui.new_child(egui::UiBuilder::new().max_rect(Rect::from_min_size(
+            egui::pos2(rect.left(), top + widgets::LH_BASE),
+            egui::vec2(rect.width().min(360.0), theme::FS_XS * 1.3),
+        )));
+        second.add(
+            egui::Label::new(
+                RichText::new(&row.sub)
+                    .size(theme::FS_XS)
+                    .color(p.text_3)
+                    .line_height(Some(theme::FS_XS * 1.3)),
+            )
+            .selectable(false)
+            .truncate(),
+        );
+    }
+    clicked
 }

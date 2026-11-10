@@ -7,8 +7,10 @@ use crate::dissect;
 use crate::engine::Engine;
 use crate::engine::packets::StoredPacket;
 use crate::networking::types::address_port_pair::AddressPortPair;
+use crate::networking::types::service::Service;
 use crate::view::format;
 use crate::view::i18n::Lang;
+use crate::view::packets::connection_label;
 
 /// Payload bytes shown at most; the PCAP file has all of them
 pub const MAX_BYTES: usize = 1024 * 1024;
@@ -21,8 +23,8 @@ pub struct Chunk {
     pub data: Vec<u8>,
     /// Bytes missing before this chunk (not captured or dropped from the store)
     pub gap: u64,
-    /// Number of the first packet of the chunk
-    pub packet: u64,
+    /// Numbers of the packets of the chunk
+    pub packets: Vec<u64>,
 }
 
 /// What one direction has sent
@@ -93,12 +95,13 @@ pub fn assemble(
             // TCP is a stream: what one side sends in a row belongs together
             Some(last) if payload.tcp && last.client == client && gap == 0 => {
                 last.data.extend_from_slice(bytes);
+                last.packets.push(p.number);
             }
             _ => chunks.push(Chunk {
                 client,
                 data: bytes.to_vec(),
                 gap,
-                packet: p.number,
+                packets: vec![p.number],
             }),
         }
     }
@@ -111,37 +114,34 @@ pub fn assemble(
     (chunks, counts, cut)
 }
 
-/// Bytes as text: printable ASCII and line breaks, other bytes as `·`
+/// Bytes as text: printable ASCII, line breaks and tabs, other bytes as `.`
 pub fn as_text(data: &[u8]) -> String {
     data.iter()
+        .filter(|b| **b != b'\r')
         .map(|b| match b {
             b'\n' | b'\t' => char::from(*b),
-            b'\r' => '\u{0}',
             b if b.is_ascii_graphic() || *b == b' ' => char::from(*b),
-            _ => '·',
+            _ => '.',
         })
-        .filter(|c| *c != '\u{0}')
         .collect()
 }
 
-/// Bytes as hex dump lines
-pub fn as_hex(data: &[u8]) -> String {
+/// Bytes as hex dump lines, the offsets counted from `base` (`00000010  47 45 …  GE…`)
+pub fn as_hex(data: &[u8], base: usize) -> String {
     let mut out = String::new();
     for (i, line) in data.chunks(16).enumerate() {
-        let _ = write!(out, "{:08x}  ", i * 16);
+        let _ = write!(out, "{:08x}  ", base + i * 16);
+        let mut hex = String::new();
         for (j, b) in line.iter().enumerate() {
-            let _ = write!(out, "{b:02x} ");
+            if j > 0 {
+                hex.push(' ');
+            }
+            let _ = write!(hex, "{b:02x}");
             if j == 7 {
-                out.push(' ');
+                hex.push(' ');
             }
         }
-        for j in line.len()..16 {
-            out.push_str("   ");
-            if j == 7 {
-                out.push(' ');
-            }
-        }
-        out.push(' ');
+        let _ = write!(out, "{hex:<49}  ");
         out.extend(line.iter().map(|b| {
             if b.is_ascii_graphic() || *b == b' ' {
                 char::from(*b)
@@ -151,6 +151,7 @@ pub fn as_hex(data: &[u8]) -> String {
         }));
         out.push('\n');
     }
+    out.pop();
     out
 }
 
@@ -173,23 +174,41 @@ pub enum StreamSide {
 pub struct ShownChunk {
     pub client: bool,
     pub text: String,
+    /// The bytes missing before it
     pub gap: Option<String>,
-    pub packet: u64,
+    /// "Packets 1205, 1206", for the pointer
+    pub packets: String,
 }
 
 /// The stream of a connection
 pub struct Stream {
-    pub title: String,
+    /// The connection from the side that started it (`connLabel`)
+    pub label: String,
+    /// Its service, if known (`· http`)
+    pub service: Option<String>,
+    /// The service is encrypted with TLS: only the handshake can be read
+    pub tls: bool,
     pub client: String,
     pub server: String,
-    pub client_counts: String,
-    pub server_counts: String,
+    /// "2.69 KB in 3 packets", with "(of … in …)" when one side is shown
+    pub counts: String,
     pub chunks: Vec<ShownChunk>,
     pub cut: bool,
     pub headers_only: bool,
     /// The connection of the packet asked for
     pub connection: AddressPortPair,
 }
+
+/// Services whose content is encrypted with TLS
+const TLS_SERVICES: [&str; 7] = [
+    "https",
+    "imaps",
+    "pop3s",
+    "smtps",
+    "submissions",
+    "ldaps",
+    "ftps",
+];
 
 /// The kept packets of the connection of packet `n`, both directions in capture order
 pub struct Conversation {
@@ -231,6 +250,7 @@ pub fn conversation(engine: &Engine, n: u64) -> Option<Conversation> {
 }
 
 /// The connection of packet `n` as a stream, if it is kept and belongs to one
+#[allow(clippy::too_many_lines)] // the stream, its chunks and the counts
 pub fn stream(
     t: Lang,
     engine: &Engine,
@@ -246,6 +266,8 @@ pub fn stream(
         client_key,
     } = conversation(engine, n)?;
     let (chunks, counts, cut) = assemble(link_type, &packets, &client_key);
+    let (mut client_at, mut server_at) = (0, 0);
+    let (mut bytes, mut shown_packets) = (0, 0);
     let shown = chunks
         .into_iter()
         .filter(|c| match side {
@@ -253,33 +275,90 @@ pub fn stream(
             StreamSide::Client => c.client,
             StreamSide::Server => !c.client,
         })
-        .map(|c| ShownChunk {
-            client: c.client,
-            text: match view {
-                StreamView::Hex => as_hex(&c.data),
-                StreamView::Text => as_text(&c.data),
-            },
-            gap: (c.gap > 0).then(|| t.get1("stream-gap", "bytes", c.gap)),
-            packet: c.packet,
+        .map(|c| {
+            // the offsets of the hex dump count each direction on its own
+            let at = if c.client {
+                &mut client_at
+            } else {
+                &mut server_at
+            };
+            let base = *at;
+            *at += c.data.len();
+            bytes += c.data.len() as u64;
+            shown_packets += c.packets.len() as u64;
+            let mut numbers: Vec<String> = c.packets.iter().take(50).map(u64::to_string).collect();
+            if c.packets.len() > 50 {
+                numbers.push("…".to_owned());
+            }
+            ShownChunk {
+                client: c.client,
+                text: match view {
+                    StreamView::Hex => as_hex(&c.data, base),
+                    // a line break at the end needs no empty line
+                    StreamView::Text => {
+                        let mut text = as_text(&c.data);
+                        if text.ends_with('\n') {
+                            text.pop();
+                        }
+                        text
+                    }
+                },
+                gap: (c.gap > 0).then(|| t.get1("stream-gap", "bytes", c.gap)),
+                packets: t.get2(
+                    "stream-chunk-packets",
+                    "count",
+                    c.packets.len(),
+                    "numbers",
+                    numbers.join(", "),
+                ),
+            }
         })
         .collect();
-    let counts_text = |bytes: u64, packets: u64| {
-        t.get2(
-            "stream-counts",
-            "bytes",
-            format::bytes(t, u128::from(bytes)),
-            "packets",
-            packets,
+    let counts_text = |bytes: u64, packets: u64, key: &str| {
+        t.fmt(
+            key,
+            &[
+                ("bytes", format::bytes(t, u128::from(bytes)).into()),
+                ("packets", format::count(t, u128::from(packets)).into()),
+                ("n", packets.into()),
+            ],
         )
     };
-    let client = format::socket(&client_key.src_ip, client_key.src_port);
-    let server = format::socket(&client_key.dst_ip, client_key.dst_port);
+    let mut counts_line = counts_text(bytes, shown_packets, "stream-counts");
+    if side != StreamSide::Both {
+        counts_line.push(' ');
+        counts_line.push_str(&counts_text(
+            counts[0] + counts[2],
+            counts[1] + counts[3],
+            "stream-counts-of",
+        ));
+    }
+    let service = {
+        let engine = engine.lock();
+        let reverse = AddressPortPair {
+            src_ip: key.dst_ip,
+            src_port: key.dst_port,
+            dst_ip: key.src_ip,
+            dst_port: key.src_port,
+            ..key
+        };
+        [key, reverse]
+            .iter()
+            .find_map(|k| engine.info_traffic.map.get(k))
+            .and_then(|info| match info.service {
+                Service::Name(name) => Some(name.to_owned()),
+                _ => None,
+            })
+    };
     Some(Stream {
-        title: format!("{client} ↔ {server} ({})", client_key.protocol),
-        client,
-        server,
-        client_counts: counts_text(counts[0], counts[1]),
-        server_counts: counts_text(counts[2], counts[3]),
+        label: connection_label(&client_key),
+        tls: service
+            .as_deref()
+            .is_some_and(|name| TLS_SERVICES.contains(&name)),
+        service,
+        client: format::socket(&client_key.src_ip, client_key.src_port),
+        server: format::socket(&client_key.dst_ip, client_key.dst_port),
+        counts: counts_line,
         chunks: shown,
         cut,
         headers_only,
@@ -344,12 +423,24 @@ mod tests {
         assert!(!cut);
         assert_eq!(chunks.len(), 3);
         assert_eq!(chunks[0].data, b"GET / HTTP/1.1\r\n\r\n");
-        assert_eq!((chunks[0].client, chunks[0].packet), (true, 1));
+        assert_eq!(
+            (chunks[0].client, chunks[0].packets.clone()),
+            (true, vec![1, 2])
+        );
         assert_eq!(chunks[1].data, b"HTTP/1.1 200 OK\r\nhello");
         assert!(!chunks[1].client);
         assert_eq!((chunks[2].gap, chunks[2].data.as_slice()), (10, &b"!"[..]));
         assert_eq!(counts, [18, 2, 23, 3]);
         assert_eq!(as_text(&chunks[0].data), "GET / HTTP/1.1\n\n");
-        assert!(as_hex(b"GET").starts_with("00000000  47 45 54 "));
+        assert_eq!(
+            as_hex(b"GET", 0x20),
+            format!("00000020  47 45 54{}  GET", " ".repeat(41))
+        );
+        let line = as_hex(b"0123456789abcdef", 0);
+        // after the eighth byte one more space, the characters after two spaces
+        assert_eq!(
+            line,
+            "00000000  30 31 32 33 34 35 36 37  38 39 61 62 63 64 65 66   0123456789abcdef"
+        );
     }
 }

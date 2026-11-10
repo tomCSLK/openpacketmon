@@ -22,9 +22,10 @@ pub struct PacketStoreConf {
 }
 
 impl PacketStoreConf {
-    /// Choices for the number of packets kept
-    pub const MAX_PACKETS_CHOICES: [usize; 6] =
-        [10_000, 100_000, 250_000, 500_000, 1_000_000, 2_000_000];
+    /// Fewest packets that can be set as the limit
+    pub const MIN_PACKETS: usize = 1_000;
+    /// Most packets that can be set as the limit
+    pub const MAX_PACKETS: usize = 2_000_000;
     /// Choices for the memory of the packet bytes, in MiB
     pub const MEGABYTES_CHOICES: [usize; 4] = [256, 512, 1024, 2048];
     const DEFAULT_MEGABYTES: usize = 512;
@@ -50,9 +51,9 @@ impl PacketStoreConf {
         self.max_megabytes() * 1024 * 1024
     }
 
-    /// The number of packets to keep, one of the choices
+    /// The number of packets to keep, within the range offered
     pub fn max_packets(self) -> usize {
-        if Self::MAX_PACKETS_CHOICES.contains(&self.max_packets) {
+        if (Self::MIN_PACKETS..=Self::MAX_PACKETS).contains(&self.max_packets) {
             self.max_packets
         } else {
             Self::default().max_packets

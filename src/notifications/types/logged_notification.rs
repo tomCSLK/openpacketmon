@@ -4,9 +4,12 @@
 use crate::config::favorite::FavoriteItem;
 use std::collections::VecDeque;
 
+/// The newest notifications kept
+pub const KEPT: usize = 200;
+
 #[derive(Default)]
 pub struct LoggedNotifications {
-    /// Logged notifications during this capture session (max 30 kept)
+    /// Logged notifications during this capture session (at most [`KEPT`])
     notifications: VecDeque<LoggedNotification>,
     /// Total number of notifications ever logged during this capture session
     total_notifications: usize,
@@ -15,7 +18,7 @@ pub struct LoggedNotifications {
 impl LoggedNotifications {
     pub fn push(&mut self, notification: LoggedNotification) {
         self.total_notifications += 1;
-        if self.notifications.len() >= 30 {
+        if self.notifications.len() >= KEPT {
             self.notifications.pop_back();
         }
         self.notifications.push_front(notification);

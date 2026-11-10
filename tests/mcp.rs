@@ -109,6 +109,7 @@ fn every_tool_only_reads() {
     assert_eq!(
         names,
         [
+            "calls",
             "capture_status",
             "connections",
             "filter_help",

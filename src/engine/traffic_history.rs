@@ -53,7 +53,7 @@ pub struct TrafficHistory {
 }
 
 impl TrafficHistory {
-    #[cfg(test)]
+    /// Seconds of the capture so far: one interval each, idle ones included
     pub fn ticks(&self) -> u32 {
         self.ticks
     }

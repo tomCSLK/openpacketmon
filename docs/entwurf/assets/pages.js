@@ -1203,7 +1203,7 @@
       '<div>' + ai('m-sec', 32) + '<span>opensecmon<br><span class="who">Schild mit Radar</span></span></div>' +
       '<div>' + ai('m-net', 32) + '<span>opennetmon<br><span class="who">Bildschirm mit Puls (gewählt: C)</span></span></div>' +
       '<div class="mine">' + ai(cur, 32) + '<span>openpacketmon<br><span class="who">Entwurf ' + cur.slice(2).toUpperCase() + ' (in der Kopfleiste)</span></span></div>' +
-      '<div><img src="../assets/openpacketmon-logo.jpg" alt="Heutiges Logo von openpacketmon" width="54" height="40" style="border-radius:6px;object-fit:cover"><span>heute<br><span class="who">violette Kugel, wird ersetzt</span></span></div></div></div></section>' +
+      '<div><span>bis 0.4<br><span class="who">violette Kugel, ersetzt (nur noch in der Geschichte des Repos)</span></span></div></div></div></section>' +
       '<div class="notice info">' + I('info') + '<div>Alle Entwürfe sind einfarbig und kommen mit hellem und dunklem Hintergrund aus. Aus dem gewählten Zeichen würden danach Programmsymbol (PNG 16–512 px, <code>.ico</code> für Windows), Fenstersymbol und das Bild in der README erzeugt; das heutige Logo bleibt nur in der Geschichte des Repos.</div></div>' +
       '<div class="logos">' + LOGOS.map(function (l) {
         return '<section class="card logo"><h2>' + l[1] + (l[0] === 'm-c' ? ' <span class="pill">Gewählt</span>' : '') + '</h2><p class="why">' + l[2] + '</p>' +

@@ -1,12 +1,12 @@
 //! The connections of the capture: a searchable, sortable list in pages and the details of one
 //! connection (with a latency measurement for live captures).
 
-use std::fmt;
 use std::net::IpAddr;
 
 use sniffnet_packet_parser::Protocol;
 
-use crate::config::favorite::FavoriteItem;
+use crate::config::favorite::{FavoriteItem, FavoriteKey};
+use crate::countries::types::country::Country;
 use crate::engine::state::EngineState;
 use crate::filter::Filter;
 use crate::networking::manage_packets::get_address_to_lookup;
@@ -14,41 +14,35 @@ use crate::networking::types::address_port_pair::AddressPortPair;
 use crate::networking::types::data_info::DataInfo;
 use crate::networking::types::data_info_host::DataInfoHost;
 use crate::networking::types::data_representation::DataRepr;
+use crate::networking::types::host::Host;
 use crate::networking::types::info_address_port_pair::InfoAddressPortPair;
 use crate::networking::types::latency::LatencyStatus;
 use crate::networking::types::program::Program;
 use crate::networking::types::service::Service;
 use crate::networking::types::traffic_direction::TrafficDirection;
+use crate::networking::types::traffic_type::TrafficType;
 use crate::report::types::sort_type::SortType;
 use crate::utils::types::timestamp::Timestamp;
-use crate::view::entries::{host_sub, program_label, service_label};
+use crate::view::entries::{category_id, program_label, service_label};
 use crate::view::i18n::Lang;
 use crate::view::packets::{conversation_filter, filter_error};
 use crate::view::{Jump, format};
 
-/// Page sizes offered in the list
-pub(crate) const PAGE_SIZES: [usize; 4] = [25, 50, 100, 250];
-pub(crate) const DEFAULT_PAGE_SIZE: usize = 50;
+/// Page sizes offered in the settings (`Verbindungen pro Seite`)
+pub(crate) const PAGE_SIZES: [usize; 3] = [30, 50, 100];
+pub(crate) const DEFAULT_PAGE_SIZE: usize = 30;
 
 /// Examples of the help of the connection filter
 pub const FILTER_EXAMPLES: [&str; 8] = [
-    "ip.addr == 192.168.1.20",
-    "port == 443 and proto == tcp",
-    "domain contains google",
-    "country == US and not as contains amazon",
-    "program contains firefox",
-    "remote == 10.0.0.0/8",
-    "favorite and bytes > 100000",
-    "bytes > 1000000 and direction == outgoing",
+    "ip.addr == 192.0.2.40",
+    "port == 443",
+    "domain contains example",
+    "program == firefox",
+    "direction == incoming",
+    "country == US",
+    "favorite",
+    "tcp and bytes > 1000000",
 ];
-
-/// The names the connection filter knows besides the protocols
-pub fn filter_field_names() -> Vec<&'static str> {
-    crate::filter::CONNECTION_FIELDS
-        .iter()
-        .map(|(name, _, _)| *name)
-        .collect()
-}
 
 /// A connection in the list
 #[allow(clippy::struct_excessive_bools)] // flags of a table row
@@ -60,15 +54,98 @@ pub struct ConnectionRow {
     pub proto: String,
     pub service: String,
     pub program: String,
-    /// Service or program do not apply (ARP, ICMP …): the table shows a dash with the text as tooltip
+    /// Service or program do not apply (ARP, ICMP …): the table shows a dash
     pub service_na: bool,
     pub program_na: bool,
-    /// Name and AS of the remote host, if resolved
+    /// The remote host: its name (its address while it has none), AS or labels, country
     pub host: String,
     pub host_sub: String,
+    pub country: String,
+    /// The host, its address or its program is a favorite (the star of the row)
+    pub favorite: bool,
+    /// What the star changes: the favorites that apply when it is on, else the host (or the
+    /// address while the host is unknown)
+    pub favorite_keys: Vec<FavoriteKey>,
     pub packets: String,
     pub data: String,
+    /// Incoming and outgoing in the unit of the list, for the bar
+    pub bar_in: u128,
+    pub bar_out: u128,
+    /// Incoming and outgoing in bytes, under the bar
+    pub bar_hint: String,
     pub last: Timestamp,
+}
+
+/// Labels of a host: local, loopback, bogon, multicast, broadcast
+pub fn host_tags(t: Lang, info: &DataInfoHost) -> Vec<String> {
+    let mut tags = Vec::new();
+    if info.is_loopback {
+        tags.push(t.get("tag-loopback"));
+    } else if info.is_local {
+        tags.push(t.get("tag-local"));
+    }
+    if let Some(bogon) = info.is_bogon {
+        tags.push(t.get1("tag-bogon", "kind", bogon));
+    }
+    match info.traffic_type {
+        TrafficType::Multicast => tags.push(t.get("tag-multicast")),
+        TrafficType::Broadcast => tags.push(t.get("tag-broadcast")),
+        TrafficType::Unicast => {}
+    }
+    tags
+}
+
+/// The AS of a host as `AS64496 Example Transit`, else its labels
+fn as_or_tags(t: Lang, state: &EngineState, host: &Host) -> String {
+    if host.asn.name.is_empty() {
+        state
+            .info_traffic
+            .hosts
+            .get(host)
+            .map(|info| host_tags(t, info).join(", "))
+            .unwrap_or_default()
+    } else {
+        format!("AS{} {}", host.asn.code, host.asn.name)
+    }
+}
+
+/// The country code of a host, empty while it is unknown
+fn country(host: &Host) -> String {
+    if host.country == Country::ZZ {
+        String::new()
+    } else {
+        host.country.to_string()
+    }
+}
+
+/// Whether the connection belongs to a favorite, and what its star changes
+fn favorite_of(
+    state: &EngineState,
+    remote: IpAddr,
+    host: Option<&Host>,
+    program: &Program,
+) -> (bool, Vec<FavoriteKey>) {
+    let favorites = &state.conf.favorites;
+    let mut on = Vec::new();
+    if let Some(host) = host
+        && favorites.contains_host(host)
+    {
+        on.push(FavoriteKey::Host(host.clone()));
+    }
+    if favorites.contains_address(&remote) {
+        on.push(FavoriteKey::Address(remote));
+    }
+    if favorites.contains_program(program) {
+        on.push(FavoriteKey::Program(program.clone()));
+    }
+    if on.is_empty() {
+        let key = host.map_or(FavoriteKey::Address(remote), |h| {
+            FavoriteKey::Host(h.clone())
+        });
+        (false, vec![key])
+    } else {
+        (true, on)
+    }
 }
 
 fn connection_row(
@@ -78,18 +155,28 @@ fn connection_row(
     info: &InfoAddressPortPair,
 ) -> ConnectionRow {
     let unit = state.conf.data_repr.data_unit;
+    let repr = DataRepr {
+        data_unit: unit,
+        per_second: false,
+    };
     let remote = get_address_to_lookup(key, info.traffic_direction);
-    let (host, host_sub) = match state.addresses_resolved.get(&remote) {
+    let resolved = state.addresses_resolved.get(&remote);
+    let (host, host_sub, cc) = match resolved {
         Some((rdns, host)) => (
             if host.domain.is_empty() {
                 rdns.clone()
             } else {
                 host.domain.clone()
             },
-            self::host_sub(host),
+            as_or_tags(t, state, host),
+            country(host),
         ),
-        None => (String::new(), String::new()),
+        None => (remote.to_string(), String::new(), String::new()),
     };
+    let (favorite, favorite_keys) =
+        favorite_of(state, remote, resolved.map(|(_, h)| h), &info.program);
+    let data = info.data_info();
+    let bytes = DataRepr::bytes(false);
     ConnectionRow {
         jump: Jump::Connection(*key),
         src: format::socket(&key.src_ip, key.src_port),
@@ -102,14 +189,25 @@ fn connection_row(
         program_na: info.program == Program::NotApplicable,
         host,
         host_sub,
+        country: cc,
+        favorite,
+        favorite_keys,
         packets: format::count(t, info.packets),
-        data: format::amount(
-            t,
-            unit,
-            info.transmitted_data(DataRepr {
-                data_unit: unit,
-                per_second: false,
-            }),
+        data: format::amount(t, unit, info.transmitted_data(repr)),
+        bar_in: data.incoming_data(repr),
+        bar_out: data.outgoing_data(repr),
+        bar_hint: t.fmt(
+            "bar-hint",
+            &[
+                (
+                    "incoming",
+                    format::bytes(t, data.incoming_data(bytes)).into(),
+                ),
+                (
+                    "outgoing",
+                    format::bytes(t, data.outgoing_data(bytes)).into(),
+                ),
+            ],
         ),
         last: info.final_timestamp,
     }
@@ -138,8 +236,10 @@ pub struct ConnectionList {
     /// Numbers of the first and the last row among all connections of the filter
     pub first_row: usize,
     pub last_row: usize,
-    /// The page sizes offered and which one is in use
-    pub sizes: Vec<(usize, bool)>,
+    /// The page size in use
+    pub size: usize,
+    /// The largest connection of the filter in the unit of the list: it fills the bar
+    pub largest: u128,
     /// The capture source knows the programs
     pub programs: bool,
 }
@@ -159,8 +259,8 @@ pub fn connection_list(t: Lang, engine: &EngineState, request: &ListRequest) -> 
     let error = parsed.as_ref().err().map(|e| filter_error(t, e));
     let filter = parsed.ok().flatten();
     let requested = request.page.unwrap_or(1).max(1);
-    let (mut entries, total, matching) = if error.is_some() {
-        (Vec::new(), 0, DataInfo::default())
+    let (mut entries, total, matching, largest) = if error.is_some() {
+        (Vec::new(), 0, DataInfo::default(), 0)
     } else {
         engine.searched_entries(filter.as_ref(), request.sort, repr, requested, size)
     };
@@ -187,61 +287,9 @@ pub fn connection_list(t: Lang, engine: &EngineState, request: &ListRequest) -> 
         pages,
         first_row,
         last_row,
-        sizes: PAGE_SIZES.iter().map(|s| (*s, *s == size)).collect(),
+        size,
+        largest,
         programs: engine.capture_source.supports_programs(),
-    }
-}
-
-/// A jump from a value of the details page to the list it belongs to
-pub struct FactLink {
-    pub label: String,
-    /// Says where the link leads
-    pub title: String,
-    pub jump: Jump,
-}
-
-/// The value of a line of the details page
-pub enum FactValue {
-    Text(String),
-    Time(Timestamp),
-}
-
-impl fmt::Display for FactValue {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::Text(text) => f.write_str(text),
-            Self::Time(ts) => f.write_str(&format::time_utc(*ts)),
-        }
-    }
-}
-
-/// A labelled value of the details page
-pub struct Fact {
-    pub label: String,
-    pub value: FactValue,
-    pub links: Vec<FactLink>,
-}
-
-impl Fact {
-    fn text(label: String, value: String) -> Self {
-        Self {
-            label,
-            value: FactValue::Text(value),
-            links: Vec::new(),
-        }
-    }
-
-    fn time(label: String, ts: Timestamp) -> Self {
-        Self {
-            label,
-            value: FactValue::Time(ts),
-            links: Vec::new(),
-        }
-    }
-
-    fn with_links(mut self, links: Vec<FactLink>) -> Self {
-        self.links = links;
-        self
     }
 }
 
@@ -251,77 +299,75 @@ fn latency_text(t: Lang, status: Option<&LatencyStatus>) -> Option<String> {
         LatencyStatus::Measured(d) => {
             #[allow(clippy::cast_precision_loss)]
             let ms = d.as_micros() as f64 / 1000.0;
-            t.get1("latency-ms", "ms", (ms * 100.0).round() / 100.0)
+            t.get1("latency-ms", "ms", format::decimal(t, ms, 1))
         }
         LatencyStatus::Failed(e) => t.get1("latency-failed", "error", e.as_str()),
     })
 }
 
-/// Name, AS and country of the remote host, with a link to its connections
-fn remote_host(t: Lang, engine: &EngineState, remote: IpAddr) -> Vec<Fact> {
-    let Some((rdns, host)) = engine.addresses_resolved.get(&remote) else {
-        return Vec::new();
-    };
-    let filter = FavoriteItem::Host((host.clone(), DataInfoHost::default())).connection_filter();
-    let mut facts = vec![
-        Fact::text(t.get("host-rdns"), rdns.clone()).with_links(vec![FactLink {
-            label: t.get("connection-list"),
-            title: t.get("connection-host-connections"),
-            jump: Jump::Connections { filter },
-        }]),
-    ];
-    if !host.asn.name.is_empty() {
-        facts.push(Fact::text(
-            t.get("host-asn"),
-            format!("AS{} {}", host.asn.code, host.asn.name),
-        ));
-    }
-    if host.country != crate::countries::types::country::Country::ZZ {
-        facts.push(Fact::text(t.get("host-country"), host.country.to_string()));
-    }
-    facts
-}
-
-/// Links from the number of packets of a connection to the packets and their statistics, with
-/// the display filter of the connection
-fn packet_links(t: Lang, key: &AddressPortPair) -> Vec<FactLink> {
-    let filter = conversation_filter(key);
-    vec![
-        FactLink {
-            label: t.get("connection-packets"),
-            title: t.get("connection-packets-hint"),
-            jump: Jump::Packets {
-                filter: filter.clone(),
-                connections: String::new(),
-            },
-        },
-        FactLink {
-            label: t.get("connection-statistics"),
-            title: t.get("connection-statistics-hint"),
-            jump: Jump::Statistics {
-                filter,
-                connections: String::new(),
-            },
-        },
-    ]
-}
-
-/// The details of one connection
+/// The details of one connection, as the two cards of the page show them
 #[allow(clippy::struct_excessive_bools)] // what the page may offer
 pub struct ConnectionDetail {
+    /// `TCP`, before the title
+    pub protocol: String,
+    /// `192.0.2.20:39874 → 198.51.100.140:80`
     pub title: String,
-    pub facts: Vec<Fact>,
-    pub remote: IpAddr,
-    pub host_facts: Vec<Fact>,
-    pub message_types: Vec<(String, String)>,
+    pub src: String,
+    pub src_mac: String,
+    pub dst: String,
+    pub dst_mac: String,
+    /// `TCP über IPv4`
+    pub protocol_line: String,
+    pub outgoing: bool,
+    /// Name, and `80/tcp · Web` after it
+    pub service: Option<(String, String)>,
+    /// Name and path; the star changes the favorite
+    pub program: Option<(String, String)>,
+    pub program_favorite: bool,
+    pub program_key: Option<FavoriteKey>,
+    pub packets: String,
+    /// The packets and the statistics of the connection, both directions; `None` without stored
+    /// packets
+    pub packets_jump: Option<Jump>,
+    pub statistics_jump: Option<Jump>,
+    /// A packet of the connection, to follow its stream (TCP and UDP)
+    pub stream: Option<u64>,
+    pub data: String,
+    pub data_in: String,
+    pub data_out: String,
+    pub bar_in: u128,
+    pub bar_out: u128,
+    pub first: Timestamp,
+    pub last: Timestamp,
+    /// More lines when they apply: VLAN, exporter, message types
+    pub more: Vec<(String, String)>,
     pub latency: Option<String>,
     pub latency_supported: bool,
     pub measuring: bool,
-    /// The connections of the remote address
-    pub address_jump: Jump,
+    /// The remote end
+    pub remote: IpAddr,
     pub remote_favorite: bool,
+    pub rdns: String,
+    /// `AS64499` and its name, or the labels of the host
+    pub asn: Option<(String, String)>,
+    pub host_tags: String,
+    pub country: String,
+    /// The connections of the host and of the address
+    pub host_jump: Option<Jump>,
+    pub address_jump: Jump,
 }
 
+/// The first stored packet of a connection: the stream page follows its conversation
+pub(crate) fn first_packet(engine: &EngineState, key: &AddressPortPair) -> Option<u64> {
+    let store = engine.packets.as_ref()?;
+    let store = store.lock();
+    store
+        .iter()
+        .find(|p| p.conn.is_some_and(|(k, _)| k == *key))
+        .map(|p| p.number)
+}
+
+#[allow(clippy::too_many_lines)] // one field after the other
 pub fn connection_detail(
     t: Lang,
     engine: &EngineState,
@@ -331,77 +377,125 @@ pub fn connection_detail(
     let remote = get_address_to_lookup(key, info.traffic_direction);
     let data = info.data_info();
     let bytes = DataRepr::bytes(false);
-    let packet_links = if engine.packets.is_some() {
-        packet_links(t, key)
+    let stored = engine.packets.is_some();
+    let filter = conversation_filter(key);
+    let outgoing = info.traffic_direction == TrafficDirection::Outgoing;
+    let protocol_line = if key.protocol == Protocol::Arp {
+        key.protocol.to_string()
     } else {
-        Vec::new()
+        t.fmt(
+            "conn-over",
+            &[
+                ("protocol", key.protocol.to_string().into()),
+                (
+                    "ip",
+                    if key.src_ip.is_ipv4() { "IPv4" } else { "IPv6" }.into(),
+                ),
+            ],
+        )
     };
-    let mut facts = vec![
-        Fact::text(
-            t.get("conn-source"),
-            format::socket(&key.src_ip, key.src_port),
-        ),
-        Fact::text(t.get("conn-source-mac"), format::mac(info.src_mac)),
-        Fact::text(
-            t.get("conn-destination"),
-            format::socket(&key.dst_ip, key.dst_port),
-        ),
-        Fact::text(t.get("conn-destination-mac"), format::mac(info.dst_mac)),
-        Fact::text(t.get("conn-protocol"), key.protocol.to_string()),
-        Fact::text(
-            t.get("conn-direction"),
-            t.get(match info.traffic_direction {
-                TrafficDirection::Outgoing => "direction-out",
-                TrafficDirection::Incoming => "direction-in",
-            }),
-        ),
-        Fact::text(t.get("conn-service"), service_label(t, &info.service)),
-        Fact::text(
-            t.get("conn-program"),
-            match &info.program {
-                Program::NamePath((name, path)) => {
-                    format!("{name} ({path})")
-                }
-                other => program_label(t, other),
-            },
-        ),
-        Fact::text(t.get("conn-packets"), format::count(t, info.packets)).with_links(packet_links),
-        Fact::text(t.get("conn-data"), format::bytes(t, data.tot_data(bytes))),
-        Fact::time(t.get("conn-first"), info.initial_timestamp),
-        Fact::time(t.get("conn-last"), info.final_timestamp),
-    ];
+    let service = match &info.service {
+        Service::Name(name) => {
+            let port = if outgoing { key.dst_port } else { key.src_port };
+            let category = t.get(category_id(info.service.category()));
+            let sub = match port {
+                Some(port) => format!(
+                    "{port}/{} · {category}",
+                    key.protocol.to_string().to_lowercase()
+                ),
+                None => category,
+            };
+            Some(((*name).to_owned(), sub))
+        }
+        _ => None,
+    };
+    let program = match &info.program {
+        Program::NamePath((_, path)) => Some((program_label(t, &info.program), path.clone())),
+        _ => None,
+    };
+    let favorites = &engine.conf.favorites;
+    let resolved = engine.addresses_resolved.get(&remote);
+    let mut more = Vec::new();
     if let Some(vlan) = info.vlan_id {
-        facts.push(Fact::text(t.get("conn-vlan"), vlan.to_string()));
+        more.push((t.get("conn-vlan"), vlan.to_string()));
     }
     if let Some(exporter) = key.exporter {
-        facts.push(Fact::text(t.get("conn-exporter"), exporter.to_string()));
+        more.push((t.get("conn-exporter"), exporter.to_string()));
     }
-    let host_facts = remote_host(t, engine, remote);
-    let mut message_types: Vec<(String, String)> = info
+    let mut message_types: Vec<String> = info
         .message_types
         .iter()
-        .map(|(m, n)| (m.to_string(), format::count(t, *n as u128)))
+        .map(|(m, n)| format!("{m} ({})", format::count(t, *n as u128)))
         .collect();
     message_types.sort();
+    if !message_types.is_empty() {
+        more.push((t.get("conn-message-types"), message_types.join(", ")));
+    }
     let status = engine.latency_statuses.get(&remote);
+    let streams = matches!(key.protocol, Protocol::Tcp | Protocol::Udp);
     ConnectionDetail {
+        protocol: key.protocol.to_string(),
         title: format!(
             "{} → {}",
             format::socket(&key.src_ip, key.src_port),
             format::socket(&key.dst_ip, key.dst_port)
         ),
-        facts,
-        remote,
-        host_facts,
-        message_types,
+        src: format::socket(&key.src_ip, key.src_port),
+        src_mac: format::mac(info.src_mac),
+        dst: format::socket(&key.dst_ip, key.dst_port),
+        dst_mac: format::mac(info.dst_mac),
+        protocol_line,
+        outgoing,
+        service,
+        program_favorite: favorites.contains_program(&info.program),
+        program_key: program
+            .is_some()
+            .then(|| FavoriteKey::Program(info.program.clone())),
+        program,
+        packets: format::count(t, info.packets),
+        packets_jump: stored.then(|| Jump::Packets {
+            filter: filter.clone(),
+            connections: String::new(),
+        }),
+        statistics_jump: stored.then(|| Jump::Statistics {
+            filter,
+            connections: String::new(),
+        }),
+        stream: if streams && stored {
+            first_packet(engine, key)
+        } else {
+            None
+        },
+        data: format::bytes(t, data.tot_data(bytes)),
+        data_in: format::bytes(t, data.incoming_data(bytes)),
+        data_out: format::bytes(t, data.outgoing_data(bytes)),
+        bar_in: data.incoming_data(bytes),
+        bar_out: data.outgoing_data(bytes),
+        first: info.initial_timestamp,
+        last: info.final_timestamp,
+        more,
         latency: latency_text(t, status),
         latency_supported: engine.capture_source.supports_latency()
             && !matches!(key.protocol, Protocol::Arp),
         measuring: matches!(status, Some(LatencyStatus::Measuring)),
+        remote,
+        remote_favorite: favorites.contains_address(&remote),
+        rdns: resolved.map(|(rdns, _)| rdns.clone()).unwrap_or_default(),
+        asn: resolved
+            .map(|(_, h)| h)
+            .filter(|h| !h.asn.name.is_empty())
+            .map(|h| (format!("AS{}", h.asn.code), h.asn.name.clone())),
+        host_tags: resolved
+            .and_then(|(_, h)| engine.info_traffic.hosts.get(h))
+            .map(|i| host_tags(t, i).join(", "))
+            .unwrap_or_default(),
+        country: resolved.map(|(_, h)| country(h)).unwrap_or_default(),
+        host_jump: resolved.map(|(_, host)| Jump::Connections {
+            filter: FavoriteItem::Host((host.clone(), DataInfoHost::default())).connection_filter(),
+        }),
         address_jump: Jump::Connections {
             filter: format!("ip.addr == {remote}"),
         },
-        remote_favorite: engine.conf.favorites.contains_address(&remote),
     }
 }
 

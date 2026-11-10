@@ -4,10 +4,14 @@
 
 - **v0.4.0** ist das erste öffentliche Release (2026-11-02, Linux; signierter Windows-Installer seit 2026-11-03), Repo https://github.com/tomCSLK/openpacketmon
   öffentlich. Oberfläche egui (5.5), Mitschnitt-Helfer mit Rechten, MCP-Anbindung (5.4), Windows (5.3, Reste in `docs/windows.md` 8).
-- **Als Nächstes:** neue Oberfläche im Stil von opensecmon (5.6). Entwurf abgenommen; die Ergänzung zu den Updates (Hinweis auf neue Versionen,
-  abgestimmt mit dem geplanten Launcher) ist eingebaut und abgenommen (2026-11-09). Umsetzung nach „go“.
-- **VoIP** (5.7): SIP, SDP, RTP und RTCP in Paketliste und Filter, unter Statistik der Reiter „Anrufe“ mit Ablauf, Sprachqualität und
-  Anhören von G.711; Entwurf **abgenommen** (2026-11-10). Umsetzung nach „go“, Zerleger und Filter zuerst.
+- **Test-Paket 0.5.0** (2026-11-10, Commit „Version 0.5.0; …“, nicht veröffentlicht) mit der neuen Oberfläche (5.6) und VoIP (5.7);
+  Test durch den Nutzer steht aus.
+- **Neue Oberfläche im Stil von opensecmon (5.6) umgesetzt** (2026-11-10, Stufen A–D nach dem abgenommenen Entwurf; Abweichungen dort).
+- **VoIP** (5.7, „go“ am 2026-11-10): SIP, SDP, RTP und RTCP in Paketliste und Filter, unter Statistik der Reiter „Anrufe“ mit Ablauf,
+  Sprachqualität und Anhören von G.711; Entwurf abgenommen. **Stufen 1–5 umgesetzt** (Zerleger, Zuordnung zu Anrufen, Filter,
+  Zeilenfarbe, Protokollhierarchie; Reiter „Anrufe“, Seite „Anruf“, Einstellungen → Anrufe; Anhören von G.711 mit Wellenform, WAV und
+  Hinweis zu § 201; MCP-Werkzeug `calls`, Rufnummern über MCP auf die letzten zwei Ziffern gekürzt, Ton nie über MCP). Als Nächstes
+  der Test mit einem echten Anruf.
 - **Offen außerhalb:** Pull Request mit der Korrektur des Befunds aus 4.8 beim Original (Einzelheiten nur in `CLAUDE.local.md`).
 - Die Abschnitte 2 bis 4 und die Stände in 5.1 bis 5.5 sind **Verlauf** (die Lizenzprüfung in 1 gilt weiter); was dort über Browser-Oberfläche, `src/web/`, `templates/`,
   `static/`, Fenster-Programm oder privates Repo steht, gilt nicht mehr.
@@ -1531,7 +1535,7 @@ Stand egui (2026-11-01, Stufen 1 bis 4 freigegeben vom Nutzer, Test-Pakete **0.3
 Entschieden (Nutzer, 2026-10-31): Der Paketspeicher bleibt im RAM, die Grenze wird wählbar (bis etwa 2 GiB mit passender Paketzahl).
 Eine temporäre Datei wie bei Wireshark kommt nur, falls das später nicht reicht, weil sonst unverschlüsselter Verkehr auf der SSD läge.
 
-#### 5.6 Neue Oberfläche im Stil von opensecmon (Wunsch des Nutzers, 2026-11-09; Entwurf abgenommen, Ergänzung zu den Updates abgenommen)
+#### 5.6 Neue Oberfläche im Stil von opensecmon (Wunsch des Nutzers, 2026-11-09; Entwurf abgenommen, Ergänzung zu den Updates abgenommen; umgesetzt 2026-11-10, Test-Paket 0.5.0)
 
 Auftrag: klickbarer Entwurf wie bei opennetmon (`../opennetmon/docs/entwurf/`, dort lokal, am 2026-11-09 abgenommen), Farben und Gestaltung
 von dort, Logo im selben Stil. Ergebnis in **`docs/entwurf/`** (statisches HTML, kein Anwendungscode; Start `index.html`, Einzelheiten
@@ -1540,7 +1544,8 @@ und offene Punkte in `docs/entwurf/README.md`). Inhalt und Funktionen wie 0.4.0,
 - **Aufbau:** Kopfleiste statt violetter Seitenleiste (Übersicht, Verbindungen, Pakete, Statistik, Hosts, Dienste, Programme; Glocke,
   Thema, Hilfe, Zahnrad), Aufzeichnung immer rechts oben (Zustand, Adapter, Dauer, Pausieren, Beenden), Statusleiste unten (Pakete,
   Paketspeicher, verworfen, KI-Hinweis, neue Version, Links; „IP Geolocation by DB-IP“ bei jeder Breite sichtbar).
-- **Gestaltung:** graue Flächen, Akzent `#1c5ea8`, Fira Sans/Fira Code (Ligaturen aus), dichte Zeilen (Tabellen 34 px, Paketliste 26 px),
+- **Gestaltung:** graue Flächen, Akzent `#1c5ea8`, Fira Sans/Fira Code (Ligaturen aus; in egui seit 2026-11-10 ebenfalls, siehe 5.7
+  Stufe 3), dichte Zeilen (Tabellen 34 px, Paketliste 26 px),
   leiser getönte Farben der Paketliste für hell und dunkel, Symbole nach Lucide (ISC).
 - **Seiten:** Aufzeichnung, Übersicht, Verbindungen, Verbindung, Pakete (virtuelle Liste mit 48 000 Zeilen, Live-Folgen, Anzeigefilter mit
   Prüfung und Vorschlägen, Strg+G, Leiste für das gewählte Paket), Paketdetails (Felder ↔ Bytes), Stream folgen, Statistik, Hosts, Dienste,
@@ -1576,10 +1581,32 @@ und offene Punkte in `docs/entwurf/README.md`). Inhalt und Funktionen wie 0.4.0,
     Antwort. Die Release-Notes sind Fremdtext (nur `https://`-Links, kein HTML, Länge begrenzen) und brauchen einen kleinen Markdown-Renderer
     (eigener Code oder Crate mit passender Lizenz). Der Launcher wird ohne Shell gestartet. Name und Aufruf des Launchers erst ins Repo, wenn er
     öffentlich ist.
-- **Umsetzung** nach „go“, in vier Stufen mit Test-Paket (Vorschlag in `docs/entwurf/README.md`):
+- **Umsetzung** in vier Stufen (Vorschlag in `docs/entwurf/README.md`):
   A Farben/Schriften (`src/gui/theme.rs`, Fira als TTF, Lizenzliste), B Kopf- und Statusleiste mit dem Hinweis auf neue Versionen
   (`src/gui/mod.rs`, `widgets.rs`, `locales/`; Fenster bleibt 1280 × 820 mit Mindestgröße 760 × 480), C Seite für Seite (`src/gui/pages/`,
   Seitendaten bleiben in `src/view/`; darin Einstellungen → Aktualisierungen mit Release-Notes), D Symbole, Logo C, Programmsymbole, README-Bild.
+- **Umgesetzt (2026-11-10, „go“ des Nutzers: „orientiere dich penibel an den entwurf“; im Test-Paket 0.5.0):**
+  - Stufen A bis D. Jede Seite mit Bildern aus `src/gui/tests.rs` (`GUI_SHOTS=… cargo test --bin openpacketmon gui::tests::shots -- --ignored`)
+    gegen Bildschirmfotos des Entwurfs aus Headless Chrome bei 1280 × 820 verglichen, meist auf 1–3 px genau; Einstellungen auch bei 960
+    und 760 px, Aufzeichnung auch mit Datei und IPFIX und bei 1150 px Höhe.
+  - Einstellungen mit Unternavigation (Anzeige, Benachrichtigungen, Paketspeicher, Geodaten, KI-Assistenten, Aktualisierungen, Über);
+    Thema und KI-Zugang wirken sofort (ohne „Speichern“), die Lizenzen stehen unter „Über“. Release-Notes mit eigenem kleinem
+    Markdown-Leser (`src/view/release_notes.rs`: Überschriften, Absätze, Listen, fett, Code, nur `https://`-Links, höchstens 400 Blöcke).
+  - Aufzeichnung: Quelle mit Symbolen in der Kopfzeile, Adaptertabelle mit Kurven der letzten 30 Sekunden (gemeinsamer Maßstab),
+    Filter und Paketspeicher nebeneinander, PCAP-Datei; die laufende Aufzeichnung mit Zustand, Dauer, Fakten und Fuß wie im Entwurf.
+  - Programmsymbol: Zeichen C weiß auf `#1c5ea8` (Ecken 22 %, Zeichen 75 %) in 8–1024 px, erzeugt mit `dev/make-icons.py` (Pillow),
+    `.ico` mit `dev/make-ico.py`; README-Bild hell und dunkel (`docs/assets/openpacketmon-logo{,-dark}.png`), das alte Logo nur noch in der
+    Geschichte. Ungenutzte Symbole entfernt (`phone`, `phone-xl`, `lock` bleiben für 5.7); die Symbole nach Lucide (ISC, teils MIT von
+    Feather) stehen in `THIRD-PARTY-LICENSES.txt`.
+  - Aufgeräumt: alte Bausteine der violetten Oberfläche, ungenutzte Texte, die Einstellung `plain_packets` (alte Konfigurationen laden
+    weiter), die Crate `egui_plot`; `cargo clippy -- -D warnings` ohne Meldung. `rmcp` auf 3.9.0 (RUSTSEC-2026-0462 betrifft den
+    HTTP-Client von rmcp, den openpacketmon nicht nutzt), `async-executor` 1.14.1 (1.14.0 zurückgezogen).
+  - **Abweichungen vom Entwurf** (bewusst): Zeitentabelle der Statistik ohne Links; Dienste per Name; Hosts mit „+n“ weiteren Adressen;
+    Benachrichtigungen höchstens 200; Sprache „Wie das System“ bleibt wählbar; der Hinweis auf neue Versionen nur ohne Launcher (der
+    geplante Launcher ist nicht öffentlich, seine Erkennung kommt mit ihm); „Fremdlizenzen“ zeigt NOTICE und THIRD-PARTY-LICENSES.txt ganz;
+    „Gespeichert“ als kurze Meldung; „Höchstens Pakete“ als freie Zahl von 1.000 bis 2.000.000; auf der Seite Aufzeichnung Filter und
+    Paketspeicher nur für Adapter und Datei, PCAP-Datei nur für Adapter (der Entwurf zeigt sie bei jeder Quelle, sie wirken dort aber
+    nicht); die Adapter bleiben nach Verkehr sortiert. Texte zu Anrufen (Paketspeicher, KI-Assistenten, Einstellungen → Anrufe) kommen mit 5.7.
 
 #### 5.7 VoIP: SIP, RTP und Anrufe (Wunsch des Nutzers, 2026-11-09; Entwurf abgenommen 2026-11-10, Umsetzung nach „go“)
 
@@ -1648,13 +1675,119 @@ Standards (SIP RFC 3261, SDP RFC 8866, RTP/RTCP RFC 3550, Payload-Typen RFC 3551
      Antworten der Werkzeuge wie in Paketinhalten; Anzeigenamen und Domains bleiben.
 - **Abgenommen (Nutzer, 2026-11-10):** der Entwurf („schaut gut aus“, 2026-11-09), Anrufe unter Statistik (Variante D), die verschobenen
   Grenzen der Kopfleiste, „RTP auch ohne SIP erkennen“ standardmäßig an, Rufnummern über MCP gekürzt auf die letzten zwei Ziffern.
+- **Umgesetzt: Stufen 1 und 2** (2026-11-10, Test-Paket 0.5.0):
+  - Zerleger `src/dissect/sip.rs`: SIP über UDP und TCP auf Port 5060, mit der Einstellung auch auf anderen Ports (an der ersten Zeile);
+    alle Kopfzeilen, Kurzformen (`f:`, `i:` …), UTF-8; Körper nach Content-Length; SDP mit allen Zeilen und den Medien (`rtpmap`,
+    `a=rtcp`, `a=rtcp-mux`, SRTP-Profile). `src/dissect/rtp.rs`: RTP mit CSRC, Erweiterung und Padding, Payload-Typen nach RFC 3551;
+    RTCP SR, RR, SDES, BYE, APP und zusammengesetzte Pakete, ein verschlüsselter Rest als Daten. Die Zerleger bleiben ohne Zustand.
+  - Zuordnung in `src/engine/analysis/voip.rs`, in der Reihenfolge der Aufzeichnung: SIP-Transaktionen nach Call-ID und CSeq, Anrufe ab
+    INVITE (REGISTER ist kein Anruf), die im SDP ausgehandelten Endpunkte (RTCP auf `a=rtcp`, bei `rtcp-mux` auf demselben Port, sonst
+    Port + 1). RTP ohne SIP an der Form: Version 2, gleichbleibende SSRC, Nummern in Schritten von 1 bis 3 über 10 Pakete, beide Ports ab
+    1024; die ersten Pakete des Stroms werden nachträglich markiert, RTCP dazu auf Port + 1 mit strenger Prüfung.
+  - Paketdetails: „→ Antwort 180 in Paket 4 (nach 612 ms)“, „← Antwort auf Paket …“, „Ausgehandelt per SDP in Paket …“, beim RTP ohne SIP
+    „Erkannt: ohne SIP, an der Form …“ (wie im Entwurf).
+  - Filter: alle Felder des Entwurfs, dazu `sip.cseq.seq`, `sip.cseq.method`, `rtp.timestamp`, `rtp.marker` und `rtcp.pt`; Zeilenfarbe
+    `voip` (`sip or rtp or rtcp`); SIP, SDP, RTP und RTCP in der Protokollhierarchie. Der Treffer-Index wartet am Live-Ende, bis ein Strom
+    als RTP erkannt oder verworfen ist (wie bei den TCP-Befunden).
+  - Einstellungen `calls.rtp_without_sip` und `calls.sip_any_port` in `conf.toml` (beide an); die Schalter kommen mit Stufe 3.
+  - MCP: Kopfzeilen mit geheimem Namen in SIP-Schichten (Authorization, Proxy-Authorization, …-Authenticate) als `[hidden]`. Rufnummern
+    kürzt seit Stufe 5 `src/mcp/privacy.rs`.
+  - Tests: 11 Zerlegertests (`src/dissect/tests/voip.rs`), 4 zur Zuordnung (Anruf mit SIP und RTP, Filter, RTP ohne SIP, abgebrochener
+    Strom und niedrige Ports), einer zum Treffer-Index, Zufallstests für SIP, RTP, RTCP und die Zuordnung (je 300 000 Durchläufe ohne
+    Befund). Bildtest mit einem erfundenen Anruf (`GUI_SHOTS_ONLY=voip`: Paketliste, SIP-, RTP- und RTCP-Details, Statistik), gegen den
+    Entwurf geprüft.
+  - **Abweichungen vom Entwurf** (bewusst): Die Feldwerte der Zerleger sind englisch wie bei allen übrigen Zerlegern und in den Antworten
+    über MCP (Entwurf: „erstes Paket des Stroms“, „verschlüsselt oder unbekannt“, „20 ms Sprache“, „2,0 %“, „ms bei 8000 Hz“; bei uns
+    „start of a talkspurt“ nach RFC 3550, „encrypted or unknown“, „20 ms of speech“, „2.0 %“, „ms at 8000 Hz“); der Zeitstempel des Sender
+    Reports steht wie bei NTP. Übersetzt sind die Bezüge und „Erkannt“.
+- **Umgesetzt: Stufe 3** (2026-11-10, Test-Paket 0.5.0):
+  - Seitendaten `src/view/calls.rs`: Anrufe aus den SIP-Dialogen (Call-ID), Ströme nach SSRC und Richtung; Verlust aus den laufenden
+    Nummern (RFC 3550 A.1, mit Überlauf), Jitter nach A.8 (nur bei bekanntem Takt, sonst „unbekannt“), größter Abstand, Folgefehler
+    (Pakete nach einem späteren oder doppelt); Zustände wie im Entwurf (läuft, klingelt, beendet selbst/Gegenseite, verpasst, abgebrochen,
+    abgelehnt mit Bedeutung des Codes, nur RTP), Anmeldung (REGISTER mit 200 OK, Gültigkeit, Digest), Bewertung gut/mäßig/schlecht mit
+    Hinweis auf der Seite und unter „Auffällig“. Die Daten werden in drei Schritten gelesen (Analyse, Paketspeicher, dann ohne Sperre).
+  - Seiten: Statistik mit Unterreitern „Protokolle | Anrufe n“; Anrufe (Kacheln, Liste, Anmeldung als Fuß, Hilfe; leer mit Hilfe); Anruf
+    (Fakten, Karte „Anhören“, Ablauf als Leiter mit Band, Sprachströme mit RTCP-Fuß). Wege dorthin: Knopf „Anruf“ über der Paketliste,
+    „Gehört zum Anruf …“ in den Paketdetails, „Auffällig“ in der Übersicht. Einstellungen → Anrufe: die zwei Schalter, Anhören, Stand des
+    Hinweises zu § 201 mit „wieder zeigen“ (`calls.law_confirmed`, Datum).
+  - Richtung: „dieser Rechner“ ist der Absender von REGISTER (das angemeldete Telefon), sonst zählt die Richtung der Pakete. In einer Datei
+    gilt jede private Adresse als lokal; fehlt dort die Anmeldung (etwa ein Mitschnitt der FRITZ!Box, der erst nach dem REGISTER beginnt),
+    kann die Richtung falsch sein.
+  - **Schriften ohne Ligaturen** wie im Entwurf (`font-variant-ligatures: none`): egui 0.37 formt Text mit harfrust, Fira Code machte so
+    aus „0x“ ein „×“ (auch in Paketdetails und Filtern). `theme::without_ligatures` benennt beim Laden `liga`, `clig`, `dlig` und `calt` in
+    der GSUB-Tabelle um; die Schriftdateien bleiben unverändert.
+  - Tests: Testaufnahme `src/view/calls/tests.rs` mit den Anrufen des Entwurfs (Anmeldung 14:36:09, RTP ohne SIP, abgelehnt mit 407 und
+    486, beendet 1:31, schlecht mit 4,3 % Verlust, verpasst, laufend), fünf Tests der Seitendaten, einer zu den Ligaturen. Bildtest
+    `GUI_SHOTS_ONLY=voip` mit Liste, allen Arten von Anrufen, Einstellungen, Übersicht, schmalem Fenster, Englisch und leerer Liste; gegen
+    die Bildschirmfotos des Entwurfs geprüft (Liste, Anrufe A, B, C, E).
+  - **Abweichungen vom Entwurf** (bewusst): ohne bekannten Namen stehen Adressen statt `sip.example.net` (im Ablauf die Adresse als Kopf,
+    darunter nur „SIP“/„RTP“); das Programm (`linphone`) nur bei einer Live-Aufzeichnung; beim RTP ohne SIP fehlt unter „Inhalt“ der nicht
+    prüfbare Satz „die Steuerung lief verschlüsselt über HTTPS“; die Schalter unter Einstellungen → Anrufe gelten sofort für die danach
+    analysierten Pakete; kommen Sprache und SIP vom selben Rechner, hat der Ablauf zwei Spuren; ein Anruf, der am Ende einer Datei noch
+    läuft, heißt „Läuft“.
+- **Umgesetzt: Stufe 4** (2026-11-10, Test-Paket 0.5.0):
+  - `src/view/calls/audio.rs`: G.711 A-law und µ-law nach den Tabellen der ITU-T-Empfehlung (eigener Code), beide Richtungen auf einer
+    Zeitachse. Die Achse ist die Gesprächszeit (von der Annahme oder der ersten Sprache bis zum Ende des Anrufs oder der letzten Sprache;
+    beim laufenden Anruf bis jetzt), höchstens 4 Stunden. Jedes Paket liegt an seinem RTP-Zeitstempel (mit Überlauf), Lücken in den
+    laufenden Nummern bleiben still und werden rot. Wellenform: 150 Balken je Richtung (Effektivwert, bezogen auf den lautesten Balken
+    beider Seiten, leise Stellen bleiben flach). WAV mit eigenem Kopf (44 Byte): 8 kHz, 16 bit, Stereo, links gesendet, rechts empfangen;
+    Dateiname `openpacketmon-call-JJJJMMTT-HHMMSS.wav` nach dem Beginn des Anrufs.
+  - `src/gui/pages/calls/player.rs`: Karte „Anhören“ wie im Entwurf (Spuren „Gesendet“/„Empfangen“ mit Namen, Wellenform, Abspielkopf,
+    Zeitachse, „Abspielen“/„Anhalten“, Zeit, „Beide | Gesendet | Empfangen“, Hilfe mit den Sätzen zu Rot und zum laufenden Anruf; unter
+    900 px die Namen über der Wellenform); ein Klick auf die Wellenform springt dorthin. Wiedergabe über `rodio` als ein Kanal (beide
+    Seiten gemischt oder eine), Ende am Schluss, beim Verlassen der Seite und ohne Aufzeichnung; ohne Soundausgabe ein roter Hinweis.
+    Knopf „Als WAV speichern“ rechts neben „Pakete des Anrufs“ (Dateidialog, Meldung „Gespeichert“). Vor dem ersten Anhören oder Speichern
+    der Hinweis zu § 201 als Dialog („Verstanden, anhören“ / „Verstanden, speichern“); das Datum steht in `calls.law_confirmed` und unter
+    Einstellungen → Anrufe.
+  - Seitenkopf des Anrufs: die Zeile mit dem Zustand ist eine Textzeile (23 px wie im Entwurf, vorher eine Bedienzeile mit 32 px); die
+    Karten stehen dadurch 9 px höher, wie im Entwurf.
+  - Tests: G.711 gegen Werte der Tabellen und hin und zurück mit einem Test-Kodierer (alle 256 A-law-Codes, µ-law ohne die zweite Null
+    0x7F), WAV-Kopf, Mischen der Kanäle, `call_audio` auf der Testaufnahme (Achse 1:31, Richtung, rote Balken und Stille beim schlechten
+    Anruf, laufender Anruf, nichts zu hören bei abgelehnt, verpasst und RTP ohne SIP). Die Testaufnahme trägt erfundene „Sprache“ (Ton mit
+    abwechselnden Sprechern wie die Kurve des Entwurfs). Bildtest mit Player halb abgespielt („Gesendet“), Hinweisdialog und schmalem
+    Fenster; gegen den Entwurf geprüft (Anruf A und B, Dialog: Zeilen und Fußleiste pixelgleich).
+  - **Abweichungen vom Entwurf** (bewusst): Der schlechte Anruf der Testaufnahme ist im Player 1:03 lang statt 1:00 (sein empfangener
+    Strom hat wie in den Zahlen des Entwurfs 1044 Pakete à 60 ms, länger als die Gesprächszeit); Namen in der Spalte links werden ein
+    Zeichen früher gekürzt (Fira Code ist als Datei 2,5 % breiter als die Webschrift des Entwurfs); im Dialog kein Fokusrahmen um den
+    Hauptknopf; abgespielt wird ein Kanal, die WAV-Datei ist Stereo.
+  - Nicht automatisch geprüft: echte Tonausgabe und Dateidialog (die Tests spielen nie Ton); zum Ausprobieren mit einem echten Anruf.
+- **Umgesetzt: Stufe 5** (2026-11-10, Test-Paket 0.5.0):
+  - Werkzeug **`calls`** (`src/mcp/tools.rs`, `CallsArgs` in `args.rs`, `server.rs`): ohne Argument die Liste (Kacheln als `summary`; je
+    Anruf `id` wie `sip-3` oder `rtp-7`, Zustand, Beginn, Dauer, Richtung, Von und An mit Adresse, Codec, Qualität, Pakete; höchstens 100,
+    neueste zuerst; die Anmeldung), mit `call` die Seite des Anrufs (Fakten als Text, Spuren, Ablauf mit Paketnummern, Sprachströme mit
+    Verlust, Jitter, größtem Abstand, Folgefehlern, Bewertung und Filter, RTCP, Hinweis bei schlechter Verbindung, Filter aller Pakete).
+    Nie Ton: keine Karte „Anhören“, kein WAV. Die Antworten laufen wie alle durch `finish`.
+  - **Rufnummern** (`Numbers` in `src/mcp/privacy.rs`): die Ziffern im Benutzerteil von `sip:`/`sips:`-URIs (bis `@`; ohne `@` ist es ein
+    Host und bleibt, außer er beginnt mit `+`), in `tel:`-URIs (Parameter wie `;ext=` je für sich), in den Anzeigenamen der Adressköpfe
+    (From, To, Contact, P-Asserted-Identity, P-Preferred-Identity, P-Called-Party-ID, Remote-Party-ID, Diversion, History-Info, Referred-By,
+    Refer-To, Reply-To, mit Kurzformen) und in der SDP-Zeile `p=` behalten nur die letzten zwei; ein Passwort in einer SIP-URI
+    (`sip:alice:geheim@…`) wird ganz `x`. Das gilt für jeden Text jeder Antwort (`clean_text`), die Adressköpfe in den Feldern der
+    SIP-Schicht, die Namen auf den Seiten der Anrufe (auch ohne Schema wie `+4930…@host`; IP-Adressen bleiben) und für Bytes (`Masker`,
+    über Segmentgrenzen; an einer Schnittkante im Zweifel auch die letzten zwei Ziffern). Filter-Orakel: `sip.from` und `sip.to` sind im
+    Index des Assistenten gekürzt.
+  - **Was sonst Ton oder Nummern verriete:** Die Nutzdaten von RTP (auch eines noch nicht entschiedenen Kandidaten) werden in
+    `follow_stream` und `packet_bytes` zu `x`, der RTP-Kopf bleibt; in RTCP-Quellbeschreibungen werden PHONE, NAME, CNAME und EMAIL gekürzt
+    (Feld und Bytes, `sdes_items` in `src/dissect/rtp.rs`); SRTP-Schlüssel (`a=crypto:`, `a=key-mgmt:`, `k=`) ganz geschwärzt, im Feld
+    als `crypto:[hidden]`; der Kopf `Identity` (RFC 8224, trägt die Nummern beider Seiten signiert, Kurzform `y`) gilt als geheim.
+  - Geprüft: `Authorization`, `Proxy-Authorization` und `…-Authenticate` greifen bei SIP über UDP (Feld `[hidden]`, Bytes `x`).
+  - Texte: `settings-mcp-hint` wie im Entwurf („… Statistik und Anrufe (ohne Ton; Rufnummern bis auf die letzten zwei Ziffern gekürzt)“),
+    englisch entsprechend; README (Abschnitt „AI assistants“), Beschreibungen und Anweisungen des MCP-Servers.
+  - Tests: sechs in `privacy.rs` (Nummern in allen Formen, was bleibt, Adressen, eine SIP-Nachricht in Bytes an jeder Schnittstelle,
+    SRTP-Schlüssel, Ton und RTCP), der Zufallstest des Maskierers mit SIP-Teilen (Stücke verbergen nie weniger als das Ganze; 1 000 000
+    Durchläufe ohne Befund); drei in `tools.rs` (ein Testanruf mit Nummern an jeder Stelle: keine Antwort und kein Byte enthält mehr als
+    die letzten zwei Ziffern, kein Ton, kein SRTP-Schlüssel; der Filter findet keine Nummer; `calls` auf der Testaufnahme), `calls` im
+    Zufallstest der Werkzeuge (100 000 Durchläufe ohne Befund) und in `tests/mcp.rs`.
+  - **Grenzen** (bewusst): Ziffern in Anzeigenamen werden auch gekürzt, wenn sie keine Nummer sind („Büro 2041“ → „Büro xx41“), ebenso ein
+    Benutzerteil mit Ziffern (`anna2024@…` → `annaxx24@…`); Nummern an anderen Stellen (etwa im Text einer SIP-MESSAGE, in XML-Körpern oder
+    im Betreff) bleiben, wie Geheimnisse an anderen Stellen.
 
 ---
 
 ## 5. Offene Punkte (Stand 2026-11-10)
 
-1. „go“ für die Umsetzung der neuen Oberfläche (5.6; Entwurf samt Ergänzung zu den Updates abgenommen).
-2. „go“ für VoIP (5.7, Entwurf abgenommen), zuerst Zerleger und Filter (Stufen 1–2).
+1. Neue Oberfläche (5.6): im Test-Paket 0.5.0; Test durch den Nutzer.
+2. VoIP (5.7, „go“ am 2026-11-10): Stufen 1–5 (Zerleger, Filter, Anrufe, Anhören, MCP) im Test-Paket 0.5.0; Test mit einem echten Anruf
+   (Tonausgabe, Dateidialog, Rufnummern über MCP).
 3. Windows-Reste (`docs/windows.md` 8): CI-Job, Test auf sauberem System, MCP-Einrichtung in `docs/windows-tester.md`, MCP-Integrationstests
    unter Windows von den echten Einstellungen trennen.
 4. Rückmeldung des Originals zum Pull Request mit der Korrektur aus 4.8 (Einzelheiten nur in `CLAUDE.local.md`).

@@ -114,3 +114,11 @@ pub struct PacketBytesArgs {
     /// Number of the packet, from the `packets` tool
     pub number: u64,
 }
+
+#[derive(Serialize, Deserialize, JsonSchema, Debug, Default)]
+#[schemars(crate = "rmcp::schemars")]
+pub struct CallsArgs {
+    /// Id of a call from the list (`sip-3`, `rtp-7`) for its details; without it the list
+    #[serde(default)]
+    pub call: Option<String>,
+}

@@ -125,7 +125,7 @@ fn tcp(data: &[u8], start: usize, end: usize, d: &mut Dissection) -> Option<Rang
                 .iter()
                 .map(|(bit, name)| {
                     Field::new(
-                        name,
+                        *name,
                         if flags & bit == 0 { "Not set" } else { "Set" },
                         start + 12..start + 14,
                     )

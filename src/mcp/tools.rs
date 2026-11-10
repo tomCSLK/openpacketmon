@@ -1,12 +1,13 @@
 //! What an assistant can ask. It runs in the window, and it only reads.
 //!
-//! The answers carry no payload, neither the secrets of an HTTP header nor the query of a URL
-//! (see `privacy`). The content of packets, as a stream or as bytes, is there only while the user
-//! allows it in the window, and even then without those secrets. Filters run on an index of their
+//! The answers carry no payload, neither the secrets of an HTTP header nor the query of a URL, and
+//! telephone numbers only with their last two digits (see `privacy`). The content of packets, as a
+//! stream or as bytes, is there only while the user allows it in the window, and even then without
+//! those secrets; the voice of a call never leaves the window. Filters run on an index of their
 //! own and hold neither the state nor the index of the window, so a long one does not slow down the
 //! capture or the pages; if the answer comes too late, the work is done for the next question.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashMap};
 use std::path::Path;
 
 use serde::de::DeserializeOwned;
@@ -16,18 +17,22 @@ use sniffnet_packet_parser::Protocol;
 
 use crate::dissect::{self, Field};
 use crate::engine::Engine;
+use crate::engine::analysis::voip::Mark;
 use crate::engine::state::EngineState;
 use crate::mcp::args::{
-    ConnectionsArgs, DEFAULT_PACKETS, FilterHelpArgs, FollowStreamArgs, MAX_FILTER_CHARS,
-    MAX_PACKETS, PacketBytesArgs, PacketDetailArgs, PacketsArgs, StatisticsArgs, StreamDirection,
-    StreamFormat,
+    CallsArgs, ConnectionsArgs, DEFAULT_PACKETS, FilterHelpArgs, FollowStreamArgs,
+    MAX_FILTER_CHARS, MAX_PACKETS, PacketBytesArgs, PacketDetailArgs, PacketsArgs, StatisticsArgs,
+    StreamDirection, StreamFormat,
 };
-use crate::mcp::privacy::{Masker, clean, clean_text, hide_header, hide_query};
+use crate::mcp::privacy::{self, Masker, clean, clean_text, hide_header, hide_query};
 use crate::mcp::protocol::Answer;
 use crate::networking::types::capture_context::CaptureSource;
 use crate::networking::types::data_representation::DataRepr;
 use crate::report::types::sort_type::SortType;
 use crate::view::Jump;
+use crate::view::calls::{
+    CallKey, CallPage, CallRow, FlowRow, Part, Party, Status, StreamRow, call_list, call_page,
+};
 use crate::view::capture::capture_problem;
 use crate::view::connections::{self, ListRequest, connection_list};
 use crate::view::entries::EntryRow;
@@ -51,9 +56,14 @@ pub const STATISTICS: &str = "statistics";
 pub const FILTER_HELP: &str = "filter_help";
 pub const FOLLOW_STREAM: &str = "follow_stream";
 pub const PACKET_BYTES: &str = "packet_bytes";
+pub const CALLS: &str = "calls";
 
 /// Connections in an answer
 const CONNECTIONS_PER_PAGE: usize = 50;
+/// Calls in the list of an answer, the newest first
+const MAX_CALLS: usize = 100;
+const NO_VOICE: &str = "The voice of calls never leaves openpacketmon; the user can listen to a \
+call in the window. Telephone numbers keep only their last two digits.";
 /// Largest answer; the limits of the tools stay well below it
 const MAX_ANSWER_BYTES: usize = 512 * 1024;
 /// With every answer that holds what other devices wrote
@@ -73,7 +83,8 @@ closes.";
 const HEADERS_ONLY: &str = "openpacketmon keeps only the headers of packets (Settings > Packet \
 store), so there is no content to show.";
 const HIDDEN_NOTE: &str = "Values of secret headers (cookies, authorization, tokens, sessions), \
-queries of URLs and passwords after PASS or AUTH are replaced by x. Secrets in other places stay.";
+queries of URLs, passwords after PASS or AUTH, keys of SRTP and the voice of calls are replaced by \
+x; telephone numbers keep only their last two digits. Secrets in other places stay.";
 
 type Reply = Result<Value, String>;
 
@@ -99,6 +110,7 @@ pub fn call(
         PACKET_BYTES => allowed(content)
             .and_then(|()| parse(arguments))
             .and_then(|args| packet_bytes(engine, &args)),
+        CALLS => parse(arguments).and_then(|args| calls(engine, &args)),
         _ => Err("unknown tool".to_owned()),
     };
     finish(reply)
@@ -253,12 +265,22 @@ fn entries(rows: &[EntryRow]) -> Value {
 
 fn overview(engine: &Engine) -> Reply {
     need_capture(engine)?;
-    let page = overview_page(Lang::En, &engine.lock());
-    let totals: Map<String, Value> = page
-        .tiles
-        .into_iter()
-        .map(|tile| (tile.label, tile.value.into()))
-        .collect();
+    let t = Lang::En;
+    let page = overview_page(t, engine);
+    let tiles = &page.tiles;
+    let mut totals: Map<String, Value> = [
+        ("tile-total", &tiles.total),
+        ("tile-in", &tiles.incoming),
+        ("tile-out", &tiles.outgoing),
+        ("tile-connections", &tiles.connections),
+        ("tile-hosts", &tiles.hosts),
+    ]
+    .into_iter()
+    .map(|(label, value)| (t.get(label), value.clone().into()))
+    .collect();
+    if let Some(dropped) = tiles.dropped {
+        totals.insert(t.get("tile-dropped"), format::count(t, dropped).into());
+    }
     let mut answer = json!({
         "totals": totals,
         "top_hosts": entries(&page.hosts),
@@ -373,15 +395,53 @@ fn packet_info(protocol: &str, info: &str) -> String {
     }
 }
 
-fn field(field: &Field) -> Value {
-    let value = match field.name {
-        "Header" => hide_header(&field.value),
-        "Start line" => hide_query(&field.value),
+/// What a layer is, for what its fields must not show
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum LayerKind {
+    /// A SIP message, whose fields are named after its header lines
+    Sip,
+    /// A packet of RTCP, whose source description can hold a number
+    Rtcp,
+    Other,
+}
+
+impl LayerKind {
+    fn of(title: &str) -> Self {
+        if title.starts_with("Session Initiation Protocol") {
+            Self::Sip
+        } else if title.starts_with("Real-time Transport Control Protocol") {
+            Self::Rtcp
+        } else {
+            Self::Other
+        }
+    }
+}
+
+/// A field of a layer
+fn field(field: &Field, kind: LayerKind) -> Value {
+    let value = match (field.name.as_ref(), kind) {
+        ("Header", _) => hide_header(&field.value),
+        ("Start line", _) => hide_query(&field.value),
+        (name, LayerKind::Sip) if privacy::is_secret_name(name) => privacy::HIDDEN.to_owned(),
+        (name, LayerKind::Sip) if privacy::is_address_header(name) => {
+            privacy::hide_address(&field.value)
+        }
+        // the lines of a session description, and the items of one of RTCP
+        ("Phone Number (p)", _) | ("PHONE", LayerKind::Rtcp) => privacy::hide_phone(&field.value),
+        ("Encryption Key (k)", _) => privacy::HIDDEN.to_owned(),
+        ("Session Attribute (a)" | "Media Attribute (a)", _) => {
+            privacy::hide_key_attribute(&field.value)
+        }
+        ("CNAME" | "NAME" | "EMAIL", LayerKind::Rtcp) => privacy::hide_address(&field.value),
         _ => field.value.clone(),
     };
     let mut answer = json!({ "name": field.name, "value": value });
     if !field.children.is_empty() {
-        answer["children"] = field.children.iter().map(self::field).collect();
+        answer["children"] = field
+            .children
+            .iter()
+            .map(|child| self::field(child, kind))
+            .collect();
     }
     answer
 }
@@ -398,9 +458,10 @@ fn packet_detail(engine: &Engine, args: &PacketDetailArgs) -> Reply {
         .layers
         .iter()
         .map(|layer| {
+            let kind = LayerKind::of(&layer.title);
             json!({
                 "title": layer.title,
-                "fields": layer.fields.iter().map(field).collect::<Vec<_>>(),
+                "fields": layer.fields.iter().map(|f| field(f, kind)).collect::<Vec<_>>(),
             })
         })
         .collect();
@@ -420,7 +481,7 @@ fn packet_detail(engine: &Engine, args: &PacketDetailArgs) -> Reply {
         answer["related"] = page
             .related
             .iter()
-            .map(|(label, number)| json!({ "text": label, "number": number }))
+            .map(|r| json!({ "text": r.text(), "number": r.number }))
             .collect();
     }
     Ok(from_network(answer))
@@ -452,9 +513,16 @@ fn statistics(engine: &Engine, index: &FilterIndex, args: &StatisticsArgs) -> Re
         return Err(format!("The filter is not valid: {}", error.message));
     }
     let summary: Map<String, Value> = page
-        .summary
+        .tiles
         .into_iter()
-        .map(|(label, value)| (label, value.into()))
+        .map(|tile| {
+            let value = match tile.unit.as_str() {
+                "" => tile.value,
+                unit if unit.starts_with('/') => format!("{}{unit}", tile.value),
+                unit => format!("{} {unit}", tile.value),
+            };
+            (tile.label, value.into())
+        })
         .collect();
     let hierarchy: Vec<Value> = page
         .hierarchy
@@ -462,11 +530,12 @@ fn statistics(engine: &Engine, index: &FilterIndex, args: &StatisticsArgs) -> Re
         .map(|row| {
             json!({
                 "protocol": row.name,
+                "name": row.long,
                 "depth": row.depth,
                 "packets": row.packets,
-                "packets_share": row.packets_share,
+                "packets_share": row.share,
                 "bytes": row.bytes,
-                "bytes_share": row.bytes_share,
+                "average_rate": row.rate,
             })
         })
         .collect();
@@ -477,7 +546,7 @@ fn statistics(engine: &Engine, index: &FilterIndex, args: &StatisticsArgs) -> Re
             json!({
                 "finding": row.label,
                 "count": row.count,
-                "is_problem": row.problem,
+                "is_problem": row.warn,
                 "filter": jump_filter(row.jump.as_ref()),
             })
         })
@@ -491,7 +560,6 @@ fn statistics(engine: &Engine, index: &FilterIndex, args: &StatisticsArgs) -> Re
                 "count": row.count,
                 "average": row.average,
                 "max": row.max,
-                "filter": jump_filter(row.jump.as_ref()),
             })
         })
         .collect();
@@ -527,7 +595,7 @@ fn text_lines(data: &[u8]) -> Vec<String> {
 fn content_lines(data: &[u8], format: StreamFormat) -> Vec<String> {
     match format {
         StreamFormat::Text => text_lines(data),
-        StreamFormat::Hex => as_hex(data).lines().map(str::to_owned).collect(),
+        StreamFormat::Hex => as_hex(data, 0).lines().map(str::to_owned).collect(),
     }
 }
 
@@ -547,6 +615,14 @@ fn follow_stream(engine: &Engine, args: &FollowStreamArgs) -> Reply {
     let (chunks, counts, cut) =
         assemble(conversation.link_type, &conversation.packets, &client_key);
     let tcp = client_key.protocol == Protocol::Tcp;
+    let marks = if tcp {
+        HashMap::new()
+    } else {
+        media_marks(
+            engine,
+            chunks.iter().filter_map(|c| c.packets.first().copied()),
+        )
+    };
     let offset = args.offset.unwrap_or(0);
     let mut skip = offset;
     let mut room = STREAM_BYTES;
@@ -558,6 +634,10 @@ fn follow_stream(engine: &Engine, args: &FollowStreamArgs) -> Reply {
         if !tcp {
             // every datagram stands alone
             *masker = Masker::new();
+            hide_media(
+                chunk.packets.first().and_then(|n| marks.get(n)),
+                &mut chunk.data,
+            );
         } else if chunk.gap > 0 {
             *masker = Masker::unknown();
         }
@@ -584,7 +664,7 @@ fn follow_stream(engine: &Engine, args: &FollowStreamArgs) -> Reply {
         room -= end - start;
         let mut entry = json!({
             "from": if chunk.client { "client" } else { "server" },
-            "packet": chunk.packet,
+            "packet": chunk.packets.first(),
             "lines": content_lines(&chunk.data[start..end], args.format),
         });
         if chunk.gap > 0 && start == 0 {
@@ -620,6 +700,28 @@ fn follow_stream(engine: &Engine, args: &FollowStreamArgs) -> Reply {
         .into();
     }
     Ok(from_network(answer))
+}
+
+/// What the analysis of calls found about these packets, for what their content must not show
+fn media_marks(engine: &Engine, numbers: impl IntoIterator<Item = u64>) -> HashMap<u64, Mark> {
+    let Some(store) = engine.lock().packets.clone() else {
+        return HashMap::new();
+    };
+    let analysis = store.analysis();
+    numbers
+        .into_iter()
+        .filter_map(|n| Some((n, analysis.get(n)?.voip?)))
+        .collect()
+}
+
+/// The payload of a datagram without the voice of RTP, and with the numbers in the reports of
+/// RTCP cut short: the voice never leaves the window
+fn hide_media(mark: Option<&Mark>, payload: &mut [u8]) {
+    match mark {
+        Some(Mark::Media { rtcp: false, .. } | Mark::Candidate) => privacy::hide_voice(payload),
+        Some(Mark::Media { rtcp: true, .. }) => privacy::hide_in_reports(payload),
+        _ => {}
+    }
 }
 
 /// Where in a line the payload of a TCP segment begins, from the segments of its direction before
@@ -702,6 +804,8 @@ fn packet_bytes(engine: &Engine, args: &PacketBytesArgs) -> Reply {
                 masker_before(&c, args.number, payload.seq)
             })
         } else {
+            let marks = media_marks(engine, [args.number]);
+            hide_media(marks.get(&args.number), &mut data[payload.range.clone()]);
             Masker::new()
         };
         masker.mask(&mut data[payload.range.clone()]);
@@ -720,6 +824,273 @@ fn packet_bytes(engine: &Engine, args: &PacketBytesArgs) -> Reply {
     }
     if shown < data.len() {
         answer["cut"] = format!("Only the first {PACKET_BYTES_SHOWN} bytes are shown.").into();
+    }
+    Ok(from_network(answer))
+}
+
+/// The name of a call in the answers (`sip-3`, `rtp-7`)
+fn call_id(key: CallKey) -> String {
+    match key {
+        CallKey::Sip(n) => format!("sip-{n}"),
+        CallKey::Rtp(n) => format!("rtp-{n}"),
+    }
+}
+
+fn call_key(id: &str) -> Option<CallKey> {
+    let (kind, n) = id.trim().split_once('-')?;
+    let n = n.parse().ok()?;
+    match kind.to_ascii_lowercase().as_str() {
+        "sip" => Some(CallKey::Sip(n)),
+        "rtp" => Some(CallKey::Rtp(n)),
+        _ => None,
+    }
+}
+
+/// A side of a call: over SIP its address, with the number cut short; a stream without SIP has
+/// IP addresses only
+fn party(party: &Party, sip: bool) -> Value {
+    let hide = |text: &str| {
+        if sip {
+            privacy::hide_address(text)
+        } else {
+            text.to_owned()
+        }
+    };
+    let mut answer = json!({ "name": hide(&party.name) });
+    if !party.title.is_empty() && party.title != party.name {
+        answer["address"] = hide(&party.title).into();
+    }
+    if !party.sub.is_empty() && party.sub != party.title {
+        answer["detail"] = hide(&party.sub).into();
+    }
+    answer
+}
+
+fn status(status: &Status) -> Value {
+    json!({ "label": status.label, "detail": status.sub })
+}
+
+fn call_row(row: &CallRow) -> Value {
+    let sip = matches!(row.key, CallKey::Sip(_));
+    let mut answer = json!({
+        "id": call_id(row.key),
+        "state": status(&row.status),
+        "start": row.start,
+        "duration": row.duration,
+        "direction": row.direction,
+        "from": party(&row.from, sip),
+        "to": party(&row.to, sip),
+        "packets": row.packets,
+    });
+    if !row.duration_sub.is_empty() {
+        answer["duration_detail"] = row.duration_sub.clone().into();
+    }
+    if !row.codec.is_empty() {
+        answer["codec"] = row.codec.clone().into();
+    }
+    if let Some(rate) = row.rate {
+        answer["quality"] = rate.label(Lang::En).into();
+        if !row.rate_title.is_empty() {
+            answer["quality_detail"] = row.rate_title.clone().into();
+        }
+    }
+    answer
+}
+
+/// The parts of a value of a call as one text; a gray remark is set off by a dot, as the window
+/// sets it off by its color
+fn parts_text(parts: &[Part]) -> String {
+    let mut text = String::new();
+    for part in parts {
+        let (piece, remark) = match part {
+            Part::Text(t) | Part::Strong(t) | Part::Mono(t) | Part::SmallMono(t) => {
+                (t.clone(), false)
+            }
+            Part::Muted(t) | Part::Running(t) => (t.clone(), true),
+            // the remark before it says that it is a packet
+            Part::Packet(n) => (n.to_string(), false),
+            Part::Packets(_, filter) => (format!("(filter: {filter})"), false),
+            Part::State(status) => (format!("{} ({})", status.label, status.sub), false),
+            Part::Dir(_) => continue,
+        };
+        if piece.is_empty() {
+            continue;
+        }
+        if !text.is_empty() {
+            let starts_word = piece.chars().next().is_some_and(char::is_alphanumeric);
+            text.push_str(if remark && starts_word { " · " } else { " " });
+        }
+        text.push_str(&piece);
+    }
+    text
+}
+
+/// A row of the flow of a call: a SIP message, or the voice as a band
+fn flow_row(row: &FlowRow) -> Value {
+    match row {
+        FlowRow::Message {
+            number,
+            at,
+            clock,
+            label,
+            right,
+            bad,
+            ok,
+        } => {
+            let mut answer = json!({
+                "packet": number,
+                "after": at,
+                "time": clock,
+                "message": label,
+                "direction": if *right { "sent from here" } else { "received here" },
+            });
+            if *bad {
+                answer["failed"] = true.into();
+            }
+            if *ok {
+                answer["answered"] = true.into();
+            }
+            answer
+        }
+        FlowRow::Media {
+            number,
+            at,
+            lead,
+            text,
+            locked,
+            filter,
+        } => {
+            let mut answer = json!({
+                "packet": number,
+                "after": at,
+                "media": format!("{lead} {text}").trim().to_owned(),
+                "filter": filter,
+            });
+            if *locked {
+                answer["content_unreadable"] = true.into();
+            }
+            answer
+        }
+    }
+}
+
+/// A voice stream of a call with its quality
+fn stream_row(s: &StreamRow) -> Value {
+    let mut answer = json!({
+        "direction": s.direction,
+        "path": s.path,
+        "ssrc": s.ssrc,
+        "filter": s.filter,
+        "packets": s.packets,
+        "lost": s.lost.as_ref().map_or_else(|| "0".to_owned(), |(n, p)| format!("{n} {p}")),
+        "max_gap": s.gap,
+        "late": s.late,
+    });
+    if let Some(jitter) = &s.jitter {
+        answer["jitter_mean_max"] = jitter.clone().into();
+    }
+    if let Some(rate) = s.rate {
+        answer["quality"] = rate.label(Lang::En).into();
+        if !s.rate_title.is_empty() {
+            answer["quality_detail"] = s.rate_title.clone().into();
+        }
+    }
+    answer
+}
+
+fn call_detail(key: CallKey, page: &CallPage) -> Value {
+    let t = Lang::En;
+    let address = [t.get("call-f-from"), t.get("call-f-to")];
+    let hide = |text: &str| {
+        if page.sip {
+            privacy::hide_address(text)
+        } else {
+            text.to_owned()
+        }
+    };
+    let facts: Vec<Value> = page
+        .facts
+        .iter()
+        .map(|fact| {
+            let text = parts_text(&fact.parts);
+            let text = if address.contains(&fact.label) {
+                hide(&text)
+            } else {
+                text
+            };
+            json!({ "name": fact.label, "value": text })
+        })
+        .collect();
+    let flow: Vec<Value> = page.flow.rows.iter().map(flow_row).collect();
+    let streams: Vec<Value> = page.streams.iter().map(stream_row).collect();
+    let mut answer = json!({
+        "id": call_id(key),
+        "from": hide(&page.from),
+        "to": hide(&page.to),
+        "state": status(&page.status),
+        "filter": page.filter,
+        "facts": facts,
+        "lanes": page
+            .flow
+            .lanes
+            .iter()
+            .map(|(name, below)| format!("{name} ({below})"))
+            .collect::<Vec<_>>(),
+        "flow": flow,
+        "streams": streams,
+        "rtcp": page.rtcp,
+        "voice": NO_VOICE,
+    });
+    if let Some((lead, text)) = &page.notice {
+        answer["notice"] = format!("{lead} {text}").into();
+    }
+    if let Some((title, text)) = &page.no_streams {
+        answer["no_streams"] = format!("{title} {text}").into();
+    }
+    answer
+}
+
+fn calls(engine: &Engine, args: &CallsArgs) -> Reply {
+    need_capture(engine)?;
+    let t = Lang::En;
+    if let Some(id) = args.call.as_deref().filter(|id| !id.trim().is_empty()) {
+        let unknown = || {
+            format!(
+                "There is no call {}. Find calls with the calls tool without arguments.",
+                id.chars().take(20).collect::<String>()
+            )
+        };
+        let key = call_key(id).ok_or_else(unknown)?;
+        let page = call_page(t, engine, key).ok_or_else(unknown)?;
+        return Ok(from_network(call_detail(key, &page)));
+    }
+    let list = call_list(t, engine);
+    if !list.unavailable.is_empty() {
+        return Err(list.unavailable);
+    }
+    let summary: Vec<Value> = list
+        .tiles
+        .iter()
+        .map(|tile| json!({ "label": tile.label, "value": tile.value, "detail": tile.sub }))
+        .collect();
+    let mut answer = json!({
+        "summary": summary,
+        "total": list.rows.len(),
+        "calls": list.rows.iter().take(MAX_CALLS).map(call_row).collect::<Vec<_>>(),
+        "details": "Ask again with `call` set to an id for the flow, the voice streams and the \
+            filter of the packets of that call.",
+        "voice": NO_VOICE,
+    });
+    if let Some(r) = &list.registration {
+        let mut registration = json!({
+            "account": privacy::hide_address(&r.account),
+            "text": r.text,
+            "packet": r.packet,
+        });
+        if !r.digest.is_empty() {
+            registration["password"] = r.digest.clone().into();
+        }
+        answer["registration"] = registration;
     }
     Ok(from_network(answer))
 }
@@ -990,7 +1361,7 @@ mod tests {
         let fixture = Fixture::capture("statistics", &sample());
         let answer = fixture.ok(STATISTICS, &json!({}));
         let text = answer["protocols"].to_string();
-        assert!(text.contains("\"http\""), "{text}");
+        assert!(text.contains("\"HTTP\""), "{text}");
         assert!(answer["summary"].as_object().is_some_and(|s| !s.is_empty()));
         let error = fixture.error(STATISTICS, &json!({ "filter": "http ==" }));
         assert!(error.starts_with("The filter is not valid"), "{error}");
@@ -1290,6 +1661,273 @@ mod tests {
         assert_eq!(first, second);
     }
 
+    const PHONE: [u8; 4] = [192, 168, 1, 20];
+    const PBX: [u8; 4] = [192, 0, 2, 10];
+    /// Pieces of the numbers of [`voip_sample`], none of which may leave the window
+    const NUMBER_PIECES: [&str; 6] = ["2468", "0135", "4930", "9753", "1086", "4940"];
+
+    /// An SDES packet of RTCP with a PHONE item
+    fn sdes_phone(ssrc: u32, phone: &str) -> Vec<u8> {
+        let mut chunk = ssrc.to_be_bytes().to_vec();
+        chunk.extend([4, u8::try_from(phone.len()).unwrap()]);
+        chunk.extend_from_slice(phone.as_bytes());
+        chunk.push(0);
+        while chunk.len() % 4 != 0 {
+            chunk.push(0);
+        }
+        let mut m = vec![0x81, 202];
+        m.extend_from_slice(&u16::try_from(chunk.len() / 4).unwrap().to_be_bytes());
+        m.extend(chunk);
+        m
+    }
+
+    /// A call from +49 30 2468013579 to +49 40 9753108642 over SIP, with the numbers in every
+    /// place SIP and RTCP have for them, a key of SRTP, and voice both ways
+    fn voip_sample() -> Vec<(u32, Vec<u8>)> {
+        use crate::dissect::tests::{rtcp_report, rtp_bytes, sdp_offer, sip_message, udp_between};
+
+        let from = "\"+49 30 2468013579\" <sip:+49302468013579@sip.example.net>;tag=1";
+        let to = "<tel:+49-40-9753108642>";
+        let to_tag = "<tel:+49-40-9753108642>;tag=2";
+        let id = "c4ll@192.168.1.20";
+        let offer = sdp_offer("192.168.1.20", 40_000, &[8])
+            .replace("s=-\r\n", "s=-\r\np=+49 30 2468013579\r\n")
+            + "a=crypto:1 AES_CM_128_HMAC_SHA1_80 inline:SECRETKEY\r\n";
+        let answer = sdp_offer("192.0.2.10", 30_000, &[8]);
+        let invite = sip_message(
+            "INVITE sip:+49409753108642@sip.example.net SIP/2.0",
+            &[
+                ("Via", "SIP/2.0/UDP 192.168.1.20:5060;branch=z9hG4bK1"),
+                ("From", from),
+                ("To", to),
+                ("Call-ID", id),
+                ("CSeq", "1 INVITE"),
+                ("Contact", "<sip:+49302468013579@192.168.1.20:5060>"),
+                ("P-Asserted-Identity", "<tel:+49302468013579>"),
+                (
+                    "Proxy-Authorization",
+                    "Digest username=\"49302468013579\", response=\"SECRETDIGEST\"",
+                ),
+                ("Identity", "SECRETIDENTITY49302468013579"),
+            ],
+            Some(&offer),
+        );
+        let ok = |cseq: &str, sdp: Option<&str>| {
+            sip_message(
+                "SIP/2.0 200 OK",
+                &[
+                    ("Via", "SIP/2.0/UDP 192.168.1.20:5060;branch=z9hG4bK1"),
+                    ("From", from),
+                    ("To", to_tag),
+                    ("Call-ID", id),
+                    ("CSeq", cseq),
+                    ("Contact", "<sip:+49409753108642@192.0.2.10>"),
+                ],
+                sdp,
+            )
+        };
+        let request = |first: &str, cseq: &str| {
+            sip_message(
+                first,
+                &[
+                    ("Via", "SIP/2.0/UDP 192.168.1.20:5060;branch=z9hG4bK2"),
+                    ("From", from),
+                    ("To", to_tag),
+                    ("Call-ID", id),
+                    ("CSeq", cseq),
+                ],
+                None,
+            )
+        };
+        let sip_out = |m: &[u8]| udp_between(PHONE, 5_060, PBX, 5_060, m);
+        let sip_in = |m: &[u8]| udp_between(PBX, 5_060, PHONE, 5_060, m);
+        let mut packets = vec![
+            (1, sip_out(&invite)),
+            (2, sip_in(&ok("1 INVITE", Some(&answer)))),
+            (
+                2,
+                sip_out(&request(
+                    "ACK sip:+49409753108642@192.0.2.10 SIP/2.0",
+                    "1 ACK",
+                )),
+            ),
+        ];
+        for seq in 1..=3_u16 {
+            let ts = u32::from(seq) * 160;
+            let secs = 2 + u32::from(seq);
+            packets.push((
+                secs,
+                udp_between(
+                    PHONE,
+                    40_000,
+                    PBX,
+                    30_000,
+                    &rtp_bytes(8, seq, ts, 7, seq == 1, 160),
+                ),
+            ));
+            packets.push((
+                secs,
+                udp_between(
+                    PBX,
+                    30_000,
+                    PHONE,
+                    40_000,
+                    &rtp_bytes(8, seq, ts, 9, seq == 1, 160),
+                ),
+            ));
+        }
+        let mut report = rtcp_report(7, 9, "49302468013579@192.168.1.20");
+        report.extend(sdes_phone(7, "+49 30 2468013579"));
+        packets.push((6, udp_between(PHONE, 40_001, PBX, 30_001, &report)));
+        packets.push((
+            8,
+            sip_out(&request(
+                "BYE sip:+49409753108642@192.0.2.10 SIP/2.0",
+                "2 BYE",
+            )),
+        ));
+        packets.push((8, sip_in(&ok("2 BYE", None))));
+        packets
+    }
+
+    #[test]
+    fn no_answer_carries_a_whole_number_or_the_voice() {
+        let mut fixture = Fixture::capture("voip", &voip_sample());
+        fixture.content = true;
+        let list = fixture.ok(CALLS, &json!({}));
+        let mut answers = vec![
+            fixture.ok(OVERVIEW, &json!({})),
+            fixture.ok(CONNECTIONS, &json!({})),
+            fixture.ok(PACKETS, &json!({})),
+            fixture.ok(STATISTICS, &json!({})),
+            list.clone(),
+        ];
+        for number in 1..=12 {
+            answers.push(fixture.ok(PACKET_DETAIL, &json!({ "number": number })));
+        }
+        for row in list["calls"].as_array().unwrap() {
+            answers.push(fixture.ok(CALLS, &json!({ "call": row["id"] })));
+        }
+        for number in [1, 4, 10] {
+            answers.push(fixture.ok(FOLLOW_STREAM, &json!({ "number": number })));
+        }
+        let all = answers
+            .iter()
+            .map(Value::to_string)
+            .collect::<Vec<_>>()
+            .join("\n");
+        for piece in NUMBER_PIECES {
+            assert!(!all.contains(piece), "{piece}: {all}");
+        }
+        assert!(!all.contains("SECRET"), "{all}");
+        // what stays: the last two digits, the names and the domains
+        assert!(all.contains("\"+xx xx xxxxxxxx79\""), "{all}");
+        assert!(all.contains("sip:+xxxxxxxxxxxx79@sip.example.net"), "{all}");
+        assert!(all.contains("+xx-xx-xxxxxxxx42"), "{all}");
+        assert!(all.contains("p=+xx xx xxxxxxxx79") || all.contains("\"+xx xx xxxxxxxx79\""));
+        assert!(all.contains("crypto:[hidden]"), "{all}");
+        assert!(all.contains("Proxy-Authorization"), "{all}");
+
+        for number in 1..=12 {
+            let answer = fixture.ok(PACKET_BYTES, &json!({ "number": number }));
+            let bytes = bytes_of(&answer["lines"]);
+            for piece in NUMBER_PIECES.iter().chain(&["SECRET"]) {
+                assert!(!contains(&bytes, piece), "{number}: {piece}");
+            }
+        }
+        // the voice: the header of RTP stays, its payload is gone
+        let rtp = fixture.ok(PACKET_BYTES, &json!({ "number": 4 }));
+        let bytes = bytes_of(&rtp["lines"]);
+        let start = usize::try_from(rtp["payload_starts_at"].as_u64().unwrap()).unwrap();
+        assert_eq!(bytes[start], 0x80);
+        assert!(bytes[start + 12..].iter().all(|b| *b == b'x'));
+        let stream = fixture.ok(FOLLOW_STREAM, &json!({ "number": 4, "format": "hex" }));
+        let chunks = stream["chunks"].as_array().unwrap();
+        assert_eq!(chunks.len(), 6);
+        for chunk in chunks {
+            let bytes = bytes_of(&chunk["lines"]);
+            assert_eq!(bytes.len(), 12 + 160);
+            assert!(bytes[12..].iter().all(|b| *b == b'x'), "{chunk}");
+        }
+    }
+
+    #[test]
+    fn a_filter_cannot_find_out_a_number() {
+        let fixture = Fixture::capture("voip-oracle", &voip_sample());
+        let count = |filter: &str| {
+            fixture.ok(PACKETS, &json!({ "filter": filter }))["total_matching"]
+                .as_u64()
+                .unwrap()
+        };
+        // what the answers show can be found
+        assert_eq!(count("sip.from contains \"79@sip.example.net\""), 5);
+        assert_eq!(count("sip.to contains \"42\""), 5);
+        for guess in [
+            "sip.from contains \"2468\"",
+            "sip.from contains \"+4930\"",
+            "sip.to contains \"9753\"",
+            "sip.to == \"<tel:+49-40-9753108642>\"",
+        ] {
+            assert_eq!(count(guess), 0, "{guess}");
+        }
+    }
+
+    #[test]
+    fn calls_are_listed_and_described_without_their_voice() {
+        let calls = crate::view::calls::tests::engine_with_calls();
+        let index = FilterIndex::with_values(privacy::hide_in_values);
+        let ask = |arguments: &Value| call(&calls.engine, &index, false, CALLS, arguments);
+        let Answer::Ok(list) = ask(&json!({})) else {
+            panic!("no list")
+        };
+        let rows = list["calls"].as_array().unwrap();
+        assert_eq!(list["total"], rows.len());
+        assert!(rows.len() >= 5, "{list}");
+        assert!(list["note"].is_string() && list["voice"].is_string());
+        assert!(!list["summary"].as_array().unwrap().is_empty());
+        assert!(
+            rows.iter().any(|r| r["from"]["name"] == "Anna Beispiel"
+                || r["to"]["name"] == "Anna Beispiel"),
+            "{list}"
+        );
+        assert!(list["registration"]["account"].is_string(), "{list}");
+        let mut streams = 0;
+        for row in rows {
+            let id = row["id"].as_str().unwrap();
+            assert!(id.starts_with("sip-") || id.starts_with("rtp-"), "{id}");
+            let Answer::Ok(detail) = ask(&json!({ "call": id })) else {
+                panic!("{id}")
+            };
+            assert_eq!(detail["id"], id);
+            let filter = detail["filter"].as_str().unwrap();
+            assert!(
+                filter.starts_with("voip.call_id == ") || filter.starts_with("rtp.ssrc "),
+                "{filter}"
+            );
+            assert!(!detail["facts"].as_array().unwrap().is_empty(), "{detail}");
+            assert!(!detail["flow"].as_array().unwrap().is_empty(), "{detail}");
+            for stream in detail["streams"].as_array().unwrap() {
+                streams += 1;
+                assert!(
+                    stream["filter"]
+                        .as_str()
+                        .unwrap()
+                        .starts_with("rtp.ssrc == ")
+                );
+                assert!(stream["quality"].is_string(), "{stream}");
+            }
+            // the voice stays in the window
+            assert!(detail["listen"].is_null() && detail["audio"].is_null());
+        }
+        assert!(streams > 0);
+        for wrong in ["sip-999999", "nonsense", "tcp-1", "sip-"] {
+            let Answer::Error(text) = ask(&json!({ "call": wrong })) else {
+                panic!("{wrong}")
+            };
+            assert!(text.starts_with("There is no call"), "{text}");
+        }
+    }
+
     /// Every tool with random arguments over garbled packets, with and without the content of
     /// packets: an answer or an error, never a panic, and a size the assistant can take. A secret
     /// in a connection of its own stays hidden throughout.
@@ -1301,7 +1939,8 @@ mod tests {
         use crate::dissect::tests::{tcp_packet, udp_packet};
         use crate::fuzz::{iterations, mutate, random_filter, rng, samples};
 
-        const TOOLS: [&str; 10] = [
+        const TOOLS: [&str; 11] = [
+            CALLS,
             CAPTURE_STATUS,
             OVERVIEW,
             CONNECTIONS,
@@ -1313,7 +1952,8 @@ mod tests {
             PACKET_BYTES,
             "no_such_tool",
         ];
-        const KEYS: [&str; 10] = [
+        const KEYS: [&str; 11] = [
+            "call",
             "filter",
             "connection_filter",
             "offset",
@@ -1338,7 +1978,9 @@ mod tests {
                 4 => json!(u64::MAX),
                 5 => json!(rng.random::<f64>() * 1e300),
                 6 => json!(
-                    ["text", "hex", "both", "client", "server", "", "TEXT"][rng.random_range(0..7)]
+                    [
+                        "text", "hex", "both", "client", "server", "", "TEXT", "sip-0", "rtp-1"
+                    ][rng.random_range(0..9)]
                 ),
                 7 => json!("x".repeat(rng.random_range(900..1200))),
                 8 if depth < 3 => json!([value(rng, depth + 1), value(rng, depth + 1)]),

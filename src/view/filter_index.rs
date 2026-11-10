@@ -11,7 +11,8 @@ use std::sync::{Mutex, PoisonError};
 use std::time::{Duration, Instant};
 
 use crate::dissect::Dissection;
-use crate::engine::analysis;
+use crate::engine::analysis::voip::Mark;
+use crate::engine::analysis::{self, Note};
 use crate::engine::packets::SharedPacketStore;
 use crate::filter::Filter;
 use crate::networking::types::address_port_pair::AddressPortPair;
@@ -21,9 +22,11 @@ use crate::view::packets::{FOLLOWUP_PACKETS, dissect_following, filter_packet};
 const ENTRIES: usize = 6;
 /// Packets dissected per lock of the store
 const CHUNK: usize = 2048;
-/// How long a message split over TCP segments waits for its next segment before the packet is
-/// judged without it
+/// How long a message split over TCP segments waits for its next segment, or a datagram with the
+/// form of RTP for its flow to be decided, before the packet is judged without
 const PENDING: Duration = Duration::from_secs(1);
+/// How far the analysis looks ahead for the flow of a datagram with the form of RTP
+const LOOKAHEAD: u64 = 20_000;
 
 pub struct FilterIndex {
     entries: Mutex<Vec<Entry>>,
@@ -188,18 +191,30 @@ fn update(
         let judged = chunk.len().min(CHUNK);
         for (i, packet) in chunk.iter().take(judged).enumerate() {
             let mut dissected = dissect_following(link_type, packet, chunk[i + 1..].iter());
-            if let Some(record) = store.analysis().feed(packet, &dissected.d) {
-                analysis::annotate(&record, &mut dissected.d);
+            let mut note = store.analysis().feed(packet, &dissected.d);
+            let undecided = |note: &Option<Note>| {
+                note.as_ref()
+                    .is_some_and(|n| n.record.voip == Some(Mark::Candidate))
+            };
+            if undecided(&note) {
+                // the flow may still turn out to be RTP: the analysis looks further ahead
+                analysis::advance(store, packet.number.saturating_add(LOOKAHEAD).min(last));
+                note = store.analysis().note(packet.number);
             }
-            if dissected.d.followup.is_some()
+            if let Some(note) = &note {
+                analysis::annotate(note, &packet.data, &mut dissected.d);
+            }
+            let waits = dissected.d.followup.is_some()
                 && last - packet.number < FOLLOWUP_PACKETS as u64
+                || undecided(&note) && last - packet.number < LOOKAHEAD;
+            if waits
                 && entry
                     .pending_since
                     .get_or_insert_with(Instant::now)
                     .elapsed()
                     < PENDING
             {
-                // the rest of the message may still come
+                // the rest of the message may still come, or the flow be decided
                 return;
             }
             entry.pending_since = None;

@@ -8,19 +8,62 @@ use semver::Version;
 use serde::Deserialize;
 use std::time::Duration;
 
+/// Longest release notes kept; they are text from the network
+const MAX_NOTES: usize = 20_000;
+
 /// Result of the check for a newer release
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub enum UpdateStatus {
     #[default]
     Unknown,
     InProgress,
-    UpToDate,
-    UpdateAvailable(String),
+    UpToDate(Release),
+    UpdateAvailable(Release),
+}
+
+impl UpdateStatus {
+    /// The latest release, once the check found it
+    pub fn release(&self) -> Option<&Release> {
+        match self {
+            Self::UpToDate(release) | Self::UpdateAvailable(release) => Some(release),
+            Self::Unknown | Self::InProgress => None,
+        }
+    }
+}
+
+/// The latest release on GitHub, as the check saw it
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Release {
+    /// Version without the leading `v`
+    pub version: String,
+    /// When it was published
+    pub published: Option<jiff::Timestamp>,
+    /// The release notes (Markdown, as written on GitHub), cut to a sane length
+    pub notes: String,
+    /// When the check asked GitHub
+    pub checked: jiff::Timestamp,
 }
 
 #[derive(Deserialize, Debug)]
 struct AppVersion {
     name: String,
+    #[serde(default)]
+    body: Option<String>,
+    #[serde(default)]
+    published_at: Option<String>,
+}
+
+/// The release notes, at most [`MAX_NOTES`] bytes and cut at a character
+fn notes(body: Option<String>) -> String {
+    let mut notes = body.unwrap_or_default().replace("\r\n", "\n");
+    if notes.len() > MAX_NOTES {
+        let mut end = MAX_NOTES;
+        while !notes.is_char_boundary(end) {
+            end -= 1;
+        }
+        notes.truncate(end);
+    }
+    notes
 }
 
 /// Checks whether a newer release of openpacketmon is available on GitHub
@@ -63,23 +106,27 @@ async fn is_newer_release_available_inner(
             println!("JSON result: {result_json:?}\n");
         }
 
-        let mut latest_version = result_json
-            .unwrap_or_else(|_| AppVersion {
-                name: String::from(":-("),
-            })
-            .name;
-        latest_version = latest_version.trim().to_string();
-
+        let latest = result_json.unwrap_or_else(|_| AppVersion {
+            name: String::from(":-("),
+            body: None,
+            published_at: None,
+        });
         // release name sample: v1.2.3
-        let stripped = latest_version.trim_start_matches('v');
+        let stripped = latest.name.trim().trim_start_matches('v').to_owned();
 
         if let (Ok(latest_semver), Ok(current_semver)) =
-            (Version::parse(stripped), Version::parse(APP_VERSION))
+            (Version::parse(&stripped), Version::parse(APP_VERSION))
         {
+            let release = Release {
+                version: stripped,
+                published: latest.published_at.and_then(|at| at.parse().ok()),
+                notes: notes(latest.body),
+                checked: jiff::Timestamp::now(),
+            };
             return if latest_semver > current_semver {
-                UpdateStatus::UpdateAvailable(stripped.to_string())
+                UpdateStatus::UpdateAvailable(release)
             } else {
-                UpdateStatus::UpToDate
+                UpdateStatus::UpToDate(release)
             };
         }
     }
@@ -108,7 +155,17 @@ mod tests {
         let result = is_newer_release_available_inner(6, 2).await;
         assert_matches!(
             result,
-            UpdateStatus::UpToDate | UpdateStatus::UpdateAvailable(_)
+            UpdateStatus::UpToDate(_) | UpdateStatus::UpdateAvailable(_)
         );
+    }
+
+    #[test]
+    fn long_notes_are_cut_at_a_character() {
+        let long = "ä".repeat(MAX_NOTES);
+        let cut = notes(Some(long));
+        assert!(cut.len() <= MAX_NOTES);
+        assert!(cut.chars().all(|c| c == 'ä'));
+        assert_eq!(notes(Some("a\r\nb".to_owned())), "a\nb");
+        assert_eq!(notes(None), "");
     }
 }

@@ -9,9 +9,16 @@ use rand::rngs::StdRng;
 use rand::{Rng, SeedableRng};
 use sniffnet_packet_parser::LinkType;
 
-use crate::dissect::tests::{ETH, client_hello, dhcp_message, dns_query, tcp_packet, udp_packet};
+use crate::dissect::rtp::MediaNote;
+use crate::dissect::tests::{
+    ETH, client_hello, dhcp_message, dns_query, rtcp_report, rtp_bytes, sdp_offer, sip_message,
+    tcp_packet, udp_between, udp_packet,
+};
 use crate::dissect::{Dissection, dissect, dissect_with, transport_payload};
+use crate::engine::analysis::{Analysis, annotate};
+use crate::engine::packets::StoredPacket;
 use crate::filter::{CONNECTION_FIELDS, FIELDS, Filter, MAX_LEN, PROTOCOLS, Packet};
+use crate::utils::types::timestamp::Timestamp;
 
 pub fn iterations(default: usize) -> usize {
     std::env::var("FUZZ_ITERATIONS")
@@ -82,7 +89,30 @@ pub fn samples() -> Vec<(u16, bool, Vec<u8>)> {
         ),
         (123, false, ntp),
         (443, false, quic),
+        (5060, false, invite()),
+        (
+            5060,
+            true,
+            b"SIP/2.0 180 Ringing\r\ni: a@example.net\r\nCSeq: 1 INVITE\r\nl: 0\r\n\r\n".to_vec(),
+        ),
     ]
+}
+
+/// A SIP INVITE with a session description
+fn invite() -> Vec<u8> {
+    let mut sdp = sdp_offer("192.0.2.20", 7078, &[8, 0, 101, 111]);
+    sdp.push_str("a=rtcp:9000 IN IP4 192.0.2.20\r\na=rtcp-mux\r\nm=video 0 RTP/SAVPF 96\r\n");
+    sip_message(
+        "INVITE sip:support@example.com SIP/2.0",
+        &[
+            ("Via", "SIP/2.0/UDP 192.0.2.20:5060;branch=z9hG4bK1"),
+            ("From", "\"Anna\" <sip:anna@sip.example.net>;tag=1"),
+            ("To", "<sip:support@example.com>"),
+            ("Call-ID", "fuzz@192.0.2.20"),
+            ("CSeq", "1 INVITE"),
+        ],
+        Some(&sdp),
+    )
 }
 
 /// Changes a few bytes, ranges or length fields of `data`
@@ -227,6 +257,58 @@ fn fuzz_dissectors_with_garbled_packets() {
             let _ = f.matches(&p);
         }
         let _ = crate::filter::color(&p);
+    }
+}
+
+#[test]
+fn fuzz_rtp_rtcp_and_the_analysis_of_calls() {
+    let mut rng = rng();
+    let samples = [
+        rtp_bytes(8, 1, 160, 7, true, 160),
+        rtcp_report(1, 2, "anna@example.net"),
+        invite(),
+    ];
+    let formats = [
+        (8, "PCMA/8000".to_owned()),
+        (111, "opus/48000/2".to_owned()),
+    ];
+    let mut analysis = Analysis::default();
+    let mut time = 0;
+    for n in 1..=iterations(20_000) as u64 {
+        let mut payload = samples[rng.random_range(0..samples.len())].clone();
+        if rng.random_ratio(3, 4) {
+            mutate(&mut rng, &mut payload);
+        }
+        let ports = [5060, 7078, 7079, 9000, 40_000, 40_001];
+        let sport = ports[rng.random_range(0..ports.len())];
+        let dport = ports[rng.random_range(0..ports.len())];
+        let packet = udp_between([192, 0, 2, 20], sport, [203, 0, 113, 61], dport, &payload);
+        // read as RTP and as RTCP, whatever it is
+        for rtcp in [false, true] {
+            let mut d = dissect(&packet, ETH);
+            let note = MediaNote {
+                rtcp,
+                formats: &formats,
+                srtp: rng.random(),
+                clock: Some(8000),
+            };
+            crate::dissect::media(&packet, &mut d, &note);
+            check(&d, &packet, ETH);
+        }
+        // and as the analysis finds it
+        time += rng.random_range(0..40_000);
+        let stored = StoredPacket {
+            number: n,
+            timestamp: Timestamp::new(1000 + time / 1_000_000, time % 1_000_000),
+            orig_len: u32::try_from(packet.len()).unwrap(),
+            data: packet.clone().into(),
+            conn: None,
+        };
+        let mut d = dissect(&packet, ETH);
+        if let Some(note) = analysis.feed(&stored, &d) {
+            annotate(&note, &packet, &mut d);
+            check(&d, &packet, ETH);
+        }
     }
 }
 

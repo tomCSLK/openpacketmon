@@ -97,6 +97,7 @@ pub struct EngineState {
 
 impl EngineState {
     pub fn new(conf: Conf) -> Self {
+        conf.settings.calls.apply();
         let capture_source = CaptureSource::from_conf(&conf);
         let previews = pcap::Device::list()
             .unwrap_or_default()
@@ -321,7 +322,12 @@ impl EngineState {
                 | CaptureContext::LiveWithSavefile(_)
                 | CaptureContext::Offline(_),
             ) if self.conf.packet_store.enabled => {
-                Some(SharedPacketStore::new(self.conf.packet_store, link_type))
+                let interface = matches!(self.capture_source, CaptureSource::Device(_))
+                    .then(|| self.capture_source.display_name());
+                Some(
+                    SharedPacketStore::new(self.conf.packet_store, link_type)
+                        .with_interface(interface),
+                )
             }
             _ => None,
         };
@@ -538,6 +544,7 @@ impl EngineState {
         Vec<(&AddressPortPair, &InfoAddressPortPair)>,
         usize,
         DataInfo,
+        u128,
     ) {
         let mut agglomerate = DataInfo::default();
         let mut values = Vec::new();
@@ -557,11 +564,16 @@ impl EngineState {
         all_results.sort_by(|&(_, a), &(_, b)| a.compare(b, sort_type, data_repr));
 
         let tot = all_results.len();
+        let largest = all_results
+            .iter()
+            .map(|(_, v)| v.transmitted_data(data_repr))
+            .max()
+            .unwrap_or(0);
         let start = page.saturating_sub(1).saturating_mul(page_size).min(tot);
         let end = start.saturating_add(page_size).min(tot);
         all_results.truncate(end);
         all_results.drain(..start);
-        (all_results, tot, agglomerate)
+        (all_results, tot, agglomerate, largest)
     }
 
     /// The connections the filter selects

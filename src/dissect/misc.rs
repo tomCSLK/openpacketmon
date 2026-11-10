@@ -8,7 +8,8 @@ use super::{Dissection, Field, hex_bytes, ipv4_at, text, u8_at, u32_at};
 /// Seconds from 1900 (NTP era 0) to 1970
 const NTP_UNIX_OFFSET: i64 = 2_208_988_800;
 
-fn ntp_time(data: &[u8], at: usize) -> String {
+/// An NTP timestamp (seconds since 1900 and their fraction) at `at`, as a time in UTC
+pub(super) fn ntp_time(data: &[u8], at: usize) -> String {
     let (Some(secs), Some(frac)) = (u32_at(data, at), u32_at(data, at + 4)) else {
         return String::new();
     };

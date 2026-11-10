@@ -10,12 +10,14 @@ use eframe::egui::{
 };
 
 use crate::engine::Engine;
+use crate::gui::icons;
 use crate::gui::load::Loader;
-use crate::gui::theme::palette;
-use crate::gui::widgets;
+use crate::gui::theme::{self, palette};
+use crate::gui::widgets::{self, Kind};
 use crate::view::i18n::Lang;
 use crate::view::packets::filter_problem;
 use crate::view::suggest::{Catalog, Expect, Line, catalog, lines, position, value_rows};
+use eframe::egui::emath::GuiRounding as _;
 
 /// A filter field with what it remembers
 #[derive(Default)]
@@ -39,15 +41,12 @@ pub struct FilterField {
     dismissed: bool,
     /// What is wrong with the text
     problem: Option<(String, Option<String>)>,
-}
-
-/// The widths of the buttons behind a filter field
-pub fn button_widths(ui: &Ui, t: Lang, reset: bool) -> Vec<f32> {
-    let mut widths = vec![widgets::button_width(ui, &t.get("apply"))];
-    if reset {
-        widths.push(widgets::button_width(ui, &t.get("filter-reset")));
-    }
-    widths
+    /// The head of the list: what the lines are
+    head: String,
+    /// The help below the toolbar is open
+    help_open: bool,
+    /// A filter with a mistake was applied: the mistake shows below the toolbar
+    error_open: bool,
 }
 
 /// What happened to the field in this frame
@@ -108,6 +107,14 @@ impl FilterField {
             shown.clear();
         }
         let wants_value = matches!(place.expect, Expect::Value | Expect::Set);
+        self.head = match place.expect {
+            Expect::Term if self.text.trim().is_empty() => t.get("sugg-common"),
+            Expect::Term => t.get("sugg-terms"),
+            Expect::Operator => t.get("sugg-compare"),
+            Expect::Value | Expect::Set => t.get("sugg-value"),
+            Expect::Next => t.get("sugg-join"),
+            Expect::Brace => String::new(),
+        };
         self.note = place
             .field
             .filter(|_| wants_value)
@@ -150,16 +157,136 @@ impl FilterField {
         at
     }
 
-    /// Draws the field; `state` colors its frame: valid or not, `None` when it is empty
-    #[allow(clippy::too_many_arguments)] // what one filter field differs in
-    pub fn show(
+    /// The toolbar of a filter (`.toolbar` with `.ffield`, the help button and "Apply"). A filter
+    /// with a mistake is not applied: its mistake shows below the toolbar.
+    pub fn bar(
         &mut self,
         ui: &mut Ui,
         t: Lang,
         engine: &Engine,
         connections: bool,
         placeholder: &str,
-        valid: Option<bool>,
+        help: &str,
+    ) -> Outcome {
+        self.bar_with(ui, t, engine, connections, placeholder, help, 0.0, |_| {})
+    }
+
+    /// [`Self::bar`] with more after "Apply" that is `after_width` wide (the field to go to a
+    /// packet)
+    #[allow(clippy::too_many_arguments)]
+    pub fn bar_with(
+        &mut self,
+        ui: &mut Ui,
+        t: Lang,
+        engine: &Engine,
+        connections: bool,
+        placeholder: &str,
+        help: &str,
+        after_width: f32,
+        after: impl FnOnce(&mut Ui),
+    ) -> Outcome {
+        let mut outcome = Outcome::default();
+        widgets::toolbar(ui, |ui| {
+            let apply = t.get("apply");
+            let mut beside = widgets::button_width(ui, &apply) + theme::CTL_H + 2.0 * theme::SP2;
+            if after_width > 0.0 {
+                beside += after_width + theme::SP2;
+            }
+            let width = (ui.available_width() - beside).max(240.0);
+            let field = self.field(ui, t, engine, connections, placeholder, width);
+            if widgets::iconbtn(ui, icons::HELP, help, self.help_open, false)
+                .on_hover_text(help)
+                .clicked()
+            {
+                self.help_open = !self.help_open;
+            }
+            let clicked = widgets::button(ui, apply, Kind::Primary).clicked();
+            outcome.apply = field.apply || clicked;
+            after(ui);
+        });
+        if outcome.apply && self.problem(t, connections).is_some() {
+            self.error_open = true;
+            outcome.apply = false;
+        }
+        outcome
+    }
+
+    /// Below the toolbar: the mistake of a filter that was not applied (`.ferr`) and the help
+    /// (`.helppop`) with its examples and `more`; returns the example clicked
+    pub fn extras(
+        &mut self,
+        ui: &mut Ui,
+        t: Lang,
+        connections: bool,
+        text: &str,
+        examples: &[&str],
+        more: impl FnOnce(&mut Ui),
+    ) -> Option<String> {
+        let p = palette(ui.ctx());
+        let problem = self.problem(t, connections).map(str::to_owned);
+        if problem.is_none() {
+            self.error_open = false;
+        }
+        if self.error_open
+            && let Some(problem) = problem
+        {
+            Frame::new()
+                .fill(p.err_bg)
+                .inner_margin(Margin::symmetric(theme::SP3 as i8, 6))
+                .show(ui, |ui| {
+                    ui.set_width(ui.available_width());
+                    ui.horizontal(|ui| {
+                        ui.spacing_mut().item_spacing.x = 6.0;
+                        let (rect, _) =
+                            ui.allocate_exact_size(egui::vec2(14.0, 14.0), Sense::hover());
+                        widgets::paint_icon(ui, icons::X_CIRCLE, rect, p.err);
+                        ui.add(egui::Label::new(widgets::small(&problem).color(p.err)).wrap());
+                    });
+                });
+            widgets::rule(ui);
+        }
+        let mut clicked = None;
+        if self.help_open {
+            Frame::new()
+                .fill(p.surface_2)
+                .inner_margin(Margin::symmetric(theme::SP4 as i8, theme::SP3 as i8))
+                .show(ui, |ui| {
+                    ui.set_width(ui.available_width());
+                    ui.spacing_mut().item_spacing.y = theme::SP2;
+                    ui.add(
+                        egui::Label::new(
+                            widgets::small(text)
+                                .color(p.text_2)
+                                .line_height(Some(theme::FS_SM * 1.45)),
+                        )
+                        .wrap(),
+                    );
+                    // rows as high as the examples (24 px), not as other controls
+                    ui.spacing_mut().interact_size.y = 24.0;
+                    ui.horizontal_wrapped(|ui| {
+                        ui.spacing_mut().item_spacing = egui::vec2(6.0, 6.0);
+                        for example in examples {
+                            if example_button(ui, example).clicked() {
+                                clicked = Some((*example).to_owned());
+                            }
+                        }
+                    });
+                    more(ui);
+                });
+            widgets::rule(ui);
+        }
+        clicked
+    }
+
+    /// The field itself (`.ffield`): the filter icon at the left, the text in the font of code,
+    /// a button to empty it at the right; green when the filter is right, red when not
+    fn field(
+        &mut self,
+        ui: &mut Ui,
+        t: Lang,
+        engine: &Engine,
+        connections: bool,
+        placeholder: &str,
         width: f32,
     ) -> Outcome {
         let p = palette(ui.ctx());
@@ -195,22 +322,87 @@ impl FilterField {
             });
         }
 
+        let (rect, _) = ui.allocate_exact_size(egui::vec2(width, theme::CTL_H), Sense::hover());
+        let valid = (!self.text.trim().is_empty()).then(|| self.problem(t, connections).is_none());
+        let (fill, line, ring, focus_line) = match valid {
+            Some(true) => (p.ok_bg, p.ok_line, p.ok_bg, p.ok),
+            Some(false) => (p.err_bg, p.err_line, p.err_bg, p.err),
+            None => (p.surface, p.border_strong, p.accent_bg, p.accent),
+        };
+        let radius = CornerRadius::same(theme::RADIUS);
+        if focused {
+            ui.painter().rect_filled(
+                rect.expand(3.0),
+                CornerRadius::same(theme::RADIUS + 3),
+                ring,
+            );
+        }
+        ui.painter().rect(
+            rect,
+            radius,
+            fill,
+            Stroke::new(1.0, if focused { focus_line } else { line }),
+            egui::StrokeKind::Inside,
+        );
+        let icon = egui::Rect::from_center_size(
+            egui::pos2(rect.left() + 10.0 + 8.0, rect.center().y),
+            egui::vec2(16.0, 16.0),
+        );
+        widgets::paint_icon(ui, icons::FILTER, icon, p.text_3);
+        // the text in a line of its own height in the middle; children leave the cursor of the
+        // toolbar where the field ends
+        let line_h = (theme::FS_BASE * 1.45).round();
+        let text_rect = egui::Rect::from_min_max(
+            egui::pos2(rect.left() + 32.0, rect.center().y - line_h / 2.0),
+            egui::pos2(rect.right() - 34.0, rect.center().y + line_h / 2.0),
+        );
+        let mut inner = ui.new_child(
+            egui::UiBuilder::new()
+                .max_rect(text_rect)
+                .layout(egui::Layout::left_to_right(egui::Align::Center)),
+        );
+        // no taller than its line, or it starts at the top of the line and its text sits low
+        inner.spacing_mut().interact_size.y = 0.0;
         let mut output = TextEdit::singleline(&mut self.text)
             .id(id)
-            .hint_text(placeholder)
-            .font(egui::TextStyle::Monospace)
-            .margin(Margin::symmetric(8, 7))
-            .desired_width(width)
-            .show(ui);
+            .frame(egui::Frame::NONE)
+            .hint_text(
+                RichText::new(placeholder)
+                    .size(theme::FS_BASE)
+                    .color(p.text_3),
+            )
+            .font(theme::mono_font(theme::FS_SM))
+            .margin(Margin::ZERO)
+            .align(egui::Align2::LEFT_CENTER)
+            .min_size(text_rect.size())
+            .desired_width(text_rect.width())
+            .show(&mut inner);
         let response = output.response.response.clone();
-        if let Some(valid) = valid {
-            let color = if valid { p.ok } else { p.down };
-            ui.painter().rect_stroke(
-                response.rect,
-                CornerRadius::same(8),
-                Stroke::new(1.0, color),
-                egui::StrokeKind::Inside,
+        if !self.text.is_empty() {
+            let clear = egui::Rect::from_min_size(
+                egui::pos2(rect.right() - 4.0 - 26.0, rect.center().y - 13.0),
+                egui::vec2(26.0, 26.0),
             );
+            let label = t.get("filter-clear");
+            let mut place = ui.new_child(egui::UiBuilder::new().max_rect(clear));
+            let button =
+                widgets::iconbtn(&mut place, icons::X, &label, false, true).on_hover_text(&label);
+            if button.clicked() {
+                self.text.clear();
+                self.list = None;
+                self.seen = None;
+                outcome.apply = true;
+                response.request_focus();
+            }
+        }
+        // the key `/` asked for the filter field of the page
+        if crate::gui::frame::take_focus_request(ui.ctx()) {
+            response.request_focus();
+            output.state.cursor.set_char_range(Some(CCursorRange::two(
+                CCursor::new(0),
+                CCursor::new(self.text.chars().count()),
+            )));
+            output.state.clone().store(ui.ctx(), id);
         }
         let enter = ui.input(|i| {
             i.events.iter().any(|e| {
@@ -255,7 +447,7 @@ impl FilterField {
         self.values.poll();
 
         if has_focus || self.pointer_on_list {
-            if let Some(clicked) = self.draw_list(ui, id, response.rect) {
+            if let Some(clicked) = self.draw_list(ui, id, rect) {
                 let line = self.line(clicked);
                 if let Some(line) = line {
                     moved_to = Some(self.take(&line, cursor));
@@ -288,7 +480,7 @@ impl FilterField {
             .cloned()
     }
 
-    /// Draws the list below the field; returns the line clicked
+    /// Draws the list below the field (`.sugg`): a head, then the lines; returns the line clicked
     fn draw_list(&mut self, ui: &mut Ui, id: Id, field: egui::Rect) -> Option<usize> {
         let p = palette(ui.ctx());
         let list = self.list.as_ref()?;
@@ -303,102 +495,126 @@ impl FilterField {
         }
         let mut clicked = None;
         let chosen = self.chosen;
+        let head = self.head.clone();
         let note = self.note.clone();
         let area = Area::new(id.with("list"))
             .order(Order::Foreground)
             .fixed_pos(field.left_bottom() + egui::vec2(0.0, 4.0))
             .show(ui.ctx(), |ui| {
-                Frame::popup(ui.style()).show(ui, |ui| {
-                    ui.set_min_width(field.width().min(520.0));
-                    ui.set_max_width(field.width().max(420.0));
-                    ui.spacing_mut().item_spacing.y = 0.0;
-                    if !note.is_empty() {
-                        ui.label(RichText::new(&note).small().color(p.muted));
-                        ui.add_space(4.0);
-                    }
-                    ScrollArea::vertical().max_height(260.0).show(ui, |ui| {
-                        for (i, line) in values.iter().chain(list.iter()).enumerate() {
-                            if suggestion(ui, line, chosen == Some(i)).clicked() {
-                                clicked = Some(i);
-                            }
+                Frame::new()
+                    .fill(p.surface)
+                    .stroke(Stroke::new(1.0, p.border))
+                    .corner_radius(CornerRadius::same(theme::RADIUS))
+                    .shadow(p.shadow_2())
+                    .inner_margin(Margin::same(theme::SP1 as i8))
+                    .show(ui, |ui| {
+                        ui.set_width(field.width() - 2.0 * theme::SP1 - 2.0);
+                        ui.spacing_mut().item_spacing.y = 0.0;
+                        if !head.is_empty() {
+                            Frame::new()
+                                .inner_margin(Margin {
+                                    left: 10,
+                                    right: 10,
+                                    top: 6,
+                                    bottom: 2,
+                                })
+                                .show(ui, |ui| {
+                                    ui.label(
+                                        RichText::new(head.to_uppercase())
+                                            .size(theme::FS_XS)
+                                            .color(p.text_3)
+                                            .extra_letter_spacing(0.48),
+                                    );
+                                });
                         }
+                        if !note.is_empty() {
+                            Frame::new()
+                                .inner_margin(Margin::symmetric(10, 2))
+                                .show(ui, |ui| {
+                                    ui.label(widgets::small(&note).color(p.text_3));
+                                });
+                        }
+                        ScrollArea::vertical()
+                            .max_height(300.0 - 40.0)
+                            .show(ui, |ui| {
+                                for (i, line) in values.iter().chain(list.iter()).enumerate() {
+                                    if suggestion(ui, line, chosen == Some(i)).clicked() {
+                                        clicked = Some(i);
+                                    }
+                                }
+                            });
                     });
-                });
             });
         self.pointer_on_list = area.response.contains_pointer();
         clicked
     }
 }
 
+/// A line of the suggestions: the name in the font of code, its meaning after it (at least 150 px
+/// further), as in `.sugg button`
 fn suggestion(ui: &mut Ui, line: &Line, chosen: bool) -> egui::Response {
     let p = palette(ui.ctx());
-    let size = egui::vec2(ui.available_width(), 26.0);
+    let name =
+        ui.painter()
+            .layout_no_wrap(line.name.clone(), theme::mono_font(theme::FS_SM), p.text);
+    let height = (theme::FS_BASE * 1.45 + 12.0).round();
+    let size = egui::vec2(ui.available_width(), height);
     let (rect, response) = ui.allocate_exact_size(size, Sense::click());
     response
         .widget_info(|| egui::WidgetInfo::selected(egui::Role::Button, true, chosen, &line.name));
     if chosen || response.hovered() {
         ui.painter()
-            .rect_filled(rect, CornerRadius::same(6), p.accent_soft);
+            .rect_filled(rect, CornerRadius::same(theme::RADIUS_SM), p.selected);
     }
-    let name = ui.painter().layout_no_wrap(
-        line.name.clone(),
-        egui::TextStyle::Monospace.resolve(ui.style()),
-        p.text,
-    );
     let name_width = name.size().x;
     ui.painter().galley(
-        rect.left_center() + egui::vec2(6.0, -name.size().y / 2.0),
+        egui::pos2(rect.left() + 10.0, rect.center().y - name.size().y / 2.0),
         name,
         p.text,
     );
     if let Some(hint) = &line.hint {
-        let left = rect.left() + 18.0 + name_width;
-        let room = rect.right() - left - 6.0;
+        let left = rect.left() + 10.0 + name_width.max(150.0) + theme::SP4;
+        let room = rect.right() - left - 10.0;
         if room > 20.0 {
             let mut job = egui::text::LayoutJob::simple_singleline(
                 hint.clone(),
-                egui::TextStyle::Small.resolve(ui.style()),
-                p.muted,
+                egui::FontId::proportional(theme::FS_SM),
+                p.text_3,
             );
             job.wrap = egui::text::TextWrapping::truncate_at_width(room);
             let galley = ui.painter().layout_job(job);
             let y = rect.center().y - galley.size().y / 2.0;
-            ui.painter().galley(egui::pos2(left, y), galley, p.muted);
+            ui.painter().galley(egui::pos2(left, y), galley, p.text_3);
         }
     }
     response
 }
 
-/// The help of a filter field; returns the example clicked
-pub fn filter_help(
-    ui: &mut Ui,
-    title: &str,
-    text: &str,
-    examples: &[&'static str],
-    lines: &[(String, String)],
-    more: impl FnOnce(&mut Ui),
-) -> Option<String> {
+/// An example of the help (`.helppop .ex button`): code in the color of links in a small frame
+fn example_button(ui: &mut Ui, text: &str) -> egui::Response {
     let p = palette(ui.ctx());
-    let mut clicked = None;
-    egui::CollapsingHeader::new(RichText::new(title).small().color(p.muted))
-        .id_salt(title)
-        .show(ui, |ui| {
-            ui.label(text);
-            ui.horizontal_wrapped(|ui| {
-                for example in examples {
-                    let link = egui::Link::new(RichText::new(*example).monospace());
-                    if ui.add(link).clicked() {
-                        clicked = Some((*example).to_owned());
-                    }
-                }
-            });
-            for (label, names) in lines {
-                ui.strong(label);
-                ui.label(RichText::new(names).monospace().small());
-            }
-            more(ui);
-        });
-    clicked
+    let galley =
+        ui.painter()
+            .layout_no_wrap(text.to_owned(), theme::mono_font(theme::FS_XS), p.accent);
+    let size = egui::vec2(galley.size().x + 16.0, 24.0);
+    let (rect, response) = ui.allocate_exact_size(size, Sense::click());
+    response.widget_info(|| egui::WidgetInfo::labeled(egui::Role::Button, true, text));
+    let line = if response.hovered() {
+        p.accent
+    } else {
+        p.border
+    };
+    ui.painter().rect(
+        rect,
+        CornerRadius::same(theme::RADIUS_SM),
+        p.surface,
+        Stroke::new(1.0, line),
+        egui::StrokeKind::Inside,
+    );
+    let at = (rect.center() - galley.size() / 2.0).round_to_pixels(ui.ctx().pixels_per_point());
+    ui.painter().galley(at, galley, p.accent);
+    widgets::focus_ring(ui, &response, theme::RADIUS_SM);
+    response.on_hover_cursor(egui::CursorIcon::PointingHand)
 }
 
 /// The byte at a position in characters

@@ -16,6 +16,7 @@
 
 mod chart;
 mod filter_field;
+mod frame;
 mod icons;
 mod load;
 mod pages;
@@ -29,9 +30,8 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use eframe::egui::{
-    self, Color32, Context, CornerRadius, FontId, Frame, Layout, Margin, Mesh, Modal, Panel,
-    Response, RichText, Sense, Shape, Stroke, ThemePreference, Ui, ViewportBuilder,
-    ViewportCommand, WidgetInfo,
+    self, Context, Frame, RichText, ThemePreference, Ui, UiBuilder, ViewportBuilder,
+    ViewportCommand,
 };
 
 use crate::APP_TITLE;
@@ -43,21 +43,19 @@ use crate::networking::types::address_port_pair::AddressPortPair;
 use crate::networking::types::capture_context::CaptureSource;
 use crate::networking::types::data_representation::DataUnit;
 use crate::notifications::types::sound::Sound;
-use crate::utils::types::timestamp::Timestamp;
+use crate::view::calls::CallKey;
 use crate::view::capture::capture_problem;
 use crate::view::filter_index::FilterIndex;
 use crate::view::i18n::Lang;
 use crate::view::{Jump, Status};
 use load::Loader;
-use theme::{palette, semibold_font};
+use theme::palette;
 use widgets::Kind;
 
 /// How often the state of the capture is read while packets come
 const LIVE_EVERY: Duration = Duration::from_millis(300);
 /// How often it is read otherwise
 const IDLE_EVERY: Duration = Duration::from_secs(1);
-/// Width of the side bar
-const SIDEBAR_WIDTH: f32 = 232.0;
 const SOURCE_URL: &str = env!("CARGO_PKG_REPOSITORY");
 const VERSION: &str = env!("CARGO_PKG_VERSION");
 
@@ -83,8 +81,51 @@ pub enum Page {
     },
     Entries(Favorite),
     Notifications,
-    Settings,
-    Licenses,
+    Settings(SettingsPanel),
+    /// The calls (a tab of the statistics)
+    Calls,
+    Call(CallKey),
+}
+
+/// The parts of the settings (`.subnav`), in the order of the navigation
+#[derive(Clone, Copy, PartialEq, Eq, Debug, Default)]
+pub enum SettingsPanel {
+    #[default]
+    Display,
+    Notifications,
+    PacketStore,
+    Calls,
+    Geo,
+    Assistants,
+    Updates,
+    About,
+}
+
+impl SettingsPanel {
+    pub const ALL: [Self; 8] = [
+        Self::Display,
+        Self::Notifications,
+        Self::PacketStore,
+        Self::Calls,
+        Self::Geo,
+        Self::Assistants,
+        Self::Updates,
+        Self::About,
+    ];
+}
+
+impl Page {
+    /// Each page keeps where it was scrolled to; a detail page of another item starts at the top
+    fn scroll_salt(&self) -> String {
+        match self {
+            Self::Connection(key) => format!("connection {key:?}"),
+            Self::Settings(panel) => format!("settings {panel:?}"),
+            Self::Packet(number) => format!("packet {number}"),
+            Self::Stream(number) => format!("stream {number}"),
+            Self::Call(key) => format!("call {key:?}"),
+            other => format!("{:?}", std::mem::discriminant(other)),
+        }
+    }
 }
 
 impl From<Jump> for Page {
@@ -107,11 +148,13 @@ impl From<Jump> for Page {
                 filter,
                 connections,
             },
+            Jump::Notifications => Self::Notifications,
+            Jump::Call(key) => Self::Call(key),
         }
     }
 }
 
-/// The entries of the side bar
+/// The entries of the header
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 enum Nav {
     Overview,
@@ -127,24 +170,23 @@ enum Nav {
 }
 
 impl Page {
-    /// The entry of the side bar this page belongs to
-    fn nav(&self) -> Option<Nav> {
+    /// The entry of the header this page belongs to
+    fn nav(&self) -> Nav {
         match self {
-            Self::Capture => Some(Nav::Capture),
-            Self::Overview => Some(Nav::Overview),
-            Self::Connections { .. } | Self::Connection(_) => Some(Nav::Connections),
-            Self::Packets { .. } | Self::Packet(_) | Self::Stream(_) => Some(Nav::Packets),
-            Self::Statistics { .. } => Some(Nav::Statistics),
-            Self::Entries(Favorite::Host) => Some(Nav::Hosts),
-            Self::Entries(Favorite::Service) => Some(Nav::Services),
-            Self::Entries(Favorite::Program) => Some(Nav::Programs),
-            Self::Notifications => Some(Nav::Notifications),
-            Self::Settings => Some(Nav::Settings),
-            Self::Licenses => None,
+            Self::Capture => Nav::Capture,
+            Self::Overview => Nav::Overview,
+            Self::Connections { .. } | Self::Connection(_) => Nav::Connections,
+            Self::Packets { .. } | Self::Packet(_) | Self::Stream(_) => Nav::Packets,
+            Self::Statistics { .. } | Self::Calls | Self::Call(_) => Nav::Statistics,
+            Self::Entries(Favorite::Host) => Nav::Hosts,
+            Self::Entries(Favorite::Service) => Nav::Services,
+            Self::Entries(Favorite::Program) => Nav::Programs,
+            Self::Notifications => Nav::Notifications,
+            Self::Settings(_) => Nav::Settings,
         }
     }
 
-    /// A page without filters, as the side bar opens it
+    /// A page without filters, as the header opens it
     fn of_nav(nav: Nav) -> Self {
         match nav {
             Nav::Overview => Self::Overview,
@@ -165,7 +207,7 @@ impl Page {
             Nav::Programs => Self::Entries(Favorite::Program),
             Nav::Notifications => Self::Notifications,
             Nav::Capture => Self::Capture,
-            Nav::Settings => Self::Settings,
+            Nav::Settings => Self::Settings(SettingsPanel::Display),
         }
     }
 }
@@ -191,7 +233,7 @@ impl Live {
     fn read(t: Lang, engine: &Engine) -> Self {
         let state = engine.lock();
         Self {
-            status: Status::read(&state),
+            status: Status::read(t, &state),
             running: state.is_running(),
             frozen: state.frozen,
             finished: state.traffic_history.no_more_packets(),
@@ -221,9 +263,15 @@ pub struct App {
     history: Vec<Page>,
     /// Asking whether the running capture may end with the window
     closing: bool,
+    /// Dialogs and the note on a new version
+    overlays: frame::Overlays,
+    /// Where the note on a new version sits in the status bar
+    update_button: Option<egui::Rect>,
     /// The user has answered: the window may close
     close_now: bool,
     sound_seen: u64,
+    /// A short message at the bottom of the window (`.toast`) and since when it shows
+    toast: Option<(String, std::time::Instant)>,
     pub pages: pages::Pages,
 }
 
@@ -254,7 +302,10 @@ impl App {
             page,
             history: Vec::new(),
             closing: false,
+            overlays: frame::Overlays::default(),
+            update_button: None,
             close_now: false,
+            toast: None,
             pages: pages::Pages::default(),
         }
     }
@@ -270,6 +321,11 @@ impl App {
         if self.history.len() > 200 {
             self.history.remove(0);
         }
+    }
+
+    /// Shows a short message at the bottom of the window for a few seconds (`App.toast`)
+    pub fn toast(&mut self, text: impl Into<String>) {
+        self.toast = Some((text.into(), std::time::Instant::now()));
     }
 
     /// Replaces the current page without a step back, for paging through packets
@@ -292,19 +348,7 @@ impl App {
         }
     }
 
-    /// The arrow left of a title
-    pub fn back_arrow(&mut self, ui: &mut Ui) {
-        if !self.can_go_back() {
-            return;
-        }
-        let p = palette(ui.ctx());
-        let hint = self.t.get("back-hint");
-        if widgets::icon_button(ui, icons::BACK, p.muted, &hint).clicked() {
-            self.back();
-        }
-    }
-
-    /// The design changed in the side bar
+    /// Light or dark, from the header or the key `t`
     fn toggle_theme(&mut self, ctx: &Context) {
         let choice = match ctx.theme() {
             egui::Theme::Dark => ThemeChoice::Light,
@@ -359,170 +403,46 @@ impl App {
             return;
         }
         let t = self.t;
-        let response = Modal::new(egui::Id::NULL.with("close-dialog")).show(ctx, |ui| {
-            ui.set_width(420.0);
-            ui.label(RichText::new(t.get("gui-close-title")).font(semibold_font(16.0)));
-            ui.add_space(4.0);
-            ui.label(t.get("gui-close-text"));
-            ui.add_space(8.0);
-            ui.horizontal(|ui| {
-                if widgets::button(ui, t.get("gui-close-confirm"), Kind::Danger).clicked() {
-                    self.close_now = true;
-                    self.closing = false;
-                    ui.ctx().send_viewport_cmd(ViewportCommand::Close);
-                }
-                if widgets::button(ui, t.get("gui-close-cancel"), Kind::Secondary).clicked() {
-                    self.closing = false;
-                }
-            });
-        });
-        if response.should_close() {
-            self.closing = false;
-        }
-    }
-
-    fn sidebar(&mut self, ui: &mut Ui) {
-        let p = palette(ui.ctx());
-        let rect = ui.max_rect();
-        let mut mesh = Mesh::default();
-        mesh.colored_vertex(rect.left_top(), p.side_top);
-        mesh.colored_vertex(rect.right_top(), p.side_top);
-        mesh.colored_vertex(rect.left_bottom(), p.side_bottom);
-        mesh.colored_vertex(rect.right_bottom(), p.side_bottom);
-        mesh.add_triangle(0, 1, 2);
-        mesh.add_triangle(1, 2, 3);
-        ui.painter().add(Shape::mesh(mesh));
-
-        Panel::bottom("sidebar-foot")
-            .frame(Frame::new().inner_margin(Margin::same(12)))
-            .show_separator_line(false)
-            .resizable(false)
-            .show(ui, |ui| {
-                ui.spacing_mut().item_spacing.y = 4.0;
-                self.sidebar_foot(ui);
-            });
-        Frame::new().inner_margin(Margin::same(12)).show(ui, |ui| {
-            ui.spacing_mut().item_spacing.y = 2.0;
-            ui.horizontal(|ui| {
-                ui.add(
-                    egui::Image::new(icons::LOGO)
-                        .fit_to_exact_size(egui::vec2(32.0, 32.0))
-                        .corner_radius(CornerRadius::same(6)),
-                );
-                ui.add(
-                    egui::Label::new(
-                        RichText::new(APP_TITLE)
-                            .font(semibold_font(16.0))
-                            .color(p.side_text),
-                    )
-                    .selectable(false),
-                );
-            });
-            ui.add_space(10.0);
-            egui::ScrollArea::vertical()
-                .scroll_bar_visibility(egui::scroll_area::ScrollBarVisibility::AlwaysHidden)
-                .auto_shrink(false)
-                .show(ui, |ui| self.nav(ui));
-        });
-    }
-
-    fn nav(&mut self, ui: &mut Ui) {
-        let t = self.t;
-        {
-            nav_label(ui, &t.get("nav-traffic"));
-            let current = self.page.nav();
-            for (nav, icon, id) in [
-                (Nav::Overview, icons::OVERVIEW, "nav-overview"),
-                (Nav::Connections, icons::CONNECTIONS, "nav-connections"),
-                (Nav::Packets, icons::PACKETS, "nav-packets"),
-                (Nav::Statistics, icons::STATISTICS, "nav-statistics"),
-                (Nav::Hosts, icons::HOSTS, "nav-hosts"),
-                (Nav::Services, icons::SERVICES, "nav-services"),
-                (Nav::Programs, icons::PROGRAMS, "nav-programs"),
-                (
-                    Nav::Notifications,
-                    icons::NOTIFICATIONS,
-                    "nav-notifications",
-                ),
-            ] {
-                let badge = (nav == Nav::Notifications).then_some(self.live.status.unread);
-                if nav_item(ui, icon, &t.get(id), current == Some(nav), badge).clicked() {
-                    self.open_nav(nav);
-                }
-            }
-            ui.add_space(10.0);
-            nav_label(ui, &t.get("nav-setup"));
-            for (nav, icon, id) in [
-                (Nav::Capture, icons::CAPTURE, "nav-capture"),
-                (Nav::Settings, icons::SETTINGS, "nav-settings"),
-            ] {
-                if nav_item(ui, icon, &t.get(id), current == Some(nav), None).clicked() {
-                    self.open_nav(nav);
-                }
-            }
-        }
-    }
-
-    fn open_nav(&mut self, nav: Nav) {
-        self.go(Page::of_nav(nav));
-    }
-
-    fn sidebar_foot(&mut self, ui: &mut Ui) {
-        let p = palette(ui.ctx());
-        let t = self.t;
-        ui.visuals_mut().hyperlink_color = p.side_muted;
-        if matches!(self.mcp.status(), crate::mcp::Status::Active { .. }) {
-            let content = self.mcp.content_allowed();
-            let (text, dot) = if content {
-                (t.get("mcp-open-content"), p.warn)
-            } else {
-                (t.get("mcp-open"), p.ok)
-            };
-            if access_note(ui, &text, dot, p.side_text)
-                .on_hover_text(t.get("mcp-open-hint"))
-                .clicked()
-            {
-                self.go(Page::Settings);
-            }
-        }
-        if nav_item(ui, icons::THEME, &t.get("nav-theme"), false, None).clicked() {
-            self.toggle_theme(ui.ctx());
-        }
-        if let Some(version) = self.live.status.update.clone() {
-            ui.hyperlink_to(
-                RichText::new(t.get1("update-available", "version", version.as_str()))
-                    .small()
-                    .color(p.side_text),
-                format!("{SOURCE_URL}/releases"),
-            );
-        }
-        ui.allocate_ui_with_layout(
-            egui::vec2(ui.available_width(), 0.0),
-            Layout::left_to_right(egui::Align::Min).with_main_wrap(true),
+        let mut confirm = false;
+        let mut cancel = false;
+        let close = frame::dialog(
+            ctx,
+            "close-dialog",
+            t,
+            &t.get("gui-close-title"),
+            Some(icons::ALERT),
             |ui| {
-                ui.spacing_mut().item_spacing = egui::vec2(4.0, 1.0);
-                let meta = |text: String| RichText::new(text).small().color(p.side_muted);
-                ui.label(meta(format!("{APP_TITLE} {VERSION} ·")));
-                ui.hyperlink_to(meta(t.get("source-code")), SOURCE_URL);
-                ui.label(meta(format!("· {} ·", t.get("based-on-sniffnet"))));
-                if ui.link(meta(t.get("licenses"))).clicked() {
-                    self.go(Page::Licenses);
-                }
-                if self.live.status.geo_dbip {
-                    ui.label(meta("·".to_owned()));
-                    ui.hyperlink_to(
-                        meta("IP Geolocation by DB-IP".to_owned()),
-                        "https://db-ip.com",
-                    );
-                }
+                ui.label(RichText::new(t.get("gui-close-text")).size(theme::FS_BASE));
+                ui.label(
+                    RichText::new(t.get("stop-save-hint"))
+                        .size(theme::FS_SM)
+                        .color(palette(ui.ctx()).text_3),
+                );
+            },
+            |ui| {
+                confirm = widgets::icon_text_button(
+                    ui,
+                    Some(icons::STOP),
+                    &t.get("gui-close-confirm"),
+                    Kind::Danger,
+                    false,
+                )
+                .clicked();
+                cancel = widgets::button(ui, t.get("gui-close-cancel"), Kind::Secondary).clicked();
             },
         );
+        if confirm {
+            self.close_now = true;
+            self.closing = false;
+            ctx.send_viewport_cmd(ViewportCommand::Close);
+        } else if close || cancel {
+            self.closing = false;
+        }
     }
 
     fn content(&mut self, ui: &mut Ui) {
         if let Some(problem) = self.live.problem.clone() {
             widgets::error(ui, &problem);
-            ui.add_space(4.0);
         }
         pages::show(self, ui);
     }
@@ -532,120 +452,47 @@ impl eframe::App for App {
     fn ui(&mut self, ui: &mut Ui, _frame: &mut eframe::Frame) {
         let ctx = ui.ctx().clone();
         self.tick(&ctx);
-        Panel::left("sidebar")
-            .exact_size(SIDEBAR_WIDTH)
-            .resizable(false)
-            .show_separator_line(false)
-            .frame(Frame::new())
-            .show(ui, |ui| self.sidebar(ui));
+        frame::keys(self, &ctx);
+        frame::header(self, ui);
+        frame::status_bar(self, ui);
         let p = palette(&ctx);
         egui::CentralPanel::default()
-            .frame(Frame::new().fill(p.bg).inner_margin(Margin::same(18)))
-            .show(ui, |ui| self.content(ui));
+            .frame(Frame::new().fill(p.bg))
+            .show(ui, |ui| {
+                // the packet list fills the window; every other page scrolls as a whole, with
+                // its head (`#main.fill` and `#main.page`)
+                if matches!(self.page, Page::Packets { .. }) {
+                    let room = frame::page_rect(&ctx, ui.max_rect());
+                    ui.scope_builder(UiBuilder::new().max_rect(room), |ui| {
+                        ui.spacing_mut().item_spacing.y = theme::SP4;
+                        self.content(ui);
+                    });
+                } else {
+                    // the bar of the page floats over its margin, as in the draft, and takes no room
+                    let inner = ui.spacing().scroll.floating_allocated_width;
+                    ui.spacing_mut().scroll.floating_allocated_width = 0.0;
+                    egui::ScrollArea::vertical()
+                        .id_salt(("page", self.page.scroll_salt()))
+                        .auto_shrink(false)
+                        .show(ui, |ui| {
+                            // the scrolled room is endless; its pages grow beyond this height
+                            let mut panel = ui.max_rect();
+                            panel.max.y = panel.min.y + ui.clip_rect().height();
+                            let room = frame::page_rect(&ctx, panel);
+                            ui.scope_builder(UiBuilder::new().max_rect(room), |ui| {
+                                ui.spacing_mut().scroll.floating_allocated_width = inner;
+                                ui.spacing_mut().item_spacing.y = theme::SP4;
+                                self.content(ui);
+                                ui.add_space(frame::page_bottom(&ctx) - theme::SP4);
+                            });
+                        });
+                }
+            });
+        frame::update_note(self, &ctx);
+        frame::toast(&mut self.toast, &ctx);
+        frame::help_dialog(self, &ctx);
+        frame::stop_dialog(self, &ctx);
         self.close_dialog(&ctx);
-    }
-}
-
-/// The heading of a group of the side bar
-fn nav_label(ui: &mut Ui, text: &str) {
-    let p = palette(ui.ctx());
-    ui.add_space(4.0);
-    ui.add(egui::Label::new(RichText::new(text).small().color(p.side_muted)).selectable(false));
-    ui.add_space(2.0);
-}
-
-/// An entry of the side bar
-/// The note in the sidebar while assistants can ask: a dot and a line, which opens the settings
-fn access_note(ui: &mut Ui, text: &str, dot: Color32, color: Color32) -> Response {
-    let galley = egui::WidgetText::from(RichText::new(text).small().color(color)).into_galley(
-        ui,
-        Some(egui::TextWrapMode::Wrap),
-        ui.available_width() - 30.0,
-        egui::TextStyle::Small,
-    );
-    let size = egui::vec2(ui.available_width(), galley.size().y.max(14.0) + 8.0);
-    let (rect, response) = ui.allocate_exact_size(size, Sense::click());
-    response.widget_info(|| WidgetInfo::labeled(egui::Role::Link, true, text));
-    if response.hovered() {
-        ui.painter()
-            .rect_filled(rect, CornerRadius::same(8), palette(ui.ctx()).side_hover);
-    }
-    ui.painter()
-        .circle_filled(rect.left_center() + egui::vec2(20.0, 0.0), 4.0, dot);
-    let top = rect.center().y - galley.size().y / 2.0;
-    ui.painter()
-        .galley(egui::pos2(rect.left() + 38.0, top), galley, color);
-    response
-}
-
-fn nav_item(
-    ui: &mut Ui,
-    icon: egui::ImageSource<'static>,
-    text: &str,
-    active: bool,
-    badge: Option<usize>,
-) -> Response {
-    let p = palette(ui.ctx());
-    let size = egui::vec2(ui.available_width(), 34.0);
-    let (rect, response) = ui.allocate_exact_size(size, Sense::click());
-    response.widget_info(|| WidgetInfo::selected(egui::Role::Button, true, active, text));
-    let radius = CornerRadius::same(8);
-    if active {
-        ui.painter().rect_filled(rect, radius, p.side_active);
-    } else if response.hovered() {
-        ui.painter().rect_filled(rect, radius, p.side_hover);
-    }
-    if response.has_focus() {
-        ui.painter().rect_stroke(
-            rect,
-            radius,
-            Stroke::new(2.0, Color32::from_rgb(0xd9, 0xf5, 0x5b)),
-            egui::StrokeKind::Inside,
-        );
-    }
-    let color = if active {
-        p.side_active_text
-    } else {
-        p.side_text
-    };
-    let icon_rect = egui::Rect::from_center_size(
-        rect.left_center() + egui::vec2(20.0, 0.0),
-        egui::vec2(18.0, 18.0),
-    );
-    egui::Image::new(icon).tint(color).paint_at(ui, icon_rect);
-    let count = badge.filter(|n| *n > 0);
-    let text_left = rect.left() + 38.0;
-    let mut text_right = rect.right() - 6.0;
-    if let Some(count) = count {
-        let label = if count > 99 {
-            "99+".to_owned()
-        } else {
-            count.to_string()
-        };
-        let galley = ui
-            .painter()
-            .layout_no_wrap(label, semibold_font(11.5), Color32::WHITE);
-        // a rectangle, not a circle, and never narrower than this
-        let size = egui::vec2((galley.size().x + 11.0).max(22.0), 20.0);
-        let right = rect.right_center() - egui::vec2(6.0, 0.0);
-        let badge = egui::Rect::from_center_size(right - egui::vec2(size.x / 2.0, 0.0), size);
-        ui.painter()
-            .rect_filled(badge, CornerRadius::same(5), p.down);
-        ui.painter()
-            .galley(badge.center() - galley.size() / 2.0, galley, Color32::WHITE);
-        text_right = badge.left() - 6.0;
-    }
-    // the text gives way to the number
-    let font = FontId::proportional(14.0);
-    let mut job = egui::text::LayoutJob::simple_singleline(text.to_owned(), font, color);
-    job.wrap = egui::text::TextWrapping::truncate_at_width(text_right - text_left);
-    let galley = ui.painter().layout_job(job);
-    let top = rect.center().y - galley.size().y / 2.0;
-    ui.painter()
-        .galley(egui::pos2(text_left, top), galley, color);
-    match count {
-        Some(count) if count > 99 => response.on_hover_text(count.to_string()),
-        _ => response,
     }
 }
 
@@ -681,20 +528,6 @@ fn windows_languages() -> Option<String> {
 #[cfg(not(windows))]
 fn windows_languages() -> Option<String> {
     None
-}
-
-/// A time in the time zone of the computer
-pub fn local_time(t: Lang, ts: Timestamp) -> String {
-    let Ok(time) = jiff::Timestamp::from_second(ts.secs()) else {
-        return String::new();
-    };
-    let format = match t {
-        Lang::De => "%d.%m.%Y %H:%M:%S",
-        Lang::En => "%Y-%m-%d %H:%M:%S",
-    };
-    time.to_zoned(jiff::tz::TimeZone::system())
-        .strftime(format)
-        .to_string()
 }
 
 fn window_icon() -> Option<egui::IconData> {

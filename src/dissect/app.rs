@@ -2,7 +2,7 @@
 
 use std::ops::Range;
 
-use super::{Dissection, TransportInfo, dhcp, dns, misc, text, tls};
+use super::{Dissection, TransportInfo, dhcp, dns, misc, sip, text, tls};
 
 /// Ports where TLS runs from the first byte (HTTPS, DNS over TLS, IMAPS, POP3S, SMTPS, LDAPS …)
 const TLS_PORTS: [u16; 9] = [443, 465, 636, 853, 993, 995, 5223, 8443, 8883];
@@ -21,6 +21,10 @@ pub(super) fn dissect(
         if tls::is_record(data, payload.start) {
             return tls::dissect(data, payload, t, d);
         }
+        // before HTTP, which shares methods like OPTIONS
+        if (t.has_port(5060) || sip::any_port()) && sip::is_sip(data, payload.start) {
+            return sip::dissect(data, payload, d);
+        }
         if text::is_http(data, payload.start) {
             return text::http(data, payload, d);
         }
@@ -33,7 +37,9 @@ pub(super) fn dissect(
         }
         return false;
     }
-    if t.has_port(53) {
+    if (t.has_port(5060) || sip::any_port()) && sip::is_sip(data, payload.start) {
+        sip::dissect(data, payload, d)
+    } else if t.has_port(53) {
         dns::dissect(data, payload, dns::Kind::Dns, d)
     } else if t.has_port(5353) {
         dns::dissect(data, payload, dns::Kind::Mdns, d)

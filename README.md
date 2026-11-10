@@ -1,4 +1,9 @@
-<p align="center"><img src="docs/assets/openpacketmon-logo.jpg" alt="openpacketmon – packet monitoring" width="600"></p>
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/assets/openpacketmon-logo-dark.png">
+    <img src="docs/assets/openpacketmon-logo.png" alt="openpacketmon – packet monitoring" width="482">
+  </picture>
+</p>
 
 # openpacketmon
 
@@ -117,16 +122,19 @@ while the window is open. Then connect the assistant once:
 claude mcp add openpacketmon -- openpacketmon mcp
 ```
 
-An assistant can read the state of the capture, an overview, the connections, the packets with their protocol fields, and the
-statistics, narrowed down with the same filters as in the window. It cannot change anything, and it gets no packet contents:
-no bytes, no streams, and neither the query of a URL nor secrets such as cookies in HTTP headers, and its filters cannot find
-them out either. A token in the path of a URL looks like any other path, so it is not hidden.
+An assistant can read the state of the capture, an overview, the connections, the packets with their protocol fields, the
+statistics and the calls over SIP and RTP, narrowed down with the same filters as in the window. It cannot change anything,
+and it gets no packet contents: no bytes, no streams, and neither the query of a URL nor secrets such as cookies in HTTP
+headers, and its filters cannot find them out either. A token in the path of a URL looks like any other path, so it is not
+hidden. The voice of a call never leaves the window, and phone numbers keep only their last two digits
+(`sip:+xxxxxxxxxx67@sip.example.net`); display names and domains stay.
 
 For a closer look you can also allow packet contents (*Allow packet contents* in the same card). An assistant can then follow
 a stream as text or hex dump and read the bytes of a packet, which includes the content of unencrypted connections. This
-switch is never saved: it ends when you close the window or turn the access off. Even then the values of secret HTTP headers
-(cookies, authorization, tokens, sessions), the queries of URLs and passwords after `PASS` or `AUTH` are replaced by `x`;
-secrets in other places, for example in an unknown protocol, stay visible. The sidebar shows while assistants have access,
+switch is never saved: it ends when you close the window or turn the access off. Even then the values of secret HTTP and SIP
+headers (cookies, authorization, tokens, sessions), the queries of URLs, passwords after `PASS` or `AUTH`, keys of SRTP and the
+voice of calls are replaced by `x`, and phone numbers are cut down as above; secrets in other places, for example in an
+unknown protocol, stay visible. The sidebar shows while assistants have access,
 and in amber while they can read packet contents.
 
 **What an assistant queries goes to its AI service**: addresses, host names and connections show what your devices do. Names

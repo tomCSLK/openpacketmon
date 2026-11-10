@@ -3,7 +3,6 @@
 use std::net::IpAddr;
 
 use crate::networking::types::data_representation::DataUnit;
-use crate::utils::types::timestamp::Timestamp;
 use crate::view::i18n::Lang;
 
 /// A count with thousands separators: `12.345` (de), `12,345` (en)
@@ -20,7 +19,7 @@ pub fn count(t: Lang, n: u128) -> String {
 }
 
 /// A number with at most `decimals` decimals (trailing zeros removed)
-fn decimal(t: Lang, v: f64, decimals: usize) -> String {
+pub fn decimal(t: Lang, v: f64, decimals: usize) -> String {
     let mut s = format!("{v:.decimals$}");
     if s.contains('.') {
         s = s.trim_end_matches('0').trim_end_matches('.').to_owned();
@@ -28,38 +27,61 @@ fn decimal(t: Lang, v: f64, decimals: usize) -> String {
     s.replace('.', &t.decimal_separator().to_string())
 }
 
-/// A data volume in decimal units (1 kB = 1000 B), e.g. `1,5 MB`
-#[allow(clippy::cast_precision_loss)]
-pub fn bytes(t: Lang, b: u128) -> String {
-    let v = b as f64;
-    if v >= 1e12 {
-        format!("{} TB", decimal(t, v / 1e12, 2))
-    } else if v >= 1e9 {
-        format!("{} GB", decimal(t, v / 1e9, 2))
-    } else if v >= 1e6 {
-        format!("{} MB", decimal(t, v / 1e6, 2))
-    } else if v >= 1e3 {
-        format!("{} kB", decimal(t, v / 1e3, 1))
-    } else {
-        format!("{b} B")
+/// A number with exactly `decimals` decimals and thousands separators, as the draft writes it
+/// (`fnum(v, dg)`): `1.234,5` (de), `1,234.5` (en)
+pub fn fixed(t: Lang, v: f64, decimals: usize) -> String {
+    let text = format!("{:.decimals$}", v.abs());
+    let (whole, fraction) = text.split_once('.').unwrap_or((&text, ""));
+    let mut out = String::with_capacity(text.len() + whole.len() / 3 + 1);
+    if v < 0.0 && text.chars().any(|c| c.is_ascii_digit() && c != '0') {
+        out.push('-');
     }
+    for (i, c) in whole.chars().enumerate() {
+        if i > 0 && (whole.len() - i).is_multiple_of(3) {
+            out.push(t.thousands_separator());
+        }
+        out.push(c);
+    }
+    if !fraction.is_empty() {
+        out.push(t.decimal_separator());
+        out.push_str(fraction);
+    }
+    out
 }
 
-/// Bits in decimal units, e.g. `12 Mbit`
+/// A value with three digits (`docs/entwurf/assets/data.js`, `fbytes`): two decimals below 10, one
+/// below 100, none above (`7,26`, `42,2`, `177`)
+fn three(t: Lang, v: f64) -> String {
+    let decimals = usize::from(v < 10.0) + usize::from(v < 100.0);
+    format!("{v:.decimals$}").replace('.', &t.decimal_separator().to_string())
+}
+
+/// A value in steps of 1000 with the units given, e.g. `1,50 KB`; below 1000 as a whole number
 #[allow(clippy::cast_precision_loss)]
-pub fn bits(t: Lang, b: u128) -> String {
-    let v = b as f64;
-    if v >= 1e12 {
-        format!("{} Tbit", decimal(t, v / 1e12, 2))
-    } else if v >= 1e9 {
-        format!("{} Gbit", decimal(t, v / 1e9, 2))
-    } else if v >= 1e6 {
-        format!("{} Mbit", decimal(t, v / 1e6, 2))
-    } else if v >= 1e3 {
-        format!("{} kbit", decimal(t, v / 1e3, 1))
-    } else {
-        format!("{b} bit")
+fn scaled(t: Lang, n: u128, base: &str, units: [&str; 4]) -> String {
+    if n < 1000 {
+        return format!("{n} {base}");
     }
+    let mut v = n as f64;
+    let mut unit = units[0];
+    for u in units {
+        v /= 1000.0;
+        unit = u;
+        if v < 1000.0 {
+            break;
+        }
+    }
+    format!("{} {unit}", three(t, v))
+}
+
+/// A data volume in decimal units (1 KB = 1000 B), e.g. `42,2 MB`
+pub fn bytes(t: Lang, b: u128) -> String {
+    scaled(t, b, "B", ["KB", "MB", "GB", "TB"])
+}
+
+/// Bits in decimal units, e.g. `12,0 Mb`
+pub fn bits(t: Lang, b: u128) -> String {
+    scaled(t, b, "b", ["Kb", "Mb", "Gb", "Tb"])
 }
 
 /// An amount in the unit chosen by the user: packets, bytes or bits.
@@ -100,12 +122,6 @@ pub fn millis(t: Lang, us: f64) -> String {
     text.replace('.', &t.decimal_separator().to_string())
 }
 
-/// `2026-06-15 19:32:10 UTC`
-pub fn time_utc(ts: Timestamp) -> String {
-    let (y, mo, d, h, mi, s) = civil_utc(ts.secs());
-    format!("{y:04}-{mo:02}-{d:02} {h:02}:{mi:02}:{s:02} UTC")
-}
-
 /// An address with a port: `192.0.2.1:443`, `[2001:db8::1]:443`, or the address alone
 pub fn socket(ip: &IpAddr, port: Option<u16>) -> String {
     match (ip, port) {
@@ -138,11 +154,19 @@ mod tests {
         assert_eq!(count(Lang::En, 1_234_567), "1,234,567");
         assert_eq!(count(Lang::En, 999), "999");
         assert_eq!(bytes(Lang::De, 512), "512 B");
-        assert_eq!(bytes(Lang::De, 1_500), "1,5 kB");
-        assert_eq!(bytes(Lang::En, 2_000_000), "2 MB");
+        assert_eq!(bytes(Lang::De, 1_500), "1,50 KB");
+        assert_eq!(bytes(Lang::De, 42_230_000), "42,2 MB");
+        assert_eq!(bytes(Lang::De, 177_000), "177 KB");
+        assert_eq!(bytes(Lang::En, 2_000_000), "2.00 MB");
         assert_eq!(bytes(Lang::En, 3_456_000_000), "3.46 GB");
-        assert_eq!(bits(Lang::En, 8_000), "8 kbit");
+        assert_eq!(bytes(Lang::En, 5_000_000_000_000_000), "5000 TB");
+        assert_eq!(bits(Lang::En, 8_000), "8.00 Kb");
+        assert_eq!(bits(Lang::De, 999), "999 b");
         assert_eq!(amount(Lang::De, DataUnit::Packets, 12_000), "12.000");
+        assert_eq!(fixed(Lang::De, 1234.56, 1), "1.234,6");
+        assert_eq!(fixed(Lang::En, 0.5, 3), "0.500");
+        assert_eq!(fixed(Lang::De, 42.0, 0), "42");
+        assert_eq!(fixed(Lang::De, -0.01, 1), "0,0");
     }
 
     #[test]
@@ -157,9 +181,26 @@ mod tests {
         );
         assert_eq!(socket(&"192.0.2.1".parse().unwrap(), None), "192.0.2.1");
         assert_eq!(mac(Some([0, 1, 2, 0xab, 0xcd, 0xef])), "00:01:02:ab:cd:ef");
-        assert_eq!(
-            time_utc(Timestamp::new(1_781_551_930, 0)),
-            "2026-06-15 19:32:10 UTC"
-        );
     }
+}
+
+/// A duration as a clock: `4:05`, from an hour on `1:04:05`
+pub fn clock(seconds: u64) -> String {
+    let (h, m, s) = (seconds / 3600, seconds / 60 % 60, seconds % 60);
+    if h > 0 {
+        format!("{h}:{m:02}:{s:02}")
+    } else {
+        format!("{m}:{s:02}")
+    }
+}
+
+/// A day in the local time zone, as written in the language
+pub fn date(t: Lang, at: jiff::Timestamp) -> String {
+    let format = match t {
+        Lang::De => "%d.%m.%Y",
+        Lang::En => "%Y-%m-%d",
+    };
+    at.to_zoned(jiff::tz::TimeZone::system())
+        .strftime(format)
+        .to_string()
 }

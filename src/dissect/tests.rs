@@ -641,3 +641,111 @@ fn garbled_application_payloads_are_handled() {
         }
     }
 }
+
+// ---- VoIP: made-up messages and streams, no real numbers or captures ---------------------------
+
+/// A UDP datagram between two IPv4 addresses
+pub(crate) fn udp_between(
+    src: [u8; 4],
+    sport: u16,
+    dst: [u8; 4],
+    dport: u16,
+    payload: &[u8],
+) -> Vec<u8> {
+    let mut p = ethernet(0x0800);
+    p.extend(ipv4(17, 8 + payload.len(), src, dst));
+    p.extend_from_slice(&sport.to_be_bytes());
+    p.extend_from_slice(&dport.to_be_bytes());
+    p.extend_from_slice(&u16::try_from(8 + payload.len()).unwrap().to_be_bytes());
+    p.extend_from_slice(&[0, 0]);
+    p.extend_from_slice(payload);
+    p
+}
+
+/// A SIP message with these header lines and a session description as its body
+pub(crate) fn sip_message(first: &str, headers: &[(&str, &str)], sdp: Option<&str>) -> Vec<u8> {
+    let mut m = format!("{first}\r\n");
+    for (name, value) in headers {
+        m.push_str(&format!("{name}: {value}\r\n"));
+    }
+    let body = sdp.unwrap_or_default();
+    if sdp.is_some() {
+        m.push_str("Content-Type: application/sdp\r\n");
+    }
+    m.push_str(&format!("Content-Length: {}\r\n\r\n{body}", body.len()));
+    m.into_bytes()
+}
+
+/// A session description offering audio at this address and port with these payload types
+pub(crate) fn sdp_offer(addr: &str, port: u16, formats: &[u8]) -> String {
+    let names = |pt: u8| match pt {
+        0 => "PCMU/8000",
+        8 => "PCMA/8000",
+        101 => "telephone-event/8000",
+        _ => "opus/48000/2",
+    };
+    let list: Vec<String> = formats.iter().map(u8::to_string).collect();
+    let mut s = format!(
+        "v=0\r\no=anna 1234 1234 IN IP4 {addr}\r\ns=-\r\nc=IN IP4 {addr}\r\nt=0 0\r\nm=audio {port} RTP/AVP {}\r\n",
+        list.join(" ")
+    );
+    for pt in formats {
+        s.push_str(&format!("a=rtpmap:{pt} {}\r\n", names(*pt)));
+    }
+    s.push_str("a=ptime:20\r\na=sendrecv\r\n");
+    s
+}
+
+/// An RTP packet with `len` bytes of payload (A-law silence)
+pub(crate) fn rtp_bytes(pt: u8, seq: u16, ts: u32, ssrc: u32, marker: bool, len: usize) -> Vec<u8> {
+    let mut m = vec![0x80, (u8::from(marker) << 7) | pt];
+    m.extend_from_slice(&seq.to_be_bytes());
+    m.extend_from_slice(&ts.to_be_bytes());
+    m.extend_from_slice(&ssrc.to_be_bytes());
+    m.extend(std::iter::repeat_n(0xd5, len));
+    m
+}
+
+/// An RTCP sender report on `about` with a source description (CNAME)
+pub(crate) fn rtcp_report(ssrc: u32, about: u32, cname: &str) -> Vec<u8> {
+    rtcp_report_on(ssrc, about, 5, 24, cname)
+}
+
+/// An RTCP sender report: `about` lost `fraction`/256 of its packets and has this jitter (in
+/// units of the clock)
+pub(crate) fn rtcp_report_on(
+    ssrc: u32,
+    about: u32,
+    fraction: u8,
+    jitter: u32,
+    cname: &str,
+) -> Vec<u8> {
+    let mut m = vec![0x81, 200, 0, 12];
+    m.extend_from_slice(&ssrc.to_be_bytes());
+    // NTP time 2026-11-09 12:00:00 UTC and its fraction
+    m.extend_from_slice(&4_003_214_400_u32.to_be_bytes());
+    m.extend_from_slice(&0x8000_0000_u32.to_be_bytes());
+    m.extend_from_slice(&160_000_u32.to_be_bytes());
+    m.extend_from_slice(&1000_u32.to_be_bytes());
+    m.extend_from_slice(&160_000_u32.to_be_bytes());
+    // the report block: the fraction lost, 12 in all, the jitter
+    m.extend_from_slice(&about.to_be_bytes());
+    m.extend_from_slice(&[fraction, 0, 0, 12]);
+    m.extend_from_slice(&3010_u32.to_be_bytes());
+    m.extend_from_slice(&jitter.to_be_bytes());
+    m.extend_from_slice(&[0; 8]);
+    let mut chunk = ssrc.to_be_bytes().to_vec();
+    chunk.push(1);
+    chunk.push(u8::try_from(cname.len()).unwrap());
+    chunk.extend_from_slice(cname.as_bytes());
+    chunk.push(0);
+    while chunk.len() % 4 != 0 {
+        chunk.push(0);
+    }
+    m.extend_from_slice(&[0x81, 202]);
+    m.extend_from_slice(&u16::try_from(chunk.len() / 4).unwrap().to_be_bytes());
+    m.extend(chunk);
+    m
+}
+
+mod voip;

@@ -1,19 +1,41 @@
-//! The capture page: choose what to analyze, start, pause and stop.
+//! The capture page (`pageCapture` of the draft): choose what to analyze and start; while a
+//! capture runs, its card with pausing, stopping and the way to the overview.
 
 use std::time::Duration;
 
-use eframe::egui::{self, ComboBox, Grid, RichText, ScrollArea, TextEdit, Ui};
+use eframe::egui::emath::GuiRounding as _;
+use eframe::egui::text::LayoutJob;
+use eframe::egui::{
+    self, Align, Frame, Id, Layout, Margin, Rect, RichText, Sense, Stroke, TextFormat, Ui, pos2,
+    vec2,
+};
 
 use crate::engine::Engine;
 use crate::gui::load::{Loader, Task};
-use crate::gui::theme::palette;
-use crate::gui::widgets::{self, Kind};
-use crate::gui::{App, Page};
+use crate::gui::pages::head;
+use crate::gui::theme::{self, medium_font, mono_font, mono_semibold_font, palette};
+use crate::gui::widgets::{self, Kind, Tone, end_field, field_help, field_label, field_row};
+use crate::gui::{App, Page, icons};
 use crate::networking::types::capture_context::CaptureSourcePicklist;
 use crate::view::capture::{
-    AdapterRow, CaptureSetup, PacketChoice, StartRequest, apply_start, capture_setup, start_error,
+    CaptureSetup, PacketChoice, RunState, RunningCapture, StartRequest, apply_start, capture_setup,
+    start_error,
 };
 use crate::view::i18n::Lang;
+
+/// The column of the radio buttons (`.adapters td:first-child`)
+const RADIO_W: f32 = 40.0;
+/// Shares of the columns "Adapter" and "Adressen", as the table of the draft lays them out
+const ADAPTER_SHARE: f32 = 0.305;
+const ADDRESS_SHARE: f32 = 0.289;
+/// The curve of an adapter (`.adapters .spark`)
+const SPARK: egui::Vec2 = vec2(140.0, 26.0);
+/// Points of a curve: one a second for 30 seconds
+const SPARK_POINTS: usize = 30;
+/// Line heights in the table: the name (`--lh`), the description (`.sub`), an address
+const LINE_NAME: f32 = theme::FS_BASE * 1.45;
+const LINE_SUB: f32 = theme::FS_XS * 1.3;
+const LINE_ADDR: f32 = theme::FS_XS * 1.35;
 
 /// What the page reads
 struct Snapshot {
@@ -34,7 +56,6 @@ struct Form {
     export_dir: String,
     export_name: String,
     packets: PacketChoice,
-    packets_max: usize,
 }
 
 impl Form {
@@ -55,11 +76,6 @@ impl Form {
             export_dir: setup.export_dir.clone(),
             export_name: setup.export_name.clone(),
             packets: setup.packets,
-            packets_max: setup
-                .packets_max
-                .iter()
-                .find(|(_, _, selected)| *selected)
-                .map_or(0, |(_, n, _)| *n),
         }
     }
 
@@ -75,7 +91,6 @@ impl Form {
             export_dir: self.export_dir.clone(),
             export_name: self.export_name.clone(),
             packets: Some(self.packets),
-            packets_max: self.packets_max,
         }
     }
 }
@@ -154,36 +169,30 @@ pub fn show(app: &mut App, ui: &mut Ui) {
         move || read(t, &engine),
     );
 
-    ui.horizontal(|ui| {
-        app.back_arrow(ui);
-        ui.vertical(|ui| {
-            widgets::page_head(
-                ui,
-                &t.get("capture-title"),
-                Some(&t.get("capture-subtitle")),
-                |_| {},
-            );
-        });
-    });
-    if let Some(error) = app.pages.capture.error.clone() {
-        widgets::error(ui, &error);
-        ui.add_space(4.0);
-    }
     let running = app
         .pages
         .capture
         .snapshot
         .value_of(&app.live.capture_id)
-        .is_some_and(|s| s.setup.running.is_some());
-    ScrollArea::vertical().auto_shrink(false).show(ui, |ui| {
-        if running {
-            running_card(app, ui);
-        } else {
-            setup_cards(app, ui);
-        }
-    });
+        .and_then(|s| s.setup.running.as_ref())
+        .map(|r| r.subtitle.clone());
+    let subtitle = running.clone().unwrap_or_else(|| t.get("capture-subtitle"));
+    head(ui, &t.get("capture-title"), Some(&subtitle), |_| {});
+    if running.is_some() {
+        running_card(app, ui);
+    } else {
+        setup(app, ui);
+    }
 }
 
+/// What the buttons of the running capture do
+enum Action {
+    Overview,
+    Pause,
+    Stop,
+}
+
+/// The card of the running capture: its state and duration, the facts, the buttons
 fn running_card(app: &mut App, ui: &mut Ui) {
     let t = app.t;
     let Some(run) = app
@@ -195,78 +204,65 @@ fn running_card(app: &mut App, ui: &mut Ui) {
     else {
         return;
     };
-    let p = palette(ui.ctx());
-    let (fill, fg) = if run.frozen {
-        (p.warn_soft, p.warn)
-    } else {
-        (p.ok_soft, p.ok)
-    };
-    let state = run.state.clone();
-    let frozen = run.frozen;
-    let mut lines: Vec<(String, String, bool)> = vec![(run.kind.clone(), run.name.clone(), true)];
-    if !run.filter.is_empty() {
-        lines.push((t.get("capture-filter"), run.filter.clone(), true));
-    }
-    if let Some(path) = &run.export {
-        lines.push((t.get("capture-export"), path.clone(), true));
-    }
-    if let Some(link) = &run.link_type {
-        lines.push((t.get("capture-link-type"), link.clone(), false));
-    }
-    if !run.listening.is_empty() {
-        lines.push((t.get("capture-listening"), run.listening.join(", "), true));
-    }
-    if let Some(store) = &run.packet_store {
-        lines.push((t.get("settings-packet-store"), store.clone(), false));
-    }
-    if let Some((adapter, by_app)) = &run.dropped {
-        lines.push((
-            t.get("capture-dropped"),
-            t.get2(
-                "capture-dropped-text",
-                "adapter",
-                adapter.as_str(),
-                "app",
-                by_app.as_str(),
-            ),
-            false,
-        ));
-    }
-    let mut action = None;
-    widgets::card(
+    let action = widgets::custom_card(
         ui,
-        &t.get("capture-running"),
-        |ui| widgets::tag(ui, &state, fill, fg),
         |ui| {
-            widgets::facts(ui, "capture-facts", |ui| {
-                for (label, value, code) in &lines {
-                    widgets::fact_label(ui, label);
-                    if *code {
-                        widgets::code(ui, value);
-                    } else {
-                        ui.label(value);
+            let (tone, icon, id) = match run.state {
+                RunState::Running => (Tone::Ok, icons::CHECK_CIRCLE, "capture-running"),
+                RunState::Paused => (Tone::Warn, icons::PAUSE, "capture-state-paused"),
+                RunState::Finished => (Tone::Ok, icons::CHECK_CIRCLE, "capture-state-finished"),
+                RunState::Failed => (Tone::Err, icons::X_CIRCLE, "capture-state-error"),
+            };
+            widgets::state(ui, tone, Some(icon), &t.get(id));
+        },
+        |ui| widgets::card_note(ui, &run.duration),
+        |ui| {
+            Frame::new()
+                .inner_margin(Margin::same(theme::SP4 as i8))
+                .show(ui, |ui| {
+                    ui.set_width(ui.available_width());
+                    facts(ui, t, run);
+                });
+            let (left, overview) = foot(
+                ui,
+                |ui| {
+                    ui.spacing_mut().item_spacing.x = theme::SP2;
+                    let mut action = None;
+                    if matches!(run.state, RunState::Running | RunState::Paused) {
+                        let (icon, id) = if run.state == RunState::Paused {
+                            (icons::PLAY, "capture-resume")
+                        } else {
+                            (icons::PAUSE, "capture-pause")
+                        };
+                        let text = t.get(id);
+                        if widgets::icon_text_button(ui, Some(icon), &text, Kind::Secondary, false)
+                            .clicked()
+                        {
+                            action = Some(Action::Pause);
+                        }
                     }
-                    ui.end_row();
-                }
-            });
-            ui.add_space(6.0);
-            ui.horizontal(|ui| {
-                if widgets::button(ui, t.get("capture-to-overview"), Kind::Secondary).clicked() {
-                    action = Some(Action::Overview);
-                }
-                let pause = if frozen {
-                    "capture-resume"
-                } else {
-                    "capture-pause"
-                };
-                if widgets::button(ui, t.get(pause), Kind::Secondary).clicked() {
-                    action = Some(Action::Pause);
-                }
-                if widgets::button(ui, t.get("capture-stop"), Kind::Danger).clicked() {
-                    action = Some(Action::Stop);
-                }
-            });
-            widgets::hint(ui, &t.get("capture-stop-hint"));
+                    let text = t.get("capture-stop");
+                    if widgets::icon_text_button(ui, Some(icons::STOP), &text, Kind::Danger, false)
+                        .clicked()
+                    {
+                        action = Some(Action::Stop);
+                    }
+                    let p = palette(ui.ctx());
+                    let hint = widgets::small(t.get("capture-stop-hint")).color(p.text_3);
+                    ui.add(egui::Label::new(hint).truncate());
+                    action
+                },
+                |ui| {
+                    let text = t.get("capture-to-overview");
+                    widgets::text_icon_button(ui, &text, icons::ARROW_RIGHT, Kind::Primary)
+                        .clicked()
+                },
+            );
+            if overview {
+                Some(Action::Overview)
+            } else {
+                left
+            }
         },
     );
     match action {
@@ -277,10 +273,137 @@ fn running_card(app: &mut App, ui: &mut Ui) {
     }
 }
 
-enum Action {
-    Overview,
-    Pause,
-    Stop,
+/// A row of the facts of the running capture
+#[derive(Clone, Copy)]
+enum Fact {
+    Source,
+    Link,
+    Listening,
+    Filter,
+    Store,
+    Export,
+    Dropped,
+}
+
+/// The facts of the running capture (`dl.facts`)
+fn facts(ui: &mut Ui, t: Lang, run: &RunningCapture) {
+    let p = palette(ui.ctx());
+    let mut shown = vec![(Fact::Source, t.get("capture-source"))];
+    if run.link_type.is_some() {
+        shown.push((Fact::Link, t.get("capture-link-type")));
+    }
+    if !run.listening.is_empty() {
+        shown.push((Fact::Listening, t.get("capture-listening")));
+    }
+    if run.filter.is_some() {
+        shown.push((Fact::Filter, t.get("capture-filter")));
+    }
+    if run.packet_store.is_some() {
+        shown.push((Fact::Store, t.get("settings-packet-store")));
+    }
+    if run.export.is_some() {
+        shown.push((Fact::Export, t.get("capture-export")));
+    }
+    if run.dropped.is_some() {
+        shown.push((Fact::Dropped, t.get("capture-dropped")));
+    }
+    let labels: Vec<String> = shown.iter().map(|(_, label)| label.clone()).collect();
+    let muted = |ui: &mut Ui, text: String| {
+        ui.label(RichText::new(text).color(p.text_3));
+    };
+    widgets::facts(ui, &labels, |ui, i| match shown[i].0 {
+        Fact::Source => {
+            ui.label(
+                RichText::new(&run.source)
+                    .font(mono_semibold_font(theme::FS_SM))
+                    .color(p.text),
+            );
+            if !run.source_desc.is_empty() {
+                muted(ui, run.source_desc.clone());
+            }
+        }
+        Fact::Link => {
+            ui.label(run.link_type.clone().unwrap_or_default());
+        }
+        Fact::Listening => {
+            widgets::code(ui, &run.listening.join(", "));
+        }
+        Fact::Filter => match run.filter.as_deref() {
+            Some(filter) if !filter.is_empty() => {
+                widgets::code(ui, filter);
+            }
+            _ => muted(ui, t.get("capture-no-filter")),
+        },
+        Fact::Store => {
+            ui.label(run.packet_store.clone().unwrap_or_default());
+        }
+        Fact::Export => match run.export.as_deref() {
+            Some(path) if !path.is_empty() => {
+                widgets::code(ui, path);
+            }
+            _ => muted(ui, t.get("capture-no-export")),
+        },
+        Fact::Dropped => {
+            if let Some((adapter, app)) = &run.dropped {
+                dropped(ui, t, adapter, app);
+            }
+        }
+    });
+}
+
+/// "0 vom Adapter, 0 von openpacketmon (Puffer voll)" with the numbers as code
+fn dropped(ui: &mut Ui, t: Lang, adapter: &str, by_app: &str) {
+    let p = palette(ui.ctx());
+    let text = t.get2("capture-dropped-text", "adapter", "\u{1}", "app", "\u{2}");
+    let plain = TextFormat {
+        font_id: egui::FontId::proportional(theme::FS_BASE),
+        color: p.text,
+        ..Default::default()
+    };
+    let code = TextFormat {
+        font_id: mono_font(theme::FS_SM),
+        color: p.text,
+        ..Default::default()
+    };
+    let mut job = LayoutJob::default();
+    let mut rest = text.as_str();
+    while let Some(at) = rest.find(['\u{1}', '\u{2}']) {
+        job.append(&rest[..at], 0.0, plain.clone());
+        let number = if rest[at..].starts_with('\u{1}') {
+            adapter
+        } else {
+            by_app
+        };
+        job.append(number, 0.0, code.clone());
+        rest = &rest[at + 1..];
+    }
+    job.append(rest, 0.0, plain);
+    ui.label(job);
+}
+
+/// The foot of a card (`.cfoot`): a line, then 12 px above and below a row of buttons of 32 px;
+/// `left` from the left, `right` at the right end
+fn foot<L, R>(
+    ui: &mut Ui,
+    left: impl FnOnce(&mut Ui) -> L,
+    right: impl FnOnce(&mut Ui) -> R,
+) -> (L, R) {
+    widgets::rule(ui);
+    Frame::new()
+        .inner_margin(Margin::symmetric(theme::SP4 as i8, theme::SP3 as i8))
+        .show(ui, |ui| {
+            ui.set_width(ui.available_width());
+            let row = vec2(ui.available_width(), widgets::CONTROL_H);
+            ui.allocate_ui_with_layout(row, Layout::left_to_right(Align::Center), |ui| {
+                let l = left(ui);
+                let r = ui
+                    .with_layout(Layout::right_to_left(Align::Center), right)
+                    .inner;
+                (l, r)
+            })
+            .inner
+        })
+        .inner
 }
 
 /// Pauses or resumes the capture
@@ -295,7 +418,8 @@ pub fn stop(app: &mut App) {
     app.go(Page::Capture);
 }
 
-fn setup_cards(app: &mut App, ui: &mut Ui) {
+/// The choices before a capture: the source, the filter, the packet store, the PCAP file
+fn setup(app: &mut App, ui: &mut Ui) {
     let ctx = ui.ctx().clone();
     let t = app.t;
     let capture_id = app.live.capture_id;
@@ -305,6 +429,11 @@ fn setup_cards(app: &mut App, ui: &mut Ui) {
     {
         state.form = Some(Form::new(&snapshot.setup));
     }
+    if let Some(error) = &state.error {
+        widgets::notice_icon(ui, Tone::Err, Some(icons::X_CIRCLE), |ui| {
+            ui.label(error.as_str());
+        });
+    }
     let Some(snapshot) = state.snapshot.value() else {
         return;
     };
@@ -313,115 +442,224 @@ fn setup_cards(app: &mut App, ui: &mut Ui) {
     };
     let mut pick_file = false;
 
-    widgets::card(
+    let sources = [
+        CaptureSourcePicklist::Device,
+        CaptureSourcePicklist::File,
+        CaptureSourcePicklist::Ipfix,
+    ];
+    let chosen = sources.iter().position(|s| *s == form.source).unwrap_or(0);
+    let mut next_source = None;
+    widgets::tall_card(
         ui,
         &t.get("capture-source"),
-        |_| {},
+        widgets::CONTROL_H,
         |ui| {
-            let sources = [
-                CaptureSourcePicklist::Device,
-                CaptureSourcePicklist::File,
-                CaptureSourcePicklist::Ipfix,
-            ];
             let labels = [
                 t.get("source-device"),
                 t.get("source-file"),
                 t.get("source-ipfix"),
             ];
-            let chosen = sources.iter().position(|s| *s == form.source).unwrap_or(0);
-            if let Some(i) = widgets::segmented(ui, &labels, chosen) {
-                form.source = sources[i];
-            }
-            ui.add_space(6.0);
-            match form.source {
-                CaptureSourcePicklist::Device => device_fields(ui, t, form, snapshot),
-                CaptureSourcePicklist::File => {
-                    ui.label(t.get("capture-file-path"));
-                    ui.horizontal(|ui| {
-                        ui.add(
-                            TextEdit::singleline(&mut form.file)
-                                .hint_text("/home/…/capture.pcapng")
-                                .desired_width((ui.available_width() - 110.0).max(120.0)),
+            let icons = [icons::ADAPTER, icons::FILE, icons::RADIO];
+            next_source = widgets::segmented_icons(ui, &labels, &icons, chosen);
+        },
+        |ui| match form.source {
+            CaptureSourcePicklist::Device => adapters(ui, t, form, snapshot),
+            CaptureSourcePicklist::File => body(ui, |ui| {
+                field_label(ui, &t.get("capture-file-path"));
+                ui.horizontal(|ui| {
+                    ui.spacing_mut().item_spacing.x = theme::SP2;
+                    let browse = t.get("capture-browse");
+                    let button = widgets::button_width(ui, &browse) + widgets::ICON_SM + 6.0;
+                    let width = (ui.available_width() - button - theme::SP2).max(120.0);
+                    widgets::input(
+                        ui,
+                        &mut form.file,
+                        Id::NULL.with("capture-file"),
+                        vec2(width, widgets::CONTROL_H),
+                        false,
+                        &t.get("capture-file-example"),
+                    );
+                    pick_file = widgets::icon_text_button(
+                        ui,
+                        Some(icons::FOLDER),
+                        &browse,
+                        Kind::Secondary,
+                        false,
+                    )
+                    .clicked();
+                });
+                field_help(ui, &t.get("capture-file-hint"));
+                end_field(ui);
+            }),
+            CaptureSourcePicklist::Ipfix => body(ui, |ui| {
+                field_row(
+                    ui,
+                    |ui, width| {
+                        field_label(ui, &t.get("capture-ipfix-addr"));
+                        widgets::input(
+                            ui,
+                            &mut form.ipfix_addr,
+                            Id::NULL.with("capture-ipfix-addr"),
+                            vec2(width, widgets::CONTROL_H),
+                            false,
+                            &t.get("capture-ipfix-all"),
                         );
-                        pick_file = widgets::button(ui, t.get("gui-choose-file"), Kind::Secondary)
-                            .clicked();
-                    });
-                    widgets::hint(ui, &t.get("capture-file-hint"));
-                }
-                CaptureSourcePicklist::Ipfix => {
-                    Grid::new("ipfix").num_columns(2).show(ui, |ui| {
-                        ui.label(t.get("capture-ipfix-addr"));
-                        ui.add(TextEdit::singleline(&mut form.ipfix_addr).hint_text("0.0.0.0"));
-                        ui.end_row();
-                        ui.label(t.get("capture-ipfix-port"));
-                        ui.add(TextEdit::singleline(&mut form.ipfix_port).hint_text("4739"));
-                        ui.end_row();
-                    });
-                    widgets::hint(ui, &t.get("capture-ipfix-hint"));
-                }
-            }
+                        end_field(ui);
+                    },
+                    |ui, width| {
+                        field_label(ui, &t.get("capture-ipfix-port"));
+                        widgets::input(
+                            ui,
+                            &mut form.ipfix_port,
+                            Id::NULL.with("capture-ipfix-port"),
+                            vec2(width, widgets::CONTROL_H),
+                            false,
+                            "4739",
+                        );
+                        end_field(ui);
+                    },
+                );
+                widgets::hint(ui, &t.get("capture-ipfix-hint"));
+                ui.add_space(theme::SP2);
+            }),
         },
     );
 
+    if let Some(i) = next_source {
+        form.source = sources[i];
+    }
+
+    // filters and the packet store only for sources with packets
     if form.source != CaptureSourcePicklist::Ipfix {
-        ui.add_space(8.0);
-        widgets::card(
+        widgets::grid2(
             ui,
-            &t.get("capture-filter"),
-            |_| {},
-            |ui| {
-                ui.label(t.get("capture-bpf"));
-                ui.add(
-                    TextEdit::singleline(&mut form.bpf)
-                        .hint_text("tcp port 443 or udp port 53")
-                        .desired_width(f32::INFINITY),
+            "capture",
+            |ui, fill| {
+                widgets::flush_card(
+                    ui,
+                    &t.get("capture-filter"),
+                    |_| {},
+                    |ui| {
+                        body(ui, |ui| {
+                            field_label(ui, &t.get("capture-bpf"));
+                            let width = ui.available_width();
+                            widgets::input(
+                                ui,
+                                &mut form.bpf,
+                                Id::NULL.with("capture-bpf"),
+                                vec2(width, widgets::CONTROL_H),
+                                // the draft writes it in the font of the page
+                                false,
+                                &t.get("capture-bpf-example"),
+                            );
+                            field_help(ui, &t.get("capture-bpf-hint"));
+                        });
+                        fill.apply(ui);
+                    },
                 );
-                widgets::hint(ui, &t.get("capture-bpf-hint"));
             },
-        );
-        ui.add_space(8.0);
-        widgets::card(
-            ui,
-            &t.get("settings-packet-store"),
-            |_| {},
-            |ui| {
+            |ui, fill| {
                 let choices = [PacketChoice::Full, PacketChoice::Headers, PacketChoice::Off];
-                let labels = [
-                    t.get("capture-packets-full"),
-                    t.get("capture-packets-headers"),
-                    t.get("capture-packets-off"),
-                ];
                 let chosen = choices.iter().position(|c| *c == form.packets).unwrap_or(0);
-                if let Some(i) = widgets::segmented(ui, &labels, chosen) {
+                let mut next = None;
+                widgets::tall_card(
+                    ui,
+                    &t.get("settings-packet-store"),
+                    widgets::CONTROL_SM_H,
+                    |ui| {
+                        let labels = [
+                            t.get("capture-packets-full"),
+                            t.get("capture-packets-headers"),
+                            t.get("capture-packets-off"),
+                        ];
+                        next = widgets::segmented_sized(ui, &labels, chosen, true);
+                    },
+                    |ui| {
+                        body(ui, |ui| {
+                            let p = palette(ui.ctx());
+                            let line = &snapshot.setup.packets_lines[chosen];
+                            ui.add(
+                                egui::Label::new(
+                                    RichText::new(line)
+                                        .font(medium_font(theme::FS_SM))
+                                        .color(p.text)
+                                        .line_height(Some(theme::FS_SM * 1.45)),
+                                )
+                                .wrap(),
+                            );
+                            ui.add_space(theme::SP2);
+                            widgets::hint(ui, &t.get("capture-packets-hint"));
+                        });
+                        fill.apply(ui);
+                    },
+                );
+                if let Some(i) = next {
                     form.packets = choices[i];
                 }
-                if form.packets != PacketChoice::Off {
-                    let current = snapshot
-                        .setup
-                        .packets_max
-                        .iter()
-                        .find(|(_, n, _)| *n == form.packets_max)
-                        .map(|(label, _, _)| label.clone())
-                        .unwrap_or_default();
-                    ComboBox::from_label(t.get("settings-packets-max"))
-                        .selected_text(current)
-                        .show_ui(ui, |ui| {
-                            for (label, n, _) in &snapshot.setup.packets_max {
-                                ui.selectable_value(&mut form.packets_max, *n, label);
-                            }
-                        });
-                }
-                widgets::hint(ui, &t.get("capture-packets-hint"));
             },
         );
     }
 
-    ui.add_space(8.0);
+    // only adapters write PCAP files
+    if form.source == CaptureSourcePicklist::Device {
+        widgets::flush_card(
+            ui,
+            &t.get("capture-export"),
+            |_| {},
+            |ui| {
+                body(ui, |ui| {
+                    widgets::check(ui, &mut form.export, &t.get("capture-export-enable"));
+                    ui.add_space(theme::SP2);
+                    let on = form.export;
+                    field_row(
+                        ui,
+                        |ui, width| {
+                            field_label(ui, &t.get("capture-export-dir"));
+                            widgets::input_on(
+                                ui,
+                                &mut form.export_dir,
+                                Id::NULL.with("capture-export-dir"),
+                                vec2(width, widgets::CONTROL_H),
+                                false,
+                                "",
+                                on,
+                            );
+                            end_field(ui);
+                        },
+                        |ui, width| {
+                            field_label(ui, &t.get("capture-export-name"));
+                            widgets::input_on(
+                                ui,
+                                &mut form.export_name,
+                                Id::NULL.with("capture-export-name"),
+                                vec2(width, widgets::CONTROL_H),
+                                false,
+                                "openpacketmon.pcap",
+                                on,
+                            );
+                            end_field(ui);
+                        },
+                    );
+                });
+            },
+        );
+    }
+
     let request = form.request();
     let busy = state.start.busy();
     let mut clicked = false;
-    ui.add_enabled_ui(!busy, |ui| {
-        clicked = widgets::button(ui, t.get("capture-start"), Kind::Primary).clicked();
+    let row = vec2(ui.available_width(), widgets::CONTROL_H);
+    ui.allocate_ui_with_layout(row, Layout::right_to_left(Align::Center), |ui| {
+        ui.add_enabled_ui(!busy, |ui| {
+            clicked = widgets::icon_text_button(
+                ui,
+                Some(icons::PLAY),
+                &t.get("capture-start"),
+                Kind::Primary,
+                false,
+            )
+            .clicked();
+        });
     });
     if pick_file {
         state.file_dialog.start(&ctx, || {
@@ -436,133 +674,258 @@ fn setup_cards(app: &mut App, ui: &mut Ui) {
     }
 }
 
-fn device_fields(ui: &mut Ui, t: Lang, form: &mut Form, snapshot: &Snapshot) {
-    let p = palette(ui.ctx());
-    ui.label(RichText::new(t.get("capture-adapters")).strong());
-    widgets::hint(ui, &t.get("capture-adapters-hint"));
-    if snapshot.setup.adapters.is_empty() {
-        widgets::notice(ui, |ui| {
-            ui.label(RichText::new(t.get("capture-no-adapters")).strong());
-            ui.label(t.get("capture-no-adapters-hint"));
+/// The body of a card with 16 px around it (`.cbody`)
+fn body(ui: &mut Ui, add: impl FnOnce(&mut Ui)) {
+    Frame::new()
+        .inner_margin(Margin::same(theme::SP4 as i8))
+        .show(ui, |ui| {
+            ui.set_width(ui.available_width());
+            add(ui);
         });
-    } else {
-        Grid::new("adapters")
-            .num_columns(3)
-            .spacing([14.0, 6.0])
-            .striped(false)
-            .show(ui, |ui| {
-                ui.scope(|ui| {
-                    ui.set_min_width(280.0);
-                    widgets::fact_label(ui, &t.get("capture-adapter"));
-                });
-                ui.scope(|ui| {
-                    ui.set_min_width(300.0);
-                    widgets::fact_label(ui, &t.get("capture-addresses"));
-                });
-                widgets::fact_label(ui, &t.get("capture-activity"));
-                ui.end_row();
-                for adapter in &snapshot.setup.adapters {
-                    if adapter.no_ip {
-                        // the preview only learns this after opening the adapter
-                        if form.device == adapter.name {
-                            form.device.clear();
-                        }
-                        no_ip_row(ui, t, adapter);
-                        ui.end_row();
-                        continue;
-                    }
-                    ui.vertical(|ui| {
-                        ui.spacing_mut().item_spacing.y = 0.0;
-                        let name = RichText::new(&adapter.label).strong();
-                        ui.radio_value(&mut form.device, adapter.name.clone(), name);
-                        if !adapter.desc.is_empty() {
-                            ui.label(RichText::new(&adapter.desc).small().color(p.muted));
-                        }
-                    });
-                    if adapter.addresses.is_empty() {
-                        ui.label(RichText::new("–").color(p.faint));
-                    } else {
-                        ui.add(
-                            egui::Label::new(RichText::new(&adapter.addresses).small())
-                                .wrap_mode(egui::TextWrapMode::Truncate),
-                        )
-                        .on_hover_text(&adapter.addresses);
-                    }
-                    ui.horizontal(|ui| {
-                        let packets = snapshot
-                            .previews
-                            .iter()
-                            .find(|(name, _)| *name == adapter.name)
-                            .map_or(&[][..], |(_, packets)| packets.as_slice());
-                        sparkline(ui, packets);
-                        ui.label(&adapter.packets);
-                    });
-                    ui.end_row();
-                }
+}
+
+/// The adapters (`table.adapters`): the hint, then a row for each with a radio button, name and
+/// description, addresses and the curve of its packets
+fn adapters(ui: &mut Ui, t: Lang, form: &mut Form, snapshot: &Snapshot) {
+    let p = palette(ui.ctx());
+    Frame::new()
+        .inner_margin(Margin {
+            left: theme::SP4 as i8,
+            right: theme::SP4 as i8,
+            top: theme::SP3 as i8,
+            bottom: 0,
+        })
+        .show(ui, |ui| {
+            ui.set_width(ui.available_width());
+            widgets::hint(ui, &t.get("capture-adapters-hint"));
+        });
+    let rows = &snapshot.setup.adapters;
+    if rows.is_empty() {
+        body(ui, |ui| {
+            widgets::notice(ui, |ui| {
+                ui.label(RichText::new(t.get("capture-no-adapters")).strong());
+                ui.label(t.get("capture-no-adapters-hint"));
             });
-    }
-    ui.add_space(4.0);
-    ui.checkbox(&mut form.export, t.get("capture-export-enable"));
-    if form.export {
-        Grid::new("export").num_columns(2).show(ui, |ui| {
-            ui.label(t.get("capture-export-dir"));
-            ui.add(TextEdit::singleline(&mut form.export_dir).desired_width(320.0));
-            ui.end_row();
-            ui.label(t.get("capture-export-name"));
-            ui.add(
-                TextEdit::singleline(&mut form.export_name)
-                    .hint_text("openpacketmon.pcap")
-                    .desired_width(320.0),
-            );
-            ui.end_row();
         });
+        return;
     }
-}
+    let total = ui.available_width();
+    let left = ui.cursor().left();
+    let w_adapter = (total * ADAPTER_SHARE).round();
+    let w_address = (total * ADDRESS_SHARE).round();
+    let cols = [
+        left,
+        left + RADIO_W,
+        left + RADIO_W + w_adapter,
+        left + RADIO_W + w_adapter + w_address,
+    ];
+    let pad = theme::SP3;
+    let pixels = ui.ctx().pixels_per_point();
 
-/// An adapter without IP traffic (Bluetooth, NFLOG …): greyed out, cannot be chosen, a note
-/// instead of the activity, since the preview does not watch it
-fn no_ip_row(ui: &mut Ui, t: Lang, adapter: &AdapterRow) {
-    let p = palette(ui.ctx());
-    let note = t.get("capture-no-ip");
-    ui.vertical(|ui| {
-        ui.spacing_mut().item_spacing.y = 0.0;
-        let name = RichText::new(&adapter.label).strong();
-        ui.add_enabled(false, egui::RadioButton::new(false, name))
-            .on_disabled_hover_text(&note);
-        if !adapter.desc.is_empty() {
-            ui.label(RichText::new(&adapter.desc).small().color(p.faint));
+    // the head (`.tbl th`)
+    let (head, _) = ui.allocate_exact_size(vec2(total, 32.0), Sense::hover());
+    ui.painter().rect_filled(head, 0.0, p.surface_2);
+    ui.painter().hline(
+        head.x_range(),
+        head.bottom() - 0.5,
+        Stroke::new(1.0, p.border),
+    );
+    for (i, id) in [
+        (1, "capture-adapter"),
+        (2, "capture-addresses"),
+        (3, "capture-activity"),
+    ] {
+        let galley = ui
+            .painter()
+            .layout_no_wrap(t.get(id), medium_font(theme::FS_SM), p.text_3);
+        let at = pos2(cols[i] + pad, head.center().y - 0.5 - galley.size().y / 2.0)
+            .round_to_pixels(pixels);
+        ui.painter().galley(at, galley, p.text_3);
+    }
+
+    // the highest number of packets in a second scales all curves
+    let max = snapshot
+        .previews
+        .iter()
+        .flat_map(|(_, packets)| packets.iter().copied())
+        .max()
+        .unwrap_or(0);
+    let id = Id::NULL.with("capture-adapters");
+    let last = rows.len() - 1;
+    for (r, row) in rows.iter().enumerate() {
+        let name_block = LINE_NAME + if row.desc.is_empty() { 0.0 } else { LINE_SUB };
+        let addresses = row.addresses.len().max(1) as f32 * LINE_ADDR;
+        let content = name_block.max(addresses).max(SPARK.y);
+        // 4 px above and below, at least `--row-h`, and the line below
+        let height = (content + 8.0).max(34.0).round() + if r < last { 1.0 } else { 0.0 };
+        let (rect, _) = ui.allocate_exact_size(vec2(total, height), Sense::hover());
+        let sense = if row.no_ip {
+            Sense::hover()
+        } else {
+            Sense::click()
+        };
+        let response = ui.interact(rect, id.with(r), sense);
+        let chosen = !row.no_ip && form.device == row.name;
+        let fill = if chosen {
+            p.selected
+        } else if response.hovered() {
+            p.hover
+        } else {
+            egui::Color32::TRANSPARENT
+        };
+        let cell = Rect::from_min_max(rect.min, pos2(rect.right(), rect.top() + height - 1.0));
+        ui.painter().rect_filled(cell, 0.0, fill);
+        if r < last {
+            ui.painter().hline(
+                rect.x_range(),
+                rect.bottom() - 0.5,
+                Stroke::new(1.0, p.border),
+            );
         }
-    });
-    if adapter.addresses.is_empty() {
-        ui.label(RichText::new("–").color(p.faint));
-    } else {
-        ui.add(
-            egui::Label::new(RichText::new(&adapter.addresses).small().color(p.faint))
-                .wrap_mode(egui::TextWrapMode::Truncate),
-        )
-        .on_hover_text(&adapter.addresses);
+        let middle = rect.top() + (height - if r < last { 1.0 } else { 0.0 }) / 2.0;
+        let (text, sub, addr) = if row.no_ip {
+            (p.text_3, p.text_3, p.text_3)
+        } else {
+            (p.text, p.text_3, p.text_2)
+        };
+        widgets::radio_mark(
+            ui,
+            pos2(cols[0] + pad + 8.0, middle),
+            chosen,
+            !row.no_ip,
+            response.hovered(),
+        );
+        // name and description
+        let clip = Rect::from_x_y_ranges(cols[1]..=cols[2] - pad, rect.y_range());
+        let painter = ui.painter().with_clip_rect(clip.intersect(ui.clip_rect()));
+        let mut y = middle - name_block / 2.0;
+        let x = cols[1] + pad;
+        let name = painter.layout_no_wrap(
+            row.label.clone(),
+            mono_semibold_font(theme::FS_BASE * 0.92),
+            text,
+        );
+        painter.galley(
+            pos2(x, y + (LINE_NAME - name.size().y) / 2.0).round_to_pixels(pixels),
+            name,
+            text,
+        );
+        y += LINE_NAME;
+        if !row.desc.is_empty() {
+            let width = (cols[2] - pad - x).min(360.0);
+            let desc = truncated(
+                ui,
+                &row.desc,
+                egui::FontId::proportional(theme::FS_XS),
+                sub,
+                width,
+            );
+            painter.galley(
+                pos2(x, y + (LINE_SUB - desc.size().y) / 2.0).round_to_pixels(pixels),
+                desc,
+                sub,
+            );
+        }
+        // the addresses, one per line
+        let clip = Rect::from_x_y_ranges(cols[2]..=cols[3] - pad, rect.y_range());
+        let painter = ui.painter().with_clip_rect(clip.intersect(ui.clip_rect()));
+        let x = cols[2] + pad;
+        let mut y = middle - addresses / 2.0;
+        let font = mono_font(theme::FS_XS);
+        if row.addresses.is_empty() {
+            let dash = painter.layout_no_wrap("–".to_owned(), font.clone(), p.text_3);
+            painter.galley(
+                pos2(x, y + (LINE_ADDR - dash.size().y) / 2.0).round_to_pixels(pixels),
+                dash,
+                p.text_3,
+            );
+        }
+        for address in &row.addresses {
+            let galley = painter.layout_no_wrap(address.clone(), font.clone(), addr);
+            painter.galley(
+                pos2(x, y + (LINE_ADDR - galley.size().y) / 2.0).round_to_pixels(pixels),
+                galley,
+                addr,
+            );
+            y += LINE_ADDR;
+        }
+        // the curve, or why there is none
+        let x = cols[3] + pad;
+        if row.no_ip {
+            let note = ui.painter().layout_no_wrap(
+                t.get("capture-no-ip"),
+                egui::FontId::proportional(theme::FS_SM),
+                p.text_3,
+            );
+            ui.painter().galley(
+                pos2(x, middle - note.size().y / 2.0).round_to_pixels(pixels),
+                note,
+                p.text_3,
+            );
+        } else {
+            let packets = snapshot
+                .previews
+                .iter()
+                .find(|(name, _)| *name == row.name)
+                .map_or(&[][..], |(_, packets)| packets.as_slice());
+            let at = Rect::from_min_size(pos2(x, middle - SPARK.y / 2.0), SPARK);
+            spark(ui, at, packets, max);
+        }
+        if response.clicked() && !row.no_ip {
+            form.device.clone_from(&row.name);
+        }
+        if !row.no_ip {
+            response.on_hover_cursor(egui::CursorIcon::PointingHand);
+        }
+        // the preview only learns after opening an adapter that it has no IP traffic
+        if row.no_ip && form.device == row.name {
+            form.device.clear();
+        }
     }
-    ui.label(RichText::new(note).small().color(p.muted));
 }
 
-/// The activity of an adapter in the last seconds
-fn sparkline(ui: &mut Ui, packets: &[u128]) {
+/// A text in one line, cut with "…" to `width`
+fn truncated(
+    ui: &Ui,
+    text: &str,
+    font: egui::FontId,
+    color: egui::Color32,
+    width: f32,
+) -> std::sync::Arc<egui::Galley> {
+    let mut job = LayoutJob::simple_singleline(text.to_owned(), font, color);
+    job.wrap.max_width = width;
+    job.wrap.max_rows = 1;
+    job.wrap.break_anywhere = true;
+    ui.painter().layout_job(job)
+}
+
+/// The packets of an adapter in the last 30 seconds (`.spark`): a line from the bottom, 1.5 px in
+/// the first color of the charts; a flat grey line without traffic
+fn spark(ui: &Ui, rect: Rect, packets: &[u128], max: u128) {
     let p = palette(ui.ctx());
-    let (rect, _) = ui.allocate_exact_size(egui::vec2(120.0, 24.0), egui::Sense::hover());
-    let max = packets.iter().copied().max().unwrap_or(0).max(1) as f32;
-    let n = packets.len().max(2) - 1;
-    let points: Vec<egui::Pos2> = packets
+    // the newest second at the right end; seconds not seen yet count as none
+    let skip = packets.len().saturating_sub(SPARK_POINTS);
+    let seen = &packets[skip..];
+    let mut values = vec![0_u128; SPARK_POINTS - seen.len()];
+    values.extend_from_slice(seen);
+    let flat = values.iter().all(|v| *v == 0);
+    #[allow(clippy::cast_precision_loss)] // a share of the height
+    let points: Vec<egui::Pos2> = values
         .iter()
         .enumerate()
-        .map(|(i, v)| {
-            egui::pos2(
-                rect.left() + rect.width() * i as f32 / n as f32,
-                rect.bottom() - rect.height() * (*v as f32 / max),
+        .map(|(k, v)| {
+            let share = if flat {
+                0.0
+            } else {
+                *v as f32 / max.max(1) as f32
+            };
+            pos2(
+                rect.left() + k as f32 * rect.width() / (SPARK_POINTS - 1) as f32,
+                rect.top() + 24.0 - share * 22.0,
             )
         })
         .collect();
-    if points.len() > 1 {
-        ui.painter()
-            .add(egui::Shape::line(points, egui::Stroke::new(1.5, p.accent)));
-    }
+    let color = if flat { p.border_strong } else { p.s1 };
+    ui.painter()
+        .add(egui::Shape::line(points, Stroke::new(1.5, color)));
 }

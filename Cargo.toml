@@ -3,7 +3,7 @@
 
 [package]
 name = "openpacketmon"
-version = "0.4.0"
+version = "0.5.0"
 description = "Network traffic monitor, based on Sniffnet"
 readme = "README.md"
 keywords = ["network", "packet", "traffic", "monitor", "pcap"]
@@ -43,7 +43,6 @@ confy = "2.0.0"
 dns-lookup = "4.0.2"
 eframe = { version = "0.37.0", default-features = false, features = ["accesskit", "clipboard", "default_fonts", "links", "wayland", "wgpu", "x11"] }
 egui_extras = { version = "0.37.0", features = ["image", "svg"] }
-egui_plot = "0.38.0"
 flate2 = "1.1.10"
 fluent-bundle = "0.16.0"
 image = { version = "0.25", default-features = false, features = ["png"] }
@@ -59,7 +58,7 @@ rand = "0.9.5"
 rust-embed = "8.13.0"
 reqwest = { version = "0.13.5", features = ["json"] }
 rfd = "0.17"
-rmcp = { version = "3.8.0", default-features = false, features = ["macros", "server", "transport-io"] }
+rmcp = { version = "3.9.0", default-features = false, features = ["macros", "server", "transport-io"] }
 rodio = { version = "0.23.0", default-features = false, features = ["playback"] }
 semver = "1.0.28"
 serde = { version = "1.0.229", features = ["derive"] }

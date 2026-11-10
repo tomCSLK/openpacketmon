@@ -239,7 +239,7 @@ pub fn connection_keys(name: &str) -> Option<&'static [&'static str]> {
 // ---- colors -------------------------------------------------------------------------------
 
 /// The coloring rules of the packet list: CSS class and filter, the first match wins
-pub const COLOR_RULES: [(&str, &str); 8] = [
+pub const COLOR_RULES: [(&str, &str); 9] = [
     (
         "bad",
         "tcp.analysis.flags or tcp.flags.rst or icmp.type in {3 4 5 11 12} or icmpv6.type < 128 \
@@ -251,6 +251,7 @@ pub const COLOR_RULES: [(&str, &str); 8] = [
     ("tls", "tls or quic"),
     ("http", "http"),
     ("icmp", "icmp or icmpv6"),
+    ("voip", "sip or rtp or rtcp"),
     ("udp", "udp"),
 ];
 

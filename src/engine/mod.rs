@@ -321,7 +321,7 @@ pub(crate) mod tests {
             );
             // one sample per second of the file: 1000, 1001, 1002 (idle), 1003
             assert_eq!(state.traffic_history.ticks(), 4);
-            let (entries, tot, agglomerate) = state.searched_entries(
+            let (entries, tot, agglomerate, _) = state.searched_entries(
                 None,
                 crate::report::types::sort_type::SortType::Neutral,
                 DataRepr::bytes(false),

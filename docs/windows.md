@@ -1,6 +1,6 @@
 # Windows-Version von openpacketmon
 
-Angelegt 2026-10-30, ergänzt bis 2026-11-09. Diese Datei beschreibt, was nötig ist, um das Projekt auf einem Windows-Rechner fortzusetzen und dort eine
+Angelegt 2026-10-30, ergänzt bis 2026-11-10. Diese Datei beschreibt, was nötig ist, um das Projekt auf einem Windows-Rechner fortzusetzen und dort eine
 Windows-Version zu bauen und zu testen.
 
 **Stand (2026-11-09):** Windows läuft auf `main` (der Zweig `windows` ist seit 2026-11-02 übernommen). Debug- und Release-Fassung bauen,
@@ -10,6 +10,21 @@ Beschreibung, ohne Npcap startet das Programm mit einem Hinweis, die C-Laufzeit 
 **signiert** und seit 2026-11-03 im Release `v0.4.0` (Abschnitt 6.1). Mitschnitt im Fenster und MCP sind geprüft. Was noch offen ist, steht
 am Ende von Abschnitt 8. Die Punkte in Abschnitt 4 stammen aus einer Durchsicht des Codes auf dem Linux-Rechner, ergänzt um das, was unter
 Windows aufgefallen ist.
+
+**v0.5.0 (2026-11-10):** Unter Linux released, **ohne Windows-Installer**; die Release-Notes verweisen bis dahin auf den von v0.4.0. Der
+Code von 0.5.0 (neue Oberfläche nach `PLAN.md` 5.6, VoIP nach 5.7) wurde unter Windows **noch nie gebaut oder getestet**. Neue
+Abhängigkeiten für Windows gibt es nicht: Ton (`rodio`) und Dateidialog (`rfd`) waren schon in 0.4.0, `openpacketmon.ico` ist neu
+erzeugt, `openpacketmon.iss` hat nur die Signatur dazubekommen. Reihenfolge:
+1. `git pull`, dann `cargo build --release --workspace` und `cargo test --workspace`.
+2. Das Fenster kurz prüfen: neue Oberfläche, Statistik → Anrufe mit einer Aufnahme, Anhören (Ton über WASAPI), Speichern als WAV mit dem
+   Dateidialog, Hinweis auf neue Versionen in der Statusleiste.
+3. Installer bauen und signieren (Abschnitt 6.1), dann in Git Bash `dev/release.sh --add-windows
+   target/installer/openpacketmon-0.5.0-setup.exe --publish`; danach die Release-Notes anpassen (`gh release edit v0.5.0 --notes-file …`,
+   Windows-Absatz wie bei v0.4.0).
+
+Muss dabei Programmcode geändert werden, passt der Installer nicht mehr zum Tag `v0.5.0` (`--add-windows` lässt seit dem Tag nur Änderungen
+an `*.md`, `docs/`, `dev/`, `resources/packaging/` und `.github/` zu). Dann braucht es ein neues Release, etwa 0.5.1; die Version nennt der
+Nutzer.
 
 Die folgenden Absätze bis „Smart App Control“ sind **Verlauf** der ersten Schritte am 2026-11-02.
 
@@ -398,5 +413,5 @@ Update über eine ältere Version, Start ohne Npcap (Abschnitt 5 Punkt 8).
 **Beginn (Nutzer, 2026-11-02):** Windows wird **vor** dem ersten Release gemacht, weil andere Tester eine Windows-Fassung
 brauchen; MCP ist fertig. Der Haltepunkt aus `PLAN.md` 4.10 ist seit 2026-11-02 aufgehoben.
 
-**Noch offen (Stand 2026-11-09):** CI-Job für Windows (Abschnitt 7), Test auf einem sauberen System (Deinstallation, Update über eine
+**Noch offen (Stand 2026-11-10):** Build, Test und signierter Installer für v0.5.0 (oben unter „v0.5.0“), CI-Job für Windows (Abschnitt 7), Test auf einem sauberen System (Deinstallation, Update über eine
 ältere Version, Start ohne Npcap), MCP-Einrichtung in `docs/windows-tester.md`, MCP-Integrationstests von den echten Einstellungen trennen.

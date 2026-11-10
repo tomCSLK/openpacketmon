@@ -2,10 +2,12 @@
 
 **Stand: 2026-11-10.**
 
-- **v0.4.0** ist das erste öffentliche Release (2026-11-02, Linux; signierter Windows-Installer seit 2026-11-03), Repo https://github.com/tomCSLK/openpacketmon
-  öffentlich. Oberfläche egui (5.5), Mitschnitt-Helfer mit Rechten, MCP-Anbindung (5.4), Windows (5.3, Reste in `docs/windows.md` 8).
-- **Test-Paket 0.5.0** (2026-11-10, Commit „Version 0.5.0; …“, nicht veröffentlicht) mit der neuen Oberfläche (5.6) und VoIP (5.7);
-  Test durch den Nutzer steht aus.
+- **v0.5.0** ist released (2026-11-10, auf Ansage des Nutzers, nur Linux) mit der neuen Oberfläche (5.6) und VoIP (5.7); die `.deb`
+  ist bitgleich mit dem Test-Paket 0.5.0 (gleiche Prüfsumme). Der signierte Windows-Installer fehlt noch (auf dem Windows-Rechner bauen,
+  dann `dev/release.sh --add-windows`, `docs/windows.md` 6.1); die Release-Notes verweisen bis dahin auf den von v0.4.0. Test durch den
+  Nutzer steht aus. Repo https://github.com/tomCSLK/openpacketmon öffentlich.
+- **v0.4.0** war das erste öffentliche Release (2026-11-02, Linux; signierter Windows-Installer seit 2026-11-03). Oberfläche egui (5.5),
+  Mitschnitt-Helfer mit Rechten, MCP-Anbindung (5.4), Windows (5.3, Reste in `docs/windows.md` 8).
 - **Neue Oberfläche im Stil von opensecmon (5.6) umgesetzt** (2026-11-10, Stufen A–D nach dem abgenommenen Entwurf; Abweichungen dort).
 - **VoIP** (5.7, „go“ am 2026-11-10): SIP, SDP, RTP und RTCP in Paketliste und Filter, unter Statistik der Reiter „Anrufe“ mit Ablauf,
   Sprachqualität und Anhören von G.711; Entwurf abgenommen. **Stufen 1–5 umgesetzt** (Zerleger, Zuordnung zu Anrufen, Filter,
@@ -1785,12 +1787,14 @@ Standards (SIP RFC 3261, SDP RFC 8866, RTP/RTCP RFC 3550, Payload-Typen RFC 3551
 
 ## 5. Offene Punkte (Stand 2026-11-10)
 
-1. Neue Oberfläche (5.6): im Test-Paket 0.5.0; Test durch den Nutzer.
-2. VoIP (5.7, „go“ am 2026-11-10): Stufen 1–5 (Zerleger, Filter, Anrufe, Anhören, MCP) im Test-Paket 0.5.0; Test mit einem echten Anruf
+1. Neue Oberfläche (5.6): in v0.5.0 released (2026-11-10); Test durch den Nutzer.
+2. VoIP (5.7, „go“ am 2026-11-10): Stufen 1–5 (Zerleger, Filter, Anrufe, Anhören, MCP) in v0.5.0 released; Test mit einem echten Anruf
    (Tonausgabe, Dateidialog, Rufnummern über MCP).
-3. Windows-Reste (`docs/windows.md` 8): CI-Job, Test auf sauberem System, MCP-Einrichtung in `docs/windows-tester.md`, MCP-Integrationstests
+3. Signierter Windows-Installer für v0.5.0: auf dem Windows-Rechner bauen und mit `dev/release.sh --add-windows … --publish` anhängen,
+   danach die Release-Notes anpassen (`gh release edit v0.5.0 --notes-file …`; sie nennen bis dahin den Installer von v0.4.0).
+4. Windows-Reste (`docs/windows.md` 8): CI-Job, Test auf sauberem System, MCP-Einrichtung in `docs/windows-tester.md`, MCP-Integrationstests
    unter Windows von den echten Einstellungen trennen.
-4. Rückmeldung des Originals zum Pull Request mit der Korrektur aus 4.8 (Einzelheiten nur in `CLAUDE.local.md`).
-5. Weitere Ideen in 5.2, noch nicht beschlossen.
+5. Rückmeldung des Originals zum Pull Request mit der Korrektur aus 4.8 (Einzelheiten nur in `CLAUDE.local.md`).
+6. Weitere Ideen in 5.2, noch nicht beschlossen.
 
 Die Namenssuche (früher Abschnitt 6, 2026-10-28) ist erledigt: **openpacketmon**, Marke vom Nutzer geprüft.

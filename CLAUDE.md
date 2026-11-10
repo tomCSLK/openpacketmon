@@ -101,8 +101,8 @@ Fassung bis 2026-11-09 (mit dem Verlauf der Browser-Oberfläche) steht in der Gi
 
 Maßgeblich ist `PLAN.md` (oben „Stand“, Abschnitt 5). Kurz (2026-11-10):
 
-- **v0.4.0** ist released (2026-11-02, Linux; signierter Windows-Installer seit 2026-11-03). **Test-Paket 0.5.0** (2026-11-10) mit
-  neuer Oberfläche und VoIP, Test durch den Nutzer steht aus.
+- **v0.5.0** ist released (2026-11-10, Linux) mit neuer Oberfläche und VoIP; Test durch den Nutzer steht aus. Der signierte
+  Windows-Installer dazu fehlt noch (`dev/release.sh --add-windows`, `docs/windows.md` 6.1). v0.4.0 (2026-11-02) hat einen.
 - **Neue Oberfläche im Stil von opensecmon** (`PLAN.md` 5.6, `docs/entwurf/`): am 2026-11-10 in egui umgesetzt (Stufen A–D: Farben und
   Schriften, Kopf- und Statusleiste mit Hinweis auf neue Versionen, alle Seiten samt Einstellungen mit Unternavigation und Release-Notes,
   Symbole, Logo C, Programmsymbole, README-Bild), gegen den Entwurf geprüft; Abweichungen in `PLAN.md` 5.6.

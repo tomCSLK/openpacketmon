@@ -46,6 +46,9 @@
     { k: 'tele', name: 'telemetry.example.com', ip: '203.0.113.99', asn: 64496, as: 'Example Transit', cc: 'US' },
     { k: 'tv', name: '192.0.2.61', ip: '192.0.2.61', tags: ['lokal'], mac: MAC.tv },
     { k: 'spk', name: '192.0.2.62', ip: '192.0.2.62', tags: ['lokal'], mac: MAC.spk },
+    { k: 'sip', name: 'sip.example.net', ip: '203.0.113.60', asn: 64502, as: 'Beispiel Telefonie', cc: 'DE' },
+    { k: 'media', name: 'media.example.net', ip: '203.0.113.61', asn: 64502, as: 'Beispiel Telefonie', cc: 'DE' },
+    { k: 'meet', name: 'meet.example.com', ip: '198.51.100.90', asn: 64496, as: 'Example Transit', cc: 'US' },
     { k: 'bcast', name: '192.0.2.255', ip: '192.0.2.255', tags: ['Broadcast'] }
   ];
   const H = {}; HOSTS.forEach(function (h) { H[h.k] = h; });
@@ -54,11 +57,12 @@
   const PROGS = {
     firefox: '/usr/lib/firefox/firefox', thunderbird: '/usr/lib/thunderbird/thunderbird', 'systemd-resolved': '/usr/lib/systemd/systemd-resolved',
     ssh: '/usr/bin/ssh', 'gvfsd-smb': '/usr/libexec/gvfsd-smb', 'avahi-daemon': '/usr/sbin/avahi-daemon', 'systemd-timesyncd': '/usr/lib/systemd/systemd-timesyncd',
-    NetworkManager: '/usr/sbin/NetworkManager', http: '/usr/lib/apt/methods/http', 'cups-browsed': '/usr/sbin/cups-browsed', ping: '/usr/bin/ping'
+    NetworkManager: '/usr/sbin/NetworkManager', http: '/usr/lib/apt/methods/http', 'cups-browsed': '/usr/sbin/cups-browsed', ping: '/usr/bin/ping',
+    linphone: '/usr/bin/linphone'
   };
   const FAV_PROG = ['thunderbird'];
 
-  const CAT = { https: 'Web', http: 'Web', imaps: 'E-Mail', domain: 'Namensauflösung und Diensterkennung', mdns: 'Namensauflösung und Diensterkennung', ssdp: 'Namensauflösung und Diensterkennung', ntp: 'Netzwerkinfrastruktur', bootps: 'Netzwerkinfrastruktur', 'microsoft-ds': 'Dateiübertragung und Freigaben', ssh: 'Fernzugriff', ipp: 'Drucken und Scannen' };
+  const CAT = { https: 'Web', http: 'Web', imaps: 'E-Mail', domain: 'Namensauflösung und Diensterkennung', mdns: 'Namensauflösung und Diensterkennung', ssdp: 'Namensauflösung und Diensterkennung', ntp: 'Netzwerkinfrastruktur', bootps: 'Netzwerkinfrastruktur', 'microsoft-ds': 'Dateiübertragung und Freigaben', ssh: 'Fernzugriff', ipp: 'Drucken und Scannen', sip: 'Telefonie' };
 
   /* ---------- Flüsse: [Host, Protokoll, Art, Dienst, Port, Programm, Gewicht, Anteil eingehend, Aufteilung, Schwankung] ---------- */
   const FL = [
@@ -115,6 +119,162 @@
     http: addConn({ id: 'st-http', flow: FLOWS[5], proto: 'TCP', src: LOCAL, sport: 39874, dst: '198.51.100.140', dport: 80, dir: 'out', svc: 'http', prog: 'http', host: H.upd })
   };
 
+  /* ---------- VoIP (Vorhaben 5.7): SIP mit SDP, RTP, RTCP ----------
+     Alles erfunden: ein Softphone (linphone) auf diesem Rechner, Anbieter sip.example.net, Sprache über media.example.net,
+     dazu ein verschlüsselter Strom ohne SIP (Videokonferenz im Browser). Damit der übrige Verkehr sichtbar bleibt, ist während
+     eines Anrufs nur jedes zweite Paket RTP; die Sprachpakete tragen deshalb 60 ms (a=ptime:60, im Programm meist 20 ms). */
+  const PROV = '203.0.113.60', MEDIA = '203.0.113.61';
+  function voConn(id, sport, dport, host, prog, svc) { return addConn({ id: id, proto: 'UDP', src: LOCAL, sport: sport, dst: host.ip, dport: dport, dir: 'out', svc: svc || '', prog: prog, host: host }); }
+  const VO = { sip: voConn('vo-sip', 5060, 5060, H.sip, 'linphone', 'sip') };
+  function hstr(s) { let h = 2166136261; for (let i = 0; i < s.length; i += 1) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); } return h >>> 0; }
+  const hx8 = function (v) { return '0x' + (v >>> 0).toString(16).padStart(8, '0'); };
+  const ANNA = { name: 'Anna Beispiel', uri: 'sip:anna@sip.example.net' };
+  // Anrufe in der Reihenfolge der Aufzeichnung; media: eigener und fremder RTP-Port, Codec (Nummer laut RFC 3551)
+  const CALLS = [
+    { id: 'E', out: true, rtpOnly: true, peer: { name: '', uri: '' }, media: { lport: 52714, rport: 10000, pt: 111 } },
+    { id: 'C', out: true, cid: '7c1e9a40d2b3@192.0.2.20', peer: { name: '', uri: 'sip:vertrieb@example.com' }, ftag: 'a3f91c', ttag: '84c2e0d7', media: { lport: 7076, rport: 0, pt: null } },
+    { id: 'A', out: true, cid: '3f2a9c1e7b54@192.0.2.20', peer: { name: '', uri: 'sip:support@example.com' }, ftag: 'c81d07', ttag: '5b9e2a61', media: { lport: 7078, rport: 31456, pt: 8 } },
+    { id: 'B', out: false, cid: 'b2c7f3e9-1d4a@203.0.113.60', peer: { name: 'Beispiel GmbH', uri: 'sip:zentrale@example.org' }, ftag: 'as4f1e09c2', ttag: '9d03b7', offer: [0, 8, 101], media: { lport: 7080, rport: 40112, pt: 0 } },
+    { id: 'D', out: false, cid: '0e5a8b1c-77f2@203.0.113.60', peer: { name: 'Anonymous', uri: 'sip:anonymous@anonymous.invalid' }, ftag: 'as71c2d4e0', ttag: 'e64a10', media: { lport: 0, rport: 38020, pt: null } },
+    { id: 'F', out: true, cid: '91d4e6b0c3a8@192.0.2.20', peer: { name: '', uri: 'sip:technik@example.org' }, ftag: '2fe8b4', ttag: '0c7d5e93', media: { lport: 7082, rport: 35990, pt: 8 } }
+  ];
+  const VOREG = { id: 'R', out: true, reg: true, cid: '5d0b3e71a9f2@192.0.2.20', peer: ANNA, ftag: 'e17a3b', ttag: '1a7f0c3e', media: {} };
+  const CALL = { R: VOREG }; CALLS.forEach(function (c) { CALL[c.id] = c; });
+  // SIP-Nachrichten: [Paket, Anruf, Richtung, Methode oder Status, CSeq, CSeq-Methode, Extras]
+  // Extras: a = mit Anmeldedaten, s = SDP (offer/answer), t = To-Tag, x = ACK zu einer Fehlerantwort
+  const SIPL = [
+    [300, 'R', 'out', 'REGISTER', 1, 'REGISTER', {}], [301, 'R', 'in', 401, 1, 'REGISTER', { t: 1 }],
+    [302, 'R', 'out', 'REGISTER', 2, 'REGISTER', { a: 1 }], [303, 'R', 'in', 200, 2, 'REGISTER', { t: 1 }],
+    [12000, 'C', 'out', 'INVITE', 1, 'INVITE', { s: 'offer' }], [12001, 'C', 'in', 407, 1, 'INVITE', { t: 1 }], [12002, 'C', 'out', 'ACK', 1, 'ACK', { t: 1, x: 1 }],
+    [12003, 'C', 'out', 'INVITE', 2, 'INVITE', { s: 'offer', a: 1 }], [12004, 'C', 'in', 100, 2, 'INVITE', {}], [12010, 'C', 'in', 486, 2, 'INVITE', { t: 1 }], [12011, 'C', 'out', 'ACK', 2, 'ACK', { t: 1, x: 1 }],
+    [19400, 'A', 'out', 'INVITE', 1, 'INVITE', { s: 'offer', a: 2 }], [19401, 'A', 'in', 100, 1, 'INVITE', {}], [19405, 'A', 'in', 180, 1, 'INVITE', { t: 1 }],
+    [19990, 'A', 'in', 200, 1, 'INVITE', { t: 1, s: 'answer' }], [19991, 'A', 'out', 'ACK', 1, 'ACK', { t: 1 }], [26000, 'A', 'out', 'BYE', 2, 'BYE', { t: 1 }], [26001, 'A', 'in', 200, 2, 'BYE', { t: 1 }],
+    [30500, 'B', 'in', 'INVITE', 1, 'INVITE', { s: 'offer' }], [30501, 'B', 'out', 100, 1, 'INVITE', {}], [30502, 'B', 'out', 180, 1, 'INVITE', { t: 1 }],
+    [30800, 'B', 'out', 200, 1, 'INVITE', { t: 1, s: 'answer' }], [30801, 'B', 'in', 'ACK', 1, 'ACK', { t: 1 }], [34800, 'B', 'in', 'BYE', 2, 'BYE', { t: 1 }], [34801, 'B', 'out', 200, 2, 'BYE', { t: 1 }],
+    [40000, 'D', 'in', 'INVITE', 1, 'INVITE', { s: 'offer' }], [40001, 'D', 'out', 100, 1, 'INVITE', {}], [40002, 'D', 'out', 180, 1, 'INVITE', { t: 1 }],
+    [40400, 'D', 'in', 'CANCEL', 1, 'CANCEL', {}], [40401, 'D', 'out', 200, 1, 'CANCEL', { t: 1 }], [40402, 'D', 'out', 487, 1, 'INVITE', { t: 1 }], [40403, 'D', 'in', 'ACK', 1, 'ACK', { t: 1, x: 1 }],
+    [46200, 'F', 'out', 'INVITE', 1, 'INVITE', { s: 'offer', a: 3 }], [46201, 'F', 'in', 100, 1, 'INVITE', {}], [46204, 'F', 'in', 180, 1, 'INVITE', { t: 1 }],
+    [46480, 'F', 'in', 200, 1, 'INVITE', { t: 1, s: 'answer' }], [46481, 'F', 'out', 'ACK', 1, 'ACK', { t: 1 }]
+  ];
+  const REASON = { 100: 'Trying', 180: 'Ringing', 200: 'OK', 401: 'Unauthorized', 407: 'Proxy Authentication Required', 486: 'Busy Here', 487: 'Request Terminated' };
+  const RTPMAP = { 0: 'PCMU/8000', 8: 'PCMA/8000', 101: 'telephone-event/8000' };
+  const NONCE = { R: '6a0d93c4e1b7f258', I: '5f3a1c0e9b7d2468' };
+  function sdpText(call, kind) {
+    const ours = call.out === (kind === 'offer');
+    const m = call.media;
+    const ip = ours ? LOCAL : MEDIA, port = ours ? m.lport : m.rport;
+    const pts = kind === 'offer' ? (call.offer || [8, 0, 101]) : [m.pt, 101];
+    const sid = 1000 + hstr(call.id + kind) % 9000;
+    return ['v=0', 'o=' + (ours ? 'anna' : '-') + ' ' + sid + ' ' + sid + ' IN IP4 ' + ip, 's=-', 'c=IN IP4 ' + ip, 't=0 0', 'm=audio ' + port + ' RTP/AVP ' + pts.join(' ')]
+      .concat(pts.map(function (pt) { return 'a=rtpmap:' + pt + ' ' + RTPMAP[pt]; }), ['a=fmtp:101 0-15', 'a=ptime:60', 'a=sendrecv']).join('\r\n') + '\r\n';
+  }
+  function sipBuild(e) {
+    const s = { n: e[0], call: e[1], dir: e[2], what: e[3], cseq: e[4], cm: e[5], x: e[6] };
+    const call = CALL[s.call];
+    s.req = typeof s.what === 'string';
+    const fromUs = s.dir === 'out', reqFromUs = s.req ? fromUs : !fromUs;
+    const user = function (u) { return u.replace(/^sip:/, '').split('@')[0]; };
+    const ours = 'sip:anna@' + LOCAL + ':5060', theirs = 'sip:' + user(call.peer.uri) + '@' + PROV + ':5060';
+    const caller = call.out ? ANNA : call.peer, callee = call.out ? call.peer : ANNA;
+    const txm = s.cm === 'CANCEL' || (s.cm === 'ACK' && s.x.x) ? 'INVITE' : s.cm;
+    const branch = 'z9hG4bK' + hstr(call.id + s.cseq + txm + (s.cm === 'ACK' && !s.x.x ? 'ack' : '')).toString(16);
+    const ruri = !s.req ? '' : s.what === 'REGISTER' ? 'sip:sip.example.net' : !fromUs ? ours : (s.what === 'INVITE' || s.what === 'CANCEL' || s.x.x) ? callee.uri : theirs;
+    s.from = (caller.name ? '"' + caller.name + '" ' : '') + '<' + caller.uri + '>';
+    s.to = '<' + callee.uri + '>';
+    const H = [];
+    H.push(['Via', 'SIP/2.0/UDP ' + (reqFromUs ? LOCAL : PROV) + ':5060;branch=' + branch + (reqFromUs ? ';rport' : '')]);
+    if (s.req) H.push(['Max-Forwards', '70']);
+    H.push(['From', s.from + ';tag=' + call.ftag], ['To', s.to + (s.x.t ? ';tag=' + call.ttag : '')], ['Call-ID', call.cid], ['CSeq', s.cseq + ' ' + s.cm]);
+    if (s.what === 'INVITE' || s.what === 'REGISTER' || (!s.req && s.what === 200 && (s.cm === 'INVITE' || s.cm === 'REGISTER')) || s.what === 180) {
+      const mine = s.req ? fromUs : fromUs;
+      H.push(['Contact', '<' + (mine ? ours : theirs) + '>' + (s.cm === 'REGISTER' ? ';expires=3600' : '')]);
+    }
+    if (s.x.a) {
+      const reg = s.what === 'REGISTER';
+      const nc = ('0000000' + s.x.a).slice(-8);
+      H.push([reg ? 'Authorization' : 'Proxy-Authorization', 'Digest username="anna", realm="sip.example.net", nonce="' + (reg ? NONCE.R : NONCE.I) + '", uri="' + ruri + '", response="' +
+        hstr(call.id + s.cseq + 'r1').toString(16).padStart(8, '0') + hstr(call.id + 'r2').toString(16).padStart(8, '0') + hstr(s.cseq + call.id + 'r3').toString(16).padStart(8, '0') + hstr('r4' + call.id).toString(16).padStart(8, '0') +
+        '", algorithm=MD5, cnonce="' + hstr(call.id + 'cn').toString(16).padStart(8, '0') + '", qop=auth, nc=' + nc]);
+    }
+    if (s.what === 401) H.push(['WWW-Authenticate', 'Digest realm="sip.example.net", nonce="' + NONCE.R + '", algorithm=MD5, qop="auth"']);
+    if (s.what === 407) H.push(['Proxy-Authenticate', 'Digest realm="sip.example.net", nonce="' + NONCE.I + '", algorithm=MD5, qop="auth"']);
+    if (s.what === 'REGISTER') H.push(['Expires', '3600']);
+    if (s.what === 'INVITE' || (s.what === 200 && s.cm === 'INVITE')) H.push(['Allow', 'INVITE, ACK, CANCEL, BYE, OPTIONS, INFO, UPDATE, NOTIFY']);
+    H.push(fromUs ? ['User-Agent', 'Linphone/5.2 (belle-sip)'] : [s.req ? 'User-Agent' : 'Server', 'Beispiel-SBC/3.1']);
+    const sdp = s.x.s ? sdpText(call, s.x.s) : '';
+    if (sdp) H.push(['Content-Type', 'application/sdp']);
+    H.push(['Content-Length', String(sdp.length)]);
+    const first = s.req ? s.what + ' ' + ruri + ' SIP/2.0' : 'SIP/2.0 ' + s.what + ' ' + REASON[s.what];
+    s.text = [first].concat(H.map(function (h) { return h[0] + ': ' + h[1]; })).join('\r\n') + '\r\n\r\n' + sdp;
+    s.sdp = !!sdp; s.ruri = ruri; s.cid = call.cid; s.method = s.req ? s.what : null; s.status = s.req ? null : s.what;
+    s.info = (s.req ? 'Request: ' + s.what + ' ' + ruri : 'Status: ' + s.what + ' ' + REASON[s.what] + ' (' + s.cm + ')') + (sdp ? ', with session description' : '');
+    s.label = (s.req ? s.what : s.what + ' ' + REASON[s.what]) + (sdp ? ' (SDP)' : '');
+    return s;
+  }
+  const SIPN = {};
+  SIPL.forEach(function (e) { const s = sipBuild(e); SIPN[s.n] = s; const c = CALL[s.call]; (c.sip = c.sip || []).push(s.n); });
+  // Bezüge: Anfrage ↔ Antworten derselben Transaktion
+  SIPL.forEach(function (e) {
+    const s = SIPN[e[0]]; s.rels = [];
+    CALL[s.call].sip.forEach(function (m) {
+      const o = SIPN[m]; if (o.cseq !== s.cseq || o.cm !== s.cm || o.req === s.req) return;
+      const dt = time(Math.max(m, s.n)) - time(Math.min(m, s.n));
+      const ms = dt >= 1 ? dt.toFixed(1).replace('.', ',') + ' s' : (dt * 1000).toFixed(1).replace('.', ',') + ' ms';
+      if (s.req && m > s.n) s.rels.push(['→ Antwort ' + o.what + ' in Paket', m, ms]);
+      if (!s.req && m < s.n) s.rels.push(['← Antwort auf Paket', m, ms]);
+    });
+  });
+  // RTP-Ströme je Anruf und Richtung (o = gesendet, i = empfangen). jit: Jitter Ø/max in ms, gap: größter Abstand in ms
+  const RTPS = [
+    { call: 'E', conn: voConn('vo-srtp', 52714, 10000, H.meet, 'firefox'), rtcp: null, from: 5000, to: 11000, every: 3, pt: 111, step: 4320, enc: true,
+      o: { ssrc: 0x9b2e7714, seq0: 40981, ts0: 2830080, gap: 97.3 }, i: { ssrc: 0xc40a3f86, seq0: 712, ts0: 640320, gap: 131.5, loss: 0.003, ooo: 0 } },
+    { call: 'A', conn: voConn('vo-rtp-a', 7078, 31456, H.media, 'linphone'), rtcp: voConn('vo-rtcp-a', 7079, 31457, H.media, 'linphone'), from: 19992, to: 26000, every: 2, pt: 8, step: 480, setup: 19990,
+      o: { ssrc: 0x5e1f02a7, seq0: 21043, ts0: 1617600, jit: [0.4, 1.9], gap: 62.1 }, i: { ssrc: 0x0b77c3d1, seq0: 3310, ts0: 92400160, jit: [3.1, 9.8], gap: 79.4 } },
+    { call: 'B', conn: voConn('vo-rtp-b', 7080, 40112, H.media, 'linphone'), rtcp: voConn('vo-rtcp-b', 7081, 40113, H.media, 'linphone'), from: 30802, to: 34800, every: 2, pt: 0, step: 480, setup: 30800,
+      o: { ssrc: 0x2c90e415, seq0: 11872, ts0: 30411520, jit: [0.5, 2.2], gap: 63.0 }, i: { ssrc: 0x7a3361f0, seq0: 50210, ts0: 7718400, jit: [41.7, 183.2], gap: 412.6, loss: 0.04, ooo: 3 } },
+    { call: 'F', conn: voConn('vo-rtp-f', 7082, 35990, H.media, 'linphone'), rtcp: voConn('vo-rtcp-f', 7083, 35991, H.media, 'linphone'), from: 46482, to: null, every: 2, pt: 8, step: 480, setup: 46480,
+      o: { ssrc: 0x41d8a9e2, seq0: 6021, ts0: 551040, jit: [0.4, 1.7], gap: 61.8 }, i: { ssrc: 0x1f6b0c58, seq0: 28877, ts0: 13104000, jit: [2.4, 7.1], gap: 70.2 } }
+  ];
+  RTPS.forEach(function (R) {
+    CALL[R.call].rtp = R;
+    [R.o, R.i].forEach(function (side, k) {
+      if (!side.loss) return;
+      const a = [0]; let L = 0;   // a[i]: verlorene Pakete vor dem i-ten empfangenen
+      for (let i = 1; i <= 2000; i += 1) { const r = hash(i, 90 + k); if (r < side.loss) L += r < side.loss * 0.3 ? 2 : 1; a.push(L); }
+      side.lost = a;
+    });
+  });
+  const PTN = { 0: 'ITU-T G.711 PCMU', 8: 'ITU-T G.711 PCMA', 111: 'dynamic (111)' };
+  function voip(n) {
+    const s = SIPN[n];
+    if (s) {
+      const p = mk(n, time(n), VO.sip, { dir: s.dir, len: 42 + s.text.length, proto: s.sdp ? 'SIP/SDP' : 'SIP', cls: 'voip', kind: 'sip', info: s.info });
+      p.sip = s; return p;
+    }
+    for (let r = 0; r < RTPS.length; r += 1) {
+      const R = RTPS[r];
+      if (n < R.from || (R.to != null && n >= R.to)) continue;
+      const off = n - R.from;
+      if (off % R.every === 0) {
+        const k = off / R.every, out = k % 2 === 0, i = k >> 1, side = out ? R.o : R.i;
+        const lost = side.lost ? side.lost[Math.min(i, side.lost.length - 1)] : 0;
+        const seq = (side.seq0 + i + lost) & 0xffff, ts = (side.ts0 + (i + lost) * R.step) >>> 0;
+        const plen = R.enc ? 70 + Math.floor(hash(n, 41) * 110) : R.step;
+        const p = mk(n, time(n), R.conn, { dir: out ? 'out' : 'in', len: 54 + plen, proto: 'RTP', cls: 'voip', kind: 'rtp',
+          info: 'PT=' + PTN[R.pt] + ', SSRC=' + hx8(side.ssrc).toUpperCase().replace('0X', '0x') + ', Seq=' + seq + ', Time=' + ts + (i === 0 ? ', Mark' : '') });
+        p.rtp = { call: R.call, R: R, out: out, i: i, lost: lost, ssrc: side.ssrc, seq: seq, ts: ts, pt: R.pt, mark: i === 0, plen: plen };
+        return p;
+      }
+      if (R.rtcp && off % 334 === 1) {
+        const m = (off - 1) / 334, out = m % 2 === 0;
+        const p = mk(n, time(n), R.rtcp, { dir: out ? 'out' : 'in', len: 42 + 52 + 28, proto: 'RTCP', cls: 'voip', kind: 'rtcp', info: 'Sender Report, Source Description' });
+        p.rtcp = { call: R.call, R: R, out: out, m: m, ssrc: (out ? R.o : R.i).ssrc, about: (out ? R.i : R.o).ssrc };
+        return p;
+      }
+    }
+    return null;
+  }
+
   /* ---------- Pakete ---------- */
   function time(n) { return (n - 1 + 0.85 * hash(n, 1)) * STEP; }
   function weightAt(f, t) {
@@ -145,6 +305,7 @@
   }
 
   function gen(n) {
+    const v = voip(n); if (v) return v;
     if (n >= 1200 && n <= 1220) return story(n);
     if (n >= 2400 && n <= 2413) return story(n);
     const t = time(n);
@@ -488,12 +649,53 @@
     } else if (p.kind === 'dhcp') {
       const b0 = put([p.dir === 'in' ? 2 : 1, 1, 6, 0]), b1 = put([0x6a, 0x1c, 0x2f, 0x40]); fill('z');
       L('Dynamic Host Configuration Protocol (' + (p.dir === 'in' ? 'ACK' : 'Request') + ')', [as, bytes.length], [F('Message type', p.dir === 'in' ? 'Boot Reply (2)' : 'Boot Request (1)', b0), F('Transaction ID', '0x6a1c2f40', b1), F('Client MAC address', MAC.local, [as + 28, as + 34]), F('Host Name', 'arbeitsplatz', [as + 250, as + 262])]);
+    } else if (p.kind === 'sip') {
+      const sp = p.sip; const cut = sp.text.indexOf('\r\n\r\n');
+      const fields = [];
+      sp.text.slice(0, cut).split('\r\n').forEach(function (line, i) {
+        const r = put(ascii(line + '\r\n'));
+        fields.push(F(i === 0 ? (sp.req ? 'Request-Line' : 'Status-Line') : line.split(':')[0], i === 0 ? line : line.slice(line.indexOf(':') + 1).trim(), r));
+      });
+      put(ascii('\r\n'));
+      L('Session Initiation Protocol (' + sp.what + ')', [as, bytes.length], fields, { rels: sp.rels });
+      if (sp.sdp) {
+        const ss = bytes.length;
+        const NM = { v: 'Version', o: 'Owner/Creator', s: 'Session Name', c: 'Connection Information', t: 'Time Description', m: 'Media Description', a: 'Media Attribute' };
+        const sf = sp.text.slice(cut + 4).split('\r\n').filter(Boolean).map(function (line) { const r = put(ascii(line + '\r\n')); return F(NM[line[0]] + ' (' + line[0] + ')', line.slice(2), r); });
+        L('Session Description Protocol', [ss, bytes.length], sf);
+      }
+    } else if (p.kind === 'rtp') {
+      const r = p.rtp, S = r.R;
+      const b0 = put([0x80]), b1 = put([(r.mark ? 0x80 : 0) | r.pt]), b2 = put(u16(r.seq)), b3 = put(u32(r.ts)), b4 = put(u32(r.ssrc));
+      const ps = bytes.length;
+      if (S.enc) fill(); else { const base = r.pt === 8 ? 0xd5 : 0xff; const pay = []; for (let i = 0; i < r.plen; i += 1) pay.push(R() < 0.5 ? base ^ Math.floor(R() * 24) : base ^ Math.floor(R() * 4)); put(pay); }
+      const fields = [F('Version', 'RFC 1889 Version (2)', b0), F('Padding / Extension / CSRC count', 'False / False / 0', b0), F('Marker', r.mark ? 'True (erstes Paket des Stroms)' : 'False', b1),
+        F('Payload type', S.enc ? 'dynamisch (111), Codec unbekannt' : PTN[r.pt] + ' (' + r.pt + ')', b1), F('Sequence number', String(r.seq), b2), F('Timestamp', String(r.ts), b3),
+        F('Synchronization Source identifier', hx8(r.ssrc) + ' (' + r.ssrc + ')', b4),
+        F('Payload', S.enc ? (bytes.length - ps) + ' bytes (verschlüsselt oder unbekannt)' : (bytes.length - ps) + ' bytes, G.711 ' + (r.pt === 8 ? 'A-law' : 'µ-law') + ', ' + (r.plen / 8) + ' ms Sprache', [ps, bytes.length])];
+      if (S.enc) fields.push({ k: 'Erkannt', v: 'ohne SIP, an der Form: Version 2, gleichbleibende SSRC, fortlaufende Nummern (Einstellung „RTP auch ohne SIP erkennen“)' });
+      L('Real-Time Transport Protocol', [as, bytes.length], fields, { rels: S.setup ? [['Ausgehandelt per SDP in Paket', S.setup, '']] : [] });
+    } else if (p.kind === 'rtcp') {
+      const r = p.rtcp, S = r.R, side = r.out ? S.i : S.o;   // berichtet wird über den Strom der Gegenseite
+      const got = 1 + Math.round(r.m * 334 / 4), lost = side.lost ? side.lost[Math.min(got, side.lost.length - 1)] : 0;
+      const frac = side.loss ? Math.round(side.loss * 1.3 * 256) : 0, jit = Math.round((side.jit ? side.jit[0] : 1) * 8);
+      const h0 = put([0x81, 200]), h1 = put(u16(12)), h2 = put(u32(r.ssrc)), h3 = put(u32(0xec9b7a00 + r.m * 5).concat(u32(Math.floor(R() * 4294967295)))), h4 = put(u32(((r.out ? S.o : S.i).ts0 + got * S.step) >>> 0));
+      const h5 = put(u32(got)), h6 = put(u32(got * S.step)), h7 = put(u32(r.about)), h8 = put([frac].concat([0, (lost >> 8) & 255, lost & 255])), h9 = put(u32(side.seq0 + got + lost)), h10 = put(u32(jit)), h11 = put(u32(0).concat(u32(0)));
+      const cname = r.out ? 'anna@192.0.2.20' : 'media@203.0.113.61'; const sd = put([0x81, 202].concat(u16(5), u32(r.ssrc), [1, cname.length], ascii(cname), [0, 0]));
+      fill('z');
+      L('Real-time Transport Control Protocol (Sender Report)', [as, as + 52], [F('Version / Reception report count', '2 / 1', h0), F('Packet type', 'Sender Report (200)', h0), F('Length', '12 (52 bytes)', h1), F('Sender SSRC', hx8(r.ssrc), h2),
+        F('Timestamp, MSW / LSW', 'Nov  9, 2026 ' + clock(p.t, true).replace(',', '.') + ' UTC', h3), F('RTP timestamp', String(bytes[h4[0]] * 16777216 + bytes[h4[0] + 1] * 65536 + bytes[h4[0] + 2] * 256 + bytes[h4[0] + 3]), h4),
+        F("Sender's packet count", String(got), h5), F("Sender's octet count", String(got * S.step), h6), F('Report: SSRC', hx8(r.about), h7),
+        F('Fraction lost / Cumulative lost', frac + ' / 256 (' + (frac / 2.56).toFixed(1).replace('.', ',') + ' %) / ' + lost, h8), F('Extended highest sequence number', String(side.seq0 + got + lost), h9),
+        F('Interarrival jitter', jit + ' (' + (jit / 8).toFixed(1).replace('.', ',') + ' ms bei 8000 Hz)', h10), F('Last SR / Delay since last SR', '0 / 0', h11)]);
+      L('Real-time Transport Control Protocol (Source description)', [sd[0], sd[1]], [F('SSRC', hx8(r.ssrc), [sd[0] + 4, sd[0] + 8]), F('CNAME', cname, [sd[0] + 10, sd[0] + 10 + cname.length])]);
     } else {
       const ds = bytes.length; fill();
       L(p.kind === 'smb' ? 'SMB2 (Server Message Block Protocol version 2)' : p.kind === 'ssh' ? 'SSH Protocol' : 'Daten', [as, bytes.length], [F(p.kind === 'smb' ? 'Command' : 'Packet', p.kind === 'smb' ? (p.dir === 'in' ? 'Read Response (8)' : 'Read Request (8)') : (bytes.length - ds) + ' bytes (verschlüsselt)', [ds, Math.min(bytes.length, ds + 64)])]);
     }
     bytes.length = Math.min(bytes.length, p.len);
-    return { p: p, c: c, bytes: bytes, layers: frame(p, layers, bytes) };
+    const v = p.sip || p.rtp || p.rtcp;
+    return { p: p, c: c, bytes: bytes, layers: frame(p, layers, bytes), call: v && CALL[v.call] && !CALL[v.call].reg ? CALL[v.call] : null };
   }
   function frame(p, layers, bytes) {
     const f = { title: 'Frame ' + p.n + ': ' + p.len + ' bytes on wire (' + p.len * 8 + ' bits), ' + bytes.length + ' bytes captured', range: [0, bytes.length], fields: [
@@ -509,10 +711,12 @@
   const PFIELDS = {
     // Protokolle
     eth: 'p', ip: 'p', ipv6: 'p', tcp: 'p', udp: 'p', icmp: 'p', arp: 'p', dns: 'p', mdns: 'p', tls: 'p', quic: 'p', http: 'p', ssdp: 'p', ntp: 'p', dhcp: 'p', smb2: 'p', ssh: 'p',
+    sip: 'p', sdp: 'p', rtp: 'p', rtcp: 'p',
     // Felder
     'ip.addr': 'ip', 'ip.src': 'ip', 'ip.dst': 'ip', 'tcp.port': 'n', 'udp.port': 'n', 'port': 'n', 'frame.len': 'n', 'frame.number': 'n', 'domain': 's', 'tls.sni': 's',
     'tcp.flags.syn': 'b', 'tcp.flags.rst': 'b', 'tcp.analysis.flags': 'b', 'tcp.analysis.retransmission': 'b', 'tcp.analysis.duplicate_ack': 'b', 'tcp.analysis.out_of_order': 'b',
-    'dns.qry.name': 's', 'http.host': 's', 'http.request.method': 's', 'eth.addr': 's'
+    'dns.qry.name': 's', 'http.host': 's', 'http.request.method': 's', 'eth.addr': 's',
+    'sip.method': 's', 'sip.status_code': 'n', 'sip.call_id': 's', 'sip.from': 's', 'sip.to': 's', 'rtp.ssrc': 's', 'rtp.seq': 'n', 'rtp.p_type': 'n', 'voip.call_id': 's'
   };
   const CFIELDS = {
     tcp: 'p', udp: 'p', icmp: 'p', arp: 'p', ipv6: 'p', favorite: 'b',
@@ -551,6 +755,19 @@
       case 'tcp.analysis.duplicate_ack': return p.an === 'Dup ACK';
       case 'tcp.analysis.out_of_order': return p.an === 'Out-Of-Order';
       case 'eth.addr': return [MAC.local, c.host.mac || MAC.router];
+      case 'sip': return !!p.sip;
+      case 'sdp': return !!p.sip && p.sip.sdp;
+      case 'rtp': return !!p.rtp;
+      case 'rtcp': return !!p.rtcp;
+      case 'sip.method': return p.sip ? (p.sip.method || null) : null;
+      case 'sip.status_code': return p.sip ? p.sip.status : null;
+      case 'sip.call_id': return p.sip ? p.sip.cid : null;
+      case 'sip.from': return p.sip ? p.sip.from : null;
+      case 'sip.to': return p.sip ? p.sip.to : null;
+      case 'rtp.ssrc': return p.rtp ? hx8(p.rtp.ssrc) : null;
+      case 'rtp.seq': return p.rtp ? p.rtp.seq : null;
+      case 'rtp.p_type': return p.rtp ? p.rtp.pt : null;
+      case 'voip.call_id': { const v = p.sip || p.rtp || p.rtcp; const k = v && CALL[v.call]; return k && k.cid && !k.reg ? k.cid : null; }
       default: return null;
     }
   }
@@ -693,8 +910,65 @@
     'http.request.method': 'Methode, z. B. GET', remote: 'Adresse der Gegenstelle', proto: 'Protokoll, z. B. tcp', srcport: 'Quellport', dstport: 'Zielport',
     direction: 'outgoing oder incoming', service: 'Dienst, z. B. https', 'as.name': 'Netzbetreiber der Gegenstelle', 'as.number': 'Nummer des Netzbetreibers', country: 'Land als Kürzel, z. B. DE',
     program: 'Programm, Name oder Pfad', 'program.path': 'Pfad des Programms', packets: 'Pakete der Verbindung', bytes: 'Datenmenge der Verbindung in Bytes', favorite: 'Verbindung zu einem Favoriten',
-    smb2: 'Dateifreigaben (SMB)', ssh: 'Fernzugriff (SSH)', eth: 'Alle Pakete mit Ethernet'
+    smb2: 'Dateifreigaben (SMB)', ssh: 'Fernzugriff (SSH)', eth: 'Alle Pakete mit Ethernet',
+    sip: 'Telefonie: Anrufe aufbauen und beenden (SIP)', sdp: 'SIP mit Beschreibung der Sprachverbindung', rtp: 'Sprache und Video (RTP)', rtcp: 'Berichte zu RTP (Verlust, Jitter)',
+    'sip.method': 'SIP-Anfrage, z. B. INVITE oder BYE', 'sip.status_code': 'SIP-Antwort, z. B. 486 (besetzt)', 'sip.call_id': 'Kennung eines Anrufs (Call-ID)', 'sip.from': 'Anrufer (From)', 'sip.to': 'Angerufener (To)',
+    'rtp.ssrc': 'Kennung eines RTP-Stroms, z. B. 0x5e1f02a7', 'rtp.seq': 'Laufende Nummer im RTP-Strom', 'rtp.p_type': 'Codec-Nummer, z. B. 8 für G.711 A-law', 'voip.call_id': 'Alle Pakete eines Anrufs: SIP und die ausgehandelten RTP/RTCP-Ströme'
   };
+
+  /* ---------- Anrufe: Zusammenfassung aus den Paketen im Speicher (im Programm die Analyse über Paketgrenzen) ---------- */
+  function callStats(id) {
+    const k = CALL[id], R = k.rtp;
+    const st = { call: k, id: id, sip: 0, rtp: 0, rtcp: 0, bytes: 0, msgs: [], o: { n: 0, exp: 0, lost: 0, loss: 0 }, i: { n: 0, exp: 0, lost: 0, loss: 0 }, rtpFirst: null, rtpLast: null };
+    const from = k.sip ? k.sip[0] : R.from;
+    const to = Math.min(N, R && R.to == null ? N : Math.max(k.sip ? k.sip[k.sip.length - 1] : 0, R ? R.to : 0));
+    if (from > N) return null;
+    for (let n = from; n <= to; n += 1) {
+      const p = pkt(n), v = p.sip || p.rtp || p.rtcp;
+      if (!v || v.call !== id) continue;
+      st.bytes += p.len;
+      if (p.sip) { st.sip += 1; st.msgs.push(p.sip); }
+      else if (p.rtcp) st.rtcp += 1;
+      else {
+        st.rtp += 1; const sd = p.rtp.out ? st.o : st.i;
+        sd.n += 1; sd.exp = Math.max(sd.exp, p.rtp.i + p.rtp.lost + 1); sd.last = n; if (sd.first == null) sd.first = n;
+        if (st.rtpFirst == null) st.rtpFirst = n; st.rtpLast = n;
+      }
+    }
+    const find = function (f) { return st.msgs.filter(f)[0] || null; };
+    const inv = find(function (m) { return m.what === 'INVITE'; });
+    const ok = find(function (m) { return m.what === 200 && m.cm === 'INVITE'; });
+    const fail = find(function (m) { return !m.req && m.cm === 'INVITE' && m.what >= 300 && m.what !== 401 && m.what !== 407; });
+    const cancel = find(function (m) { return m.what === 'CANCEL'; });
+    const bye = find(function (m) { return m.what === 'BYE'; });
+    const ring = find(function (m) { return m.what === 180; });
+    st.first = from; st.t0 = time(from);
+    if (k.rtpOnly) { st.state = 'rtp'; st.t1 = time(st.rtpLast || from); }
+    else if (cancel) { st.state = k.out ? 'cancelled' : 'missed'; st.t1 = time(cancel.n); st.endN = cancel.n; }
+    else if (fail) { st.state = 'rejected'; st.code = fail.what; st.t1 = time(fail.n); st.endN = fail.n; }
+    else if (ok && bye) { st.state = 'ended'; st.t1 = time(bye.n); st.endN = bye.n; st.byUs = bye.dir === 'out'; }
+    else if (ok) { st.state = 'running'; st.t1 = now(); }
+    else { st.state = ring ? 'ringing' : 'setup'; st.t1 = now(); }
+    st.inv = inv; st.ok = ok; st.ring = ring;
+    st.tAnswer = ok ? time(ok.n) : null;
+    st.talk = ok ? st.t1 - st.tAnswer : (k.rtpOnly ? st.t1 - st.t0 : 0);
+    st.wait = (ok ? st.tAnswer : st.t1) - st.t0;
+    st.packets = st.sip + st.rtp + st.rtcp;
+    if (R) {
+      [['o', R.o], ['i', R.i]].forEach(function (x) {
+        const sd = st[x[0]], def = x[1];
+        sd.ssrc = def.ssrc; sd.lost = Math.max(0, sd.exp - sd.n); sd.loss = sd.exp ? sd.lost / sd.exp * 100 : 0;
+        sd.jit = def.jit || null; sd.gap = def.gap; sd.ooo = def.ooo || 0;
+        sd.rate = !sd.n ? null : (sd.loss >= 3 || (sd.jit && sd.jit[0] >= 50)) ? 'bad' : (sd.loss >= 1 || (sd.jit && sd.jit[0] >= 30)) ? 'fair' : 'good';
+      });
+      const order = { good: 0, fair: 1, bad: 2 };
+      st.rate = [st.o.rate, st.i.rate].filter(Boolean).sort(function (a, b) { return order[b] - order[a]; })[0] || null;
+      st.codec = R.pt === 8 ? 'G.711 A-law' : R.pt === 0 ? 'G.711 µ-law' : 'unbekannt';
+      st.playable = !R.enc && st.rtp > 0;
+    } else { st.rate = null; st.codec = k.media.pt != null ? '' : '–'; st.playable = false; }
+    return st;
+  }
+  function calls() { return CALLS.map(function (c) { return callStats(c.id); }).filter(Boolean); }
 
   /* ---------- Benachrichtigungen ---------- */
   const NOTES = [
@@ -719,6 +993,7 @@
     CONNS: CONNS, CBY: CBY, ST: ST, SEC: SEC, ANALYSIS: ANALYSIS, NOTES: NOTES, HINTS: HINTS, PFIELDS: PFIELDS, CFIELDS: CFIELDS,
     count: function () { return N; }, total: function () { return TOTAL; }, grow: grow, gen: gen, pkt: pkt, time: time, now: now, clock: clock,
     detail: detail, HTTP_REQ: HTTP_REQ, HTTP_RESP: HTTP_RESP, isFav: isFav,
+    CALLS: CALLS, CALL: CALL, VO: VO, calls: calls, callStats: callStats, hx8: hx8,
     hostsAgg: hostsAgg, servicesAgg: servicesAgg, programsAgg: programsAgg,
     packetFilter: packetFilter, connFilter: connFilter,
     fnum: fnum, fbytes: fbytes, fbits: fbits, funit: funit, ftime: ftime, fdur: fdur

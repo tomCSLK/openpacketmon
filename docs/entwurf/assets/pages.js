@@ -96,12 +96,12 @@
   }
   function filterExtras(id, kind) {
     const ex = kind === 'c' ? ['ip.addr == 192.0.2.40', 'port == 443', 'domain contains example', 'program == firefox', 'direction == incoming', 'country == US', 'favorite', 'tcp and bytes > 1000000'] :
-      ['dns', 'tls.sni contains example', 'ip.addr == 192.0.2.0/24', 'tcp.analysis.flags', 'http.request.method == GET', 'tcp.port in {80 443}', 'not arp and not mdns'];
+      ['dns', 'tls.sni contains example', 'ip.addr == 192.0.2.0/24', 'tcp.analysis.flags', 'http.request.method == GET', 'tcp.port in {80 443}', 'sip or rtp', 'not arp and not mdns'];
     const txt = kind === 'c' ? 'Dieselbe Sprache wie der Anzeigefilter der Pakete, mit Feldern der Verbindungen. Ein Protokoll allein (tcp, udp, icmp, arp, ipv6) wählt die Verbindungen dieses Protokolls, favorite allein die Verbindungen von Favoriten. Vergleiche mit == != &lt; &lt;= &gt; &gt;= contains und in {80 443}, verknüpft mit and, or, not und Klammern. remote ist die Gegenstelle, domain der Name des Hosts, as.name und country kommen aus der Geolokalisierung.' :
-      'Ein Protokoll allein (dns, tcp) wählt die Pakete, die es enthalten; ein Feld allein (tls.sni, tcp.flags.syn) die Pakete, die es haben. Vergleiche mit == != &lt; &lt;= &gt; &gt;= contains und in {80 443}, verknüpft mit and, or, not und Klammern. Text ohne Groß-/Kleinschreibung, Adressen auch als Netz. domain sucht in DNS-Namen, TLS-SNI und HTTP-Host; tcp.analysis.flags findet alle Befunde der TCP-Analyse.';
+      'Ein Protokoll allein (dns, tcp) wählt die Pakete, die es enthalten; ein Feld allein (tls.sni, tcp.flags.syn) die Pakete, die es haben. Vergleiche mit == != &lt; &lt;= &gt; &gt;= contains und in {80 443}, verknüpft mit and, or, not und Klammern. Text ohne Groß-/Kleinschreibung, Adressen auch als Netz. domain sucht in DNS-Namen, TLS-SNI und HTTP-Host; tcp.analysis.flags findet alle Befunde der TCP-Analyse; voip.call_id wählt alle Pakete eines Anrufs.';
     return '<div class="ferr" id="' + id + '-e" role="alert">' + I('x-circle', 'sm') + '<span></span></div>' +
       '<div class="helppop" id="' + id + '-p">' + txt + '<div class="ex">' + ex.map(function (e) { return '<button type="button" data-ex="' + esc(e) + '">' + esc(e) + '</button>'; }).join('') + '</div>' +
-      (kind === 'p' ? '<div class="rowkeys" style="margin-top:var(--sp-3)"><span class="muted">Farben:</span>' + [['bad', 'Fehler/Reset/TCP-Probleme'], ['tcp', 'TCP-Auf-/Abbau'], ['dns', 'DNS'], ['local', 'ARP/DHCP/SSDP/NTP'], ['tls', 'TLS'], ['http', 'HTTP'], ['icmp', 'ICMP'], ['udp', 'QUIC/UDP']].map(function (r) { return '<span class="rowkey ' + r[0] + '">' + r[1] + '</span>'; }).join('') + '</div>' : '') + '</div>';
+      (kind === 'p' ? '<div class="rowkeys" style="margin-top:var(--sp-3)"><span class="muted">Farben:</span>' + [['bad', 'Fehler/Reset/TCP-Probleme'], ['tcp', 'TCP-Auf-/Abbau'], ['dns', 'DNS'], ['local', 'ARP/DHCP/SSDP/NTP'], ['tls', 'TLS'], ['http', 'HTTP'], ['icmp', 'ICMP'], ['udp', 'QUIC/UDP'], ['voip', 'SIP/RTP']].map(function (r) { return '<span class="rowkey ' + r[0] + '">' + r[1] + '</span>'; }).join('') + '</div>' : '') + '</div>';
   }
   function bindFilter(id, kind, onApply) {
     const inp = $('#' + id), box = $('#' + id + '-f'), sg = $('#' + id + '-s'), err = $('#' + id + '-e'), help = $('#' + id + '-p'), hb = $('#' + id + '-h');
@@ -255,7 +255,7 @@
       '<div class="srcpanel cbody" id="src-ipfix" hidden><div class="field-row"><div class="field"><label for="ipa">Adresse</label><input id="ipa" type="text" placeholder="alle Adressen"></div><div class="field"><label for="ipp">UDP-Port</label><input id="ipp" type="number" placeholder="4739"></div></div><p class="help">openpacketmon empfängt Flussdaten (IPFIX) von Routern oder Switches. Leer lassen für alle Adressen und Port 4739.</p></div></section>' +
       '<div class="grid2"><section class="card"><header><h2>Filter</h2></header><div class="cbody"><div class="field" style="margin:0"><label for="bpf">BPF-Filter (optional)</label><input id="bpf" type="text" class="mono" placeholder="z. B. tcp port 443"><span class="help">Nur passende Pakete werden ausgewertet, z. B. „tcp port 443“ oder „host 192.0.2.1“ (Syntax wie bei tcpdump).</span></div></div></section>' +
       '<section class="card"><header><h2>Paketspeicher</h2><div class="seg sm" id="storeSeg" role="group" aria-label="Paketspeicher"><button type="button" data-v="full" aria-pressed="true">Vollständige Pakete</button><button type="button" data-v="head" aria-pressed="false">Nur Kopfdaten</button><button type="button" data-v="off" aria-pressed="false">Aus</button></div></header>' +
-      '<div class="cbody"><p class="small" id="storeLine" style="font-weight:500">vollständige Pakete, höchstens 500.000 Pakete</p><p class="help" style="margin:0">Gespeicherte Pakete zeigen die Seiten Pakete, Paketdetails und Stream folgen und lassen sich als PCAP speichern. Vollständige Pakete brauchen mehr Arbeitsspeicher (Grenze in den Einstellungen, bis 2 GiB). „Nur Kopfdaten“ behält die ersten 128 Bytes jedes Pakets.</p></div></section></div>' +
+      '<div class="cbody"><p class="small" id="storeLine" style="font-weight:500">vollständige Pakete, höchstens 500.000 Pakete</p><p class="help" style="margin:0">Gespeicherte Pakete zeigen die Seiten Pakete, Paketdetails und Stream folgen und lassen sich als PCAP speichern. Vollständige Pakete brauchen mehr Arbeitsspeicher (Grenze in den Einstellungen, bis 2 GiB). „Nur Kopfdaten“ behält die ersten 128 Bytes jedes Pakets; Anrufe lassen sich dann nicht anhören.</p></div></section></div>' +
       '<section class="card"><header><h2>PCAP-Datei</h2></header><div class="cbody"><label class="check"><input type="checkbox" id="exp"> Pakete zusätzlich in eine PCAP-Datei schreiben</label>' +
       '<div class="field-row" style="margin-top:var(--sp-2)"><div class="field"><label for="exd">Ordner</label><input id="exd" type="text" value="~/Dokumente" disabled></div><div class="field"><label for="exn">Dateiname</label><input id="exn" type="text" value="openpacketmon.pcap" disabled></div></div></div></section>' +
       '<div class="btngroup" style="justify-content:flex-end"><button class="btn primary" type="button" id="startBtn">' + I('play', 'sm') + 'Aufzeichnung starten</button></div>';
@@ -279,7 +279,7 @@
     const hosts = function () { return D.hostsAgg(); };
     $('#main').innerHTML = pagehead('Übersicht', 'Aufzeichnung auf <span class="mono">' + D.ADAPTER.name + '</span> seit ' + D.clock(0) + ' Uhr · <span id="ovDur">' + DURNAME() + '</span>', unitSeg('unitSeg', unit)) +
       '<div class="tiles" id="tiles"></div>' +
-      '<section class="card attn"><header><h2>Auffällig</h2><span class="hint">Aus der TCP-Analyse und den Favoriten, nur ein Hinweis</span></header><div id="attn"></div></section>' +
+      '<section class="card attn"><header><h2>Auffällig</h2><span class="hint">Aus der TCP-Analyse, den Anrufen und den Favoriten, nur ein Hinweis</span></header><div id="attn"></div></section>' +
       '<section class="card"><header><h2>Verkehr pro Sekunde</h2><div class="legend"><span><i></i>Eingehend</span><span><i class="l2"></i>Ausgehend</span><span class="rate" id="rate"></span></div></header><div class="chartbox" id="ovChart"></div></section>' +
       '<div class="grid3" id="tops"></div>';
     bindSeg('unitSeg', function (u) { unit = u; App.store.set('unit', u); render(); });
@@ -299,6 +299,10 @@
       const A = D.ANALYSIS; const all = A['Retransmission'] + A['Dup ACK'] + A['Out-Of-Order'] + A['RST'];
       $('#attn').innerHTML =
         '<div class="arow warn">' + I('alert') + '<div><b>' + D.fnum(all) + ' Pakete mit Befund der TCP-Analyse</b><div class="msg">' + A['Retransmission'] + ' Wiederholungen, ' + A['Dup ACK'] + ' doppelte ACKs, ' + A['Out-Of-Order'] + ' außer der Reihe, ' + A['RST'] + ' Abbrüche – meist zu video.example.net und www.example.com</div></div><a class="btn sm" href="statistik.html?f=tcp.analysis.flags">Statistik</a></div>' +
+        D.calls().filter(function (k) { return k.rate === 'bad'; }).map(function (k) {
+          const sd = k.i.rate === 'bad' ? k.i : k.o;
+          return '<div class="arow warn">' + I('phone') + '<div><b>Anruf mit schlechter Verbindung</b><div class="msg">' + esc(callLabel(k.call)) + ', ' + D.clock(k.t0).slice(0, 5) + ' Uhr: ' + D.fnum(sd.loss, 1) + ' % Verlust ' + (sd === k.i ? 'beim Empfang' : 'beim Senden') + (sd.jit ? ', Jitter ' + D.fnum(sd.jit[0], 1) + ' ms' : '') + '</div></div><a class="btn sm" href="anruf.html?id=' + k.id + '">Anruf</a></div>';
+        }).join('') +
         '<div class="arow">' + I('star') + '<div><b>Favoriten tauschen Daten aus</b><div class="msg">nas.local, mail.example.com, 203.0.113.44 und das Programm thunderbird</div></div><a class="btn sm" href="benachrichtigungen.html">Benachrichtigungen</a></div>' +
         '<div class="arow">' + I('info') + '<div><b>Unverschlüsseltes Web zu updates.example.net</b><div class="msg">HTTP auf Port 80 vom Programm http (apt); Inhalte sind lesbar</div></div><a class="btn sm" href="pakete.html?f=http">Pakete</a></div>';
     }
@@ -493,7 +497,8 @@
       const sb = $('#selbar'); sb.hidden = false;
       sb.innerHTML = '<b>Paket ' + n + '</b><span class="mono small">' + esc(p.proto) + ' · ' + esc(p.info.length > 70 ? p.info.slice(0, 70) + '…' : p.info) + '</span><span class="sp"></span>' +
         '<a class="btn sm primary" href="' + url('paket.html', { n: n, f: S.f, c: S.c, cf: S.cf }) + '">Details öffnen <kbd>Enter</kbd></a>' +
-        '<a class="btn sm" href="verbindung.html?id=' + c.id + '">Verbindung</a>' + (c.proto === 'TCP' || c.proto === 'UDP' ? '<a class="btn sm" href="stream.html?c=' + c.id + '">Stream</a>' : '');
+        '<a class="btn sm" href="verbindung.html?id=' + c.id + '">Verbindung</a>' + (c.proto === 'TCP' || c.proto === 'UDP' ? '<a class="btn sm" href="stream.html?c=' + c.id + '">Stream</a>' : '') +
+        (function () { const v = p.sip || p.rtp || p.rtcp, k = v && D.CALL[v.call]; return k && !k.reg ? '<a class="btn sm" href="anruf.html?id=' + v.call + '">' + I('phone', 'sm') + 'Anruf</a>' : ''; })();
       if (scroll) scrollToN(n);
       render();
     }
@@ -580,7 +585,8 @@
       '<div class="seg" role="group" aria-label="Blättern">' + (prev ? '<a href="' + url('paket.html', Object.assign({ n: prev }, keep)) + '">' + I('chev-left', 'sm') + 'Vorheriges</a>' : '<button type="button" disabled>' + I('chev-left', 'sm') + 'Vorheriges</button>') +
       (next ? '<a href="' + url('paket.html', Object.assign({ n: next }, keep)) + '">Nächstes' + I('chev-right', 'sm') + '</a>' : '<button type="button" disabled>Nächstes' + I('chev-right', 'sm') + '</button>') + '</div>',
       { back: url('pakete.html', Object.assign({ n: n }, keep)), crumb: '<a href="' + url('pakete.html', Object.assign({ n: n }, keep)) + '">Pakete</a> <span>›</span> <span>Paket ' + n + '</span>' }) +
-      '<div class="notice info">' + I('connections') + '<div>Verbindung: <a class="mono" href="verbindung.html?id=' + c.id + '">' + esc(connLabel(c)) + '</a> · <a href="pakete.html?c=' + c.id + '">Pakete</a> · <a href="statistik.html?c=' + c.id + '">Statistik</a>' + (stream ? ' · <a href="stream.html?c=' + c.id + '">Stream</a>' : '') + ' · <a href="verbindung.html?id=' + c.id + '">Details</a></div></div>' +
+      '<div class="notice info">' + I('connections') + '<div>Verbindung: <a class="mono" href="verbindung.html?id=' + c.id + '">' + esc(connLabel(c)) + '</a> · <a href="pakete.html?c=' + c.id + '">Pakete</a> · <a href="statistik.html?c=' + c.id + '">Statistik</a>' + (stream ? ' · <a href="stream.html?c=' + c.id + '">Stream</a>' : '') + ' · <a href="verbindung.html?id=' + c.id + '">Details</a>' +
+        (d.call ? '<br>' + I('phone', 'sm') + ' Gehört zum Anruf <a href="anruf.html?id=' + d.call.id + '">' + esc(callLabel(d.call)) + '</a>' : '') + '</div></div>' +
       '<div class="split2"><section class="card"><header><h2>Schichten</h2><span class="hint">Klick auf ein Feld markiert seine Bytes</span></header><ul class="layers" id="layers">' + layers + '</ul></section>' +
       '<section class="card"><header><h2>Bytes</h2><span class="hint">' + d.bytes.length + ' Bytes</span><button class="btn sm ghost" type="button" data-draft-toast="Entwurf: kopiert die Bytes als Hex">' + I('copy', 'sm') + 'Kopieren</button></header><pre class="hex" id="hex">' + hex() + '</pre></section></div>';
     function mark(r, el) {
@@ -662,21 +668,28 @@
   }
 
   /* ---------- Statistik ---------- */
+  // Unterreiter der Statistik; Anrufe stehen bewusst nicht in der Kopfleiste (selten gebraucht, Variante D, Nutzer 2026-11-10)
+  function statTabs(cur) {
+    const n = D.calls().filter(function (k) { return !k.call.rtpOnly; }).length;
+    return '<nav class="ptabs" aria-label="Bereiche der Statistik"><a href="statistik.html"' + (cur === 'p' ? ' aria-current="page"' : '') + '>' + I('statistics', 'sm') + 'Protokolle</a>' +
+      '<a href="anrufe.html"' + (cur === 'a' ? ' aria-current="page"' : '') + '>' + I('phone', 'sm') + 'Anrufe' + (n ? '<span class="cnt">' + n + '</span>' : '') + '</a></nav>';
+  }
+
   function pageStatistics() {
     if (none()) { $('#main').innerHTML = pagehead('Statistik', '') + noCapture(); return; }
     const S = selection();
     let f = S.f;
     $('#main').innerHTML = pagehead('Statistik', 'Protokolle, TCP-Probleme und Antwortzeiten der gespeicherten Pakete, für alle oder die des Anzeigefilters.',
-      '<a class="btn" id="toPk" href="#">' + I('packets', 'sm') + 'Pakete anzeigen</a>') + connNote(S, 'statistik') +
+      '<a class="btn" id="toPk" href="#">' + I('packets', 'sm') + 'Pakete anzeigen</a>') + statTabs('p') + connNote(S, 'statistik') +
       '<section class="card"><div class="toolbar">' + filterUI('sf', 'p', f, 'Anzeigefilter, z. B. ip.addr == 192.0.2.20 oder tcp.port == 443 (leer: alle Pakete)') + '</div>' + filterExtras('sf', 'p') + '</section>' +
       '<div class="tiles t5" id="stiles"></div>' +
       '<section class="card"><header><h2>Verkehr der Auswahl</h2><div class="legend"><span><i></i>Eingehend</span><span><i class="l2"></i>Ausgehend</span></div></header><div class="chartbox" id="sChart"></div></section>' +
       '<section class="card"><header><h2>Protokollhierarchie</h2><span class="hint">Jede Zeile zählt die Pakete, die das Protokoll enthalten, mit ihrer ganzen Länge. Ein Klick zeigt die Pakete.</span></header><div class="tblwrap"><table class="tbl hier"><thead><tr><th>Protokoll</th><th class="num">Pakete</th><th style="width:28%">Anteil</th><th class="num">Bytes</th><th class="num hide-sm">Ø Datenrate</th></tr></thead><tbody id="hier"></tbody></table></div></section>' +
       '<div class="grid2"><section class="card"><header><h2>TCP-Analyse</h2></header><p class="help" style="padding:var(--sp-3) var(--sp-4) 0;margin:0">Wiederholungen, Lücken und doppelte ACKs deuten auf Paketverlust hin, ein Nullfenster auf einen überlasteten Empfänger. Ein Klick zeigt die Pakete.</p><div class="tblwrap"><table class="tbl findings"><thead><tr><th>Befund</th><th class="num">Anzahl</th></tr></thead><tbody id="find"></tbody></table></div></section>' +
       '<section class="card"><header><h2>Antwortzeiten</h2></header><p class="help" style="padding:var(--sp-3) var(--sp-4) 0;margin:0">TCP-Verbindungsaufbau: SYN bis zum ACK des Clients. ACK: Zeit bis zur Bestätigung eines Segments (gemessen an diesem Rechner). DNS: Anfrage bis Antwort.</p><div class="tblwrap"><table class="tbl"><thead><tr><th>Messung</th><th class="num">Anzahl</th><th class="num">Mittel</th><th class="num">Höchstens</th></tr></thead><tbody id="times"></tbody></table></div></section></div>';
-    const APP = { 'TLSv1.3': 'TLS', 'TLSv1.2': 'TLS', HTTP: 'HTTP', IPP: 'HTTP', SSHv2: 'SSH', SMB2: 'SMB2', DNS: 'DNS', MDNS: 'MDNS', QUIC: 'QUIC', SSDP: 'SSDP', NTP: 'NTP', DHCP: 'DHCP' };
-    const FN = { Ethernet: 'eth', IPv4: 'ip', IPv6: 'ipv6', ARP: 'arp', TCP: 'tcp', UDP: 'udp', ICMP: 'icmp', TLS: 'tls', HTTP: 'http', SSH: 'ssh', SMB2: 'smb2', DNS: 'dns', MDNS: 'mdns', QUIC: 'quic', SSDP: 'ssdp', NTP: 'ntp', DHCP: 'dhcp' };
-    const LONG = { Ethernet: 'Ethernet', IPv4: 'Internet Protocol Version 4', IPv6: 'Internet Protocol Version 6', ARP: 'Address Resolution Protocol', TCP: 'Transmission Control Protocol', UDP: 'User Datagram Protocol', ICMP: 'Internet Control Message Protocol', TLS: 'Transport Layer Security', HTTP: 'Hypertext Transfer Protocol', SSH: 'SSH Protocol', SMB2: 'SMB2', DNS: 'Domain Name System', MDNS: 'Multicast DNS', QUIC: 'QUIC IETF', SSDP: 'Simple Service Discovery Protocol', NTP: 'Network Time Protocol', DHCP: 'Dynamic Host Configuration Protocol' };
+    const APP = { 'TLSv1.3': 'TLS', 'TLSv1.2': 'TLS', HTTP: 'HTTP', IPP: 'HTTP', SSHv2: 'SSH', SMB2: 'SMB2', DNS: 'DNS', MDNS: 'MDNS', QUIC: 'QUIC', SSDP: 'SSDP', NTP: 'NTP', DHCP: 'DHCP', SIP: 'SIP', 'SIP/SDP': 'SIP', RTP: 'RTP', RTCP: 'RTCP' };
+    const FN = { Ethernet: 'eth', IPv4: 'ip', IPv6: 'ipv6', ARP: 'arp', TCP: 'tcp', UDP: 'udp', ICMP: 'icmp', TLS: 'tls', HTTP: 'http', SSH: 'ssh', SMB2: 'smb2', DNS: 'dns', MDNS: 'mdns', QUIC: 'quic', SSDP: 'ssdp', NTP: 'ntp', DHCP: 'dhcp', SIP: 'sip', SDP: 'sdp', RTP: 'rtp', RTCP: 'rtcp' };
+    const LONG = { Ethernet: 'Ethernet', IPv4: 'Internet Protocol Version 4', IPv6: 'Internet Protocol Version 6', ARP: 'Address Resolution Protocol', TCP: 'Transmission Control Protocol', UDP: 'User Datagram Protocol', ICMP: 'Internet Control Message Protocol', TLS: 'Transport Layer Security', HTTP: 'Hypertext Transfer Protocol', SSH: 'SSH Protocol', SMB2: 'SMB2', DNS: 'Domain Name System', MDNS: 'Multicast DNS', QUIC: 'QUIC IETF', SSDP: 'Simple Service Discovery Protocol', NTP: 'Network Time Protocol', DHCP: 'Dynamic Host Configuration Protocol', SIP: 'Session Initiation Protocol', SDP: 'Session Description Protocol', RTP: 'Real-Time Transport Protocol', RTCP: 'Real-time Transport Control Protocol' };
     function render() {
       let pf = f ? D.packetFilter(f) : null; if (pf && pf.err) pf = null;
       const N = D.count(); let pk = 0, by = 0, t0 = null, t1 = 0, syn = 0, ackOut = 0, dnsR = 0;
@@ -689,6 +702,7 @@
         const path = ['Ethernet', c.proto === 'ARP' ? 'ARP' : c.host.v6 ? 'IPv6' : 'IPv4'];
         if (c.proto !== 'ARP') path.push(c.proto);
         if (APP[p.proto]) path.push(APP[p.proto]);
+        if (p.proto === 'SIP/SDP') path.push('SDP');
         let node = tree;
         path.forEach(function (k) { node[k] = node[k] || { _p: 0, _b: 0 }; node[k]._p += 1; node[k]._b += p.len; node = node[k]; });
         if (p.an) A[p.an] += 1;
@@ -742,6 +756,264 @@
     bindFilter('sf', 'p', function (v) { f = v; setParam('f', v); render(); });
     render();
     let rt = null; window.addEventListener('resize', function () { clearTimeout(rt); rt = setTimeout(render, 150); });
+  }
+
+  /* ---------- Anrufe (VoIP, Vorhaben 5.7) ---------- */
+  const CST = {
+    running: ['Läuft', 'run', 'activity'], ended: ['Beendet', '', 'check-circle'], rejected: ['Abgelehnt', 'warn', 'x-circle'], missed: ['Verpasst', 'warn', 'alert'],
+    cancelled: ['Abgebrochen', '', 'x-circle'], ringing: ['Klingelt', 'run', 'phone'], setup: ['Aufbau', '', 'phone'], rtp: ['Nur RTP', '', 'help-circle']
+  };
+  const SIPDE = { 486: 'besetzt', 487: 'abgebrochen', 404: 'nicht gefunden', 480: 'nicht erreichbar', 603: 'abgewiesen' };
+  const RATE = { good: ['ok', 'check-circle', 'gut'], fair: ['warn', 'alert', 'mäßig'], bad: ['err', 'x-circle', 'schlecht'] };
+  const ME = { name: 'Anna Beispiel', uri: 'sip:anna@sip.example.net' };
+  function uriTxt(u) { return u.replace(/^sip:/, ''); }
+  function callLabel(k) {
+    if (k.rtpOnly) return 'RTP-Strom ohne SIP (' + D.H.meet.name + ')';
+    const p = k.peer.name || uriTxt(k.peer.uri);
+    return k.out ? ME.name + ' → ' + p : p + ' → ' + ME.name;
+  }
+  function mmss(sec) { sec = Math.max(0, Math.round(sec)); return Math.floor(sec / 60) + ':' + String(sec % 60).padStart(2, '0'); }
+  function cstate(st) { const x = CST[st.state]; return '<span class="cstate ' + x[1] + '">' + I(x[2], 'sm') + x[0] + '</span>'; }
+  function cstateSub(st) {
+    if (st.state === 'rejected') return st.code + ' ' + ({ 486: 'Busy Here', 487: 'Request Terminated' }[st.code] || '') + (SIPDE[st.code] ? ' (' + SIPDE[st.code] + ')' : '');
+    if (st.state === 'missed') return 'Anrufer hat aufgelegt';
+    if (st.state === 'cancelled') return 'vor der Annahme aufgelegt';
+    if (st.state === 'ended') return st.byUs ? 'selbst aufgelegt' : 'Gegenseite hat aufgelegt';
+    if (st.state === 'rtp') return 'kein SIP gesehen';
+    if (st.state === 'running') return 'seit ' + D.clock(st.tAnswer).slice(0, 5) + ' Uhr';
+    return '';
+  }
+  function rateTag(r, note) { return !r ? '<span class="muted">–</span>' : '<span class="st ' + RATE[r][0] + '"' + (note ? ' title="' + esc(note) + '"' : '') + '>' + I(RATE[r][1], 'sm') + RATE[r][2] + '</span>'; }
+  function party(p, here) {
+    if (!p.uri) return '<span class="who">' + esc(D.H.meet.name) + '</span><span class="sub">198.51.100.90:10000</span>';
+    const anon = /anonymous/.test(p.uri);
+    const sub = here ? 'dieser Rechner' : anon ? 'Nummer unterdrückt' : p.name ? uriTxt(p.uri) : '';
+    return '<span class="who" title="' + esc(uriTxt(p.uri)) + '">' + (p.name ? '<b>' + esc(p.name) + '</b>' : esc(uriTxt(p.uri))) + '</span>' + (sub ? '<span class="sub">' + esc(sub) + '</span>' : '');
+  }
+  function callFilter(st) { const k = st.call; return k.cid ? 'voip.call_id == "' + k.cid + '"' : 'rtp.ssrc in {' + D.hx8(st.o.ssrc) + ' ' + D.hx8(st.i.ssrc) + '}'; }
+  function lawModal() {
+    if ($('#lawModal')) return;
+    document.body.insertAdjacentHTML('beforeend', '<div class="modal law" id="lawModal" role="dialog" aria-modal="true" aria-labelledby="lawTitle"><header><h2 id="lawTitle">' + I('alert') + 'Gespräch anhören?</h2><button class="iconbtn" type="button" data-close aria-label="Schließen">' + I('x') + '</button></header>' +
+      '<div class="mbody"><p>Telefonate sind vertraulich. Wer das nichtöffentlich gesprochene Wort eines anderen ohne Einwilligung abhört, aufnimmt oder eine Aufnahme weitergibt, kann sich strafbar machen (§ 201 StGB).</p>' +
+      '<p>Höre ein Gespräch nur an oder speichere es, wenn du selbst daran teilgenommen hast oder alle Beteiligten einverstanden sind, zum Beispiel bei der Fehlersuche an der eigenen Telefonanlage.</p>' +
+      '<p class="small muted">Dieser Hinweis kommt einmal. Wieder anzeigen lässt er sich unter Einstellungen → Anrufe.</p></div>' +
+      '<footer><button class="btn" type="button" data-close>Abbrechen</button><button class="btn primary" type="button" id="lawYes">Verstanden, anhören</button></footer></div>');
+  }
+  // Erst nach dem Hinweis auf § 201 StGB anhören oder speichern (einmal je Benutzer)
+  function withLaw(what, go) {
+    if (App.store.get('voipOk')) { go(); return; }
+    lawModal();
+    $('#lawYes').textContent = what === 'wav' ? 'Verstanden, speichern' : 'Verstanden, anhören';
+    $('#lawYes').onclick = function () { App.store.set('voipOk', new Date().toLocaleDateString('de-DE')); App.closeModals(); go(); };
+    App.openModal('lawModal');
+  }
+  function wavToast(st) { App.toast('Entwurf: speichert den Anruf als WAV (Dateidialog): 8 kHz, 16 bit, Stereo, links gesendet, rechts empfangen; ' + (st.i.lost + st.o.lost ? 'Lücken als Stille' : 'ohne Lücken')); }
+  function voipHelp() {
+    return '<ul class="small" style="margin:0;padding-left:20px;display:grid;gap:6px">' +
+      '<li><b>Softphone auf diesem Rechner:</b> Die Aufzeichnung auf dem Netzwerkadapter genügt.</li>' +
+      '<li><b>Telefon am Router oder an der Telefonanlage:</b> Den Verkehr sieht dieser Rechner nicht. Viele Router schneiden selbst mit (bei einer FRITZ!Box unter <span class="mono">fritz.box/html/capture.html</span>); die Datei unter Aufzeichnung → Aufzeichnungsdatei öffnen. Oder Port-Spiegelung am Switch.</li>' +
+      '<li><b>Verschlüsselt:</b> SIP über TLS (Port 5061) und SRTP bleiben unlesbar. Dann gibt es keine Anrufliste, höchstens Ströme ohne Anruf, die sich nicht abspielen lassen.</li>' +
+      '<li><b>Anhören</b> geht mit G.711 (A-law und µ-law) und braucht vollständige Pakete im Paketspeicher. G.722 und Opus folgen später.</li></ul>';
+  }
+
+  function pageCalls() {
+    if (none()) { $('#main').innerHTML = pagehead('Statistik', '') + noCapture(); return; }
+    const all = q.get('leer') === '1' ? [] : D.calls();
+    const head = pagehead('Statistik', 'Telefonate über SIP und RTP (VoIP) in den gespeicherten Paketen, mit Ablauf, Sprachqualität und, bei G.711, zum Anhören.',
+      '<a class="btn" href="' + url('pakete.html', { f: 'sip or rtp or rtcp' }) + '">' + I('packets', 'sm') + 'Pakete anzeigen</a>') + statTabs('a');
+    if (!all.length) {
+      $('#main').innerHTML = head + '<section class="card"><div class="empty">' + I('phone', 'xl') + '<h2>Keine Anrufe gefunden.</h2><p class="small" style="max-width:640px">openpacketmon erkennt Anrufe an SIP (UDP oder TCP, meist Port 5060) und an den Sprachströmen (RTP), die darin ausgehandelt werden.</p></div>' +
+        '<div class="cbody" style="border-top:1px solid var(--border)"><h3 style="margin:0 0 var(--sp-2)">So kommen Anrufe in die Aufzeichnung</h3>' + voipHelp() + '</div></section>';
+      return;
+    }
+    $('#main').innerHTML = head + '<div class="tiles t5" id="ctiles"></div>' +
+      '<section class="card"><header><h2>Anrufe</h2><span class="hint">Neueste oben. Ein Klick zeigt Ablauf, Qualität und Anhören.</span></header><div class="tblwrap"><table class="tbl calls"><thead><tr><th>Zustand</th><th class="hide-sm">Beginn</th><th class="num">Dauer</th><th class="hide-md">Richtung</th><th>Von</th><th>An</th><th class="hide-md">Codec</th><th>Qualität</th><th class="num hide-sm">Pakete</th><th class="hide-sm"><span class="sr-only">Anhören</span></th></tr></thead><tbody id="cbody"></tbody></table></div>' +
+      '<div class="cfoot" style="justify-content:flex-start" id="creg"></div></section>' +
+      '<section class="card"><header><h2>So kommen Anrufe in die Aufzeichnung</h2></header><div class="cbody">' + voipHelp() + '</div></section>';
+    function render() {
+      const list = D.calls().slice().reverse();
+      const sipc = list.filter(function (k) { return !k.call.rtpOnly; });
+      const ans = sipc.filter(function (k) { return k.ok; }), noans = sipc.filter(function (k) { return !k.ok && k.state !== 'ringing' && k.state !== 'setup'; });
+      const bad = list.filter(function (k) { return k.rate === 'bad'; }), rtpOnly = list.filter(function (k) { return k.call.rtpOnly; });
+      const run = sipc.filter(function (k) { return k.state === 'running'; }).length;
+      const talk = ans.reduce(function (a, k) { return a + k.talk; }, 0);
+      $('#ctiles').innerHTML = [
+        ['phone', 'Anrufe', sipc.length, run ? 'davon ' + run + ' läuft' : 'keiner läuft', ''],
+        ['check-circle', 'Angenommen', ans.length, 'Gesprächszeit ' + mmss(talk), ''],
+        ['x-circle', 'Nicht zustande gekommen', noans.length, noans.map(function (k) { return CST[k.state][0].toLowerCase(); }).join(', ') || '–', ''],
+        ['alert', 'Schlechte Verbindung', bad.length, 'ab 3 % Verlust oder 50 ms Jitter', bad.length ? 'warn' : ''],
+        ['lock', 'Ströme ohne Anruf', rtpOnly.length, 'RTP ohne SIP, nicht abspielbar', '']
+      ].map(function (t) { return '<div class="tile ' + t[4] + '"><div class="k">' + I(t[0], 'sm') + t[1] + '</div><div class="v">' + t[2] + '</div><div class="s">' + t[3] + '</div></div>'; }).join('');
+      $('#cbody').innerHTML = list.map(function (k) {
+        const c = k.call;
+        const us = { name: ME.name, uri: ME.uri };
+        const from = c.rtpOnly ? { name: '', uri: 'sip:' + D.LOCAL } : c.out ? us : c.peer, to = c.rtpOnly ? c.peer : c.out ? c.peer : us;
+        const durTxt = k.ok || c.rtpOnly ? mmss(k.talk) : '–';
+        const durSub = k.ok ? (k.state === 'running' ? 'läuft' : '') : c.rtpOnly ? '' : (k.state === 'missed' ? 'geklingelt ' : 'nach ') + D.fnum(k.wait, 1) + ' s';
+        return '<tr class="click" data-id="' + k.id + '"><td>' + cstate(k) + '<span class="sub">' + esc(cstateSub(k)) + '</span></td><td class="mono hide-sm">' + D.clock(k.t0).slice(0, 8) + '</td>' +
+          '<td class="num" data-dur="' + k.id + '">' + durTxt + (durSub ? '<span class="sub">' + durSub + '</span>' : '') + '</td>' +
+          '<td class="hide-md"><span class="dirc">' + (c.out ? I('arrow-up', 'sm') + 'ausgehend' : I('arrow-down', 'sm') + 'eingehend') + '</span></td>' +
+          '<td>' + (c.rtpOnly ? '<span class="who mono">' + D.LOCAL + '</span><span class="sub">dieser Rechner · firefox</span>' : party(from, from === us)) + '</td><td>' + party(to, to === us) + '</td>' +
+          '<td class="hide-md nowrap"' + (c.rtpOnly ? ' title="Nutzlast-Typ 111 (dynamisch), ohne SDP nicht zuzuordnen"' : '') + '>' + (k.codec || '<span class="muted">–</span>') + '</td><td>' + rateTag(k.rate, c.rtpOnly ? 'nur aus dem Verlust; Jitter ohne Taktrate unbekannt' : '') + '</td><td class="num hide-sm">' + D.fnum(k.packets) + '</td>' +
+          '<td class="w0 hide-sm">' + (k.playable ? '<a class="btn sm ghost" href="anruf.html?id=' + k.id + '#anhoeren" title="Anhören" aria-label="Anhören">' + I('play', 'sm') + '</a>' : '') + '</td></tr>';
+      }).join('');
+      const reg = D.pkt(303);
+      $('#creg').innerHTML = '<span class="small muted">' + I('check-circle', 'sm') + ' Angemeldet: <span class="mono">anna@sip.example.net</span> bei sip.example.net um ' + D.clock(reg.t).slice(0, 8) + ' Uhr, gültig 1 Stunde (<a href="paket.html?n=303">Paket 303</a>). Das Kennwort steht nicht in den Paketen, nur eine Prüfsumme (Digest).</span>';
+    }
+    render();
+    $('#cbody').addEventListener('click', function (e) { if (e.target.closest('a')) return; const tr = e.target.closest('tr[data-id]'); if (tr) location.href = 'anruf.html?id=' + tr.dataset.id; });
+    let last = 0;
+    document.addEventListener('opm-tick', function () { const t = Date.now(); if (t - last < 1000) return; last = t; render(); });
+  }
+
+  function pageCall() {
+    if (none()) { $('#main').innerHTML = pagehead('Anruf', '', '', { back: 'anrufe.html' }) + noCapture(); return; }
+    const id = D.CALL[q.get('id')] && !D.CALL[q.get('id')].reg ? q.get('id') : 'A';
+    let st = D.callStats(id); const k = st.call, R = k.rtp;
+    const crumb = '<a href="statistik.html">Statistik</a> <span>›</span> <a href="anrufe.html">Anrufe</a> <span>›</span> <span>Anruf</span>';
+    const fromTxt = k.rtpOnly ? D.LOCAL : k.out ? ME.name : (k.peer.name || uriTxt(k.peer.uri)), toTxt = k.rtpOnly ? D.H.meet.name : k.out ? (k.peer.name || uriTxt(k.peer.uri)) : ME.name;
+    const pf = url('pakete.html', { f: callFilter(st) });
+    $('#main').innerHTML = pagehead('<span class="tag">' + (k.rtpOnly ? 'RTP' : 'SIP') + '</span>' + esc(fromTxt) + ' → ' + esc(toTxt), cstate(st) + ' <span class="muted">' + esc(cstateSub(st)) + '</span>',
+      '<a class="btn" href="' + pf + '">' + I('packets', 'sm') + (k.rtpOnly ? 'Pakete des Stroms' : 'Pakete des Anrufs') + '</a>' + (st.playable ? '<button class="btn" type="button" id="wavBtn">' + I('download', 'sm') + 'Als WAV speichern</button>' : ''),
+      { back: 'anrufe.html', crumb: crumb }) +
+      (st.rate === 'bad' ? '<div class="notice warn">' + I('alert') + '<div><b>Schlechte Verbindung beim ' + (st.i.rate === 'bad' ? 'Empfang' : 'Senden') + ':</b> ' + D.fnum((st.i.rate === 'bad' ? st.i : st.o).loss, 1) + ' % der Sprachpakete fehlen, Jitter im Mittel ' + D.fnum((st.i.rate === 'bad' ? st.i : st.o).jit[0], 1) + ' ms. Die Ursache liegt meist auf dem Weg zum Anbieter, etwa im WLAN oder an einer ausgelasteten Leitung; Sprache klingt dann abgehackt.</div></div>' : '') +
+      '<div class="split2"><section class="card"><header><h2>' + (k.rtpOnly ? 'Strom' : 'Anruf') + '</h2></header><div class="cbody tight"><dl class="facts" id="cfacts"></dl></div></section>' +
+      '<section class="card" id="anhoeren"><header><h2>Anhören</h2>' + (st.playable ? '<span class="hint">' + st.codec + ', 8 kHz, beide Richtungen</span>' : '') + '</header><div class="cbody" id="cplay"></div></section></div>' +
+      '<section class="card"><header><h2>Ablauf</h2><span class="hint">' + (k.rtpOnly ? 'Ohne SIP gibt es keinen Ablauf, nur den Strom.' : 'SIP-Nachrichten und Sprachströme; ein Klick auf eine Zeile zeigt das Paket.') + '</span></header><div class="ladder" id="ladder"></div></section>' +
+      '<section class="card"><header><h2>Sprachströme (RTP)</h2></header>' + (R ? '<p class="help" style="padding:var(--sp-3) var(--sp-4) 0;margin:0">Verlust aus den laufenden Nummern, Jitter nach RFC 3550 aus Ankunftszeit und Zeitstempel, größter Abstand zwischen zwei Paketen. Gut: unter 1 % Verlust und unter 30 ms Jitter; schlecht: ab 3 % oder ab 50 ms.</p>' +
+      '<div class="tblwrap"><table class="tbl"><thead><tr><th>Richtung</th><th>Quelle → Ziel</th><th class="hide-md">SSRC</th><th class="num">Pakete</th><th class="num">Verloren</th><th class="num">Jitter Ø / max</th><th class="num hide-sm">Größter Abstand</th><th class="num hide-md">Folgefehler</th><th>Bewertung</th></tr></thead><tbody id="cstreams"></tbody></table></div><div class="cfoot" style="justify-content:flex-start" id="crtcp"></div>'
+        : '<div class="empty"><h2>Kein Sprachstrom.</h2><p class="small">Der Anruf kam nicht zustande; angeboten war G.711 (A-law oder µ-law), gesprochen wurde nicht.</p></div>') + '</section>';
+
+    function facts() {
+      st = D.callStats(id);
+      const row = function (dt, dd) { return '<dt>' + dt + '</dt><dd>' + dd + '</dd>'; };
+      const nlink = function (n) { return '<a class="mono" href="paket.html?n=' + n + '">' + n + '</a>'; };
+      let h = '';
+      if (k.rtpOnly) {
+        h += row('Zustand', cstate(st) + '<span class="muted">kein SIP gesehen</span>') +
+          row('Endpunkte', '<span class="mono">' + D.LOCAL + ':' + k.media.lport + '</span> ↔ <span class="mono">198.51.100.90:' + k.media.rport + '</span><span class="muted">' + D.H.meet.name + '</span>') +
+          row('Programm', '<b>firefox</b><span class="muted mono small">' + esc(D.PROGS.firefox) + '</span>') +
+          row('Erkannt', 'an der Form der Pakete (Einstellungen → Anrufe, „RTP auch ohne SIP erkennen“)') +
+          row('Codec', 'unbekannt: Typ 111 ist dynamisch und wird nur im SDP benannt') +
+          row('Inhalt', 'vermutlich verschlüsselt (SRTP), etwa eine Videokonferenz im Browser; die Steuerung lief verschlüsselt über HTTPS') +
+          row('Beginn', '<span class="mono">' + D.clock(st.t0, true).slice(0, 12) + '</span>') + row('Dauer', '<span class="mono">' + mmss(st.talk) + '</span>');
+      } else {
+        const us = k.out ? 'ausgehend' : 'eingehend';
+        h += row('Zustand', cstate(st) + '<span class="muted">' + esc(cstateSub(st)) + '</span>') +
+          row('Von', esc(k.out ? '"' + ME.name + '" <' + ME.uri + '>' : (k.peer.name ? '"' + k.peer.name + '" ' : '') + '<' + k.peer.uri + '>') + (/anonymous/.test(k.peer.uri) && !k.out ? '<span class="muted">Nummer unterdrückt</span>' : '')) +
+          row('An', esc('<' + (k.out ? k.peer.uri : ME.uri) + '>')) +
+          row('Richtung', (k.out ? I('arrow-up', 'sm') : I('arrow-down', 'sm')) + us + '<span class="muted">' + (k.out ? 'von diesem Rechner' : 'an diesen Rechner') + '</span>') +
+          row('Beginn', '<span class="mono">' + D.clock(st.t0, true).slice(0, 12) + '</span><span class="links">· INVITE in Paket ' + nlink(st.inv.n) + '</span>') +
+          row(st.ok ? 'Bis zur Annahme' : st.state === 'missed' ? 'Geklingelt' : 'Bis zur Antwort', '<span class="mono">' + D.fnum(st.wait, 1) + ' s</span>' + (st.ring ? '<span class="muted">klingelt ab Paket ' + nlink(st.ring.n) + '</span>' : '')) +
+          (st.ok ? row('Gesprächsdauer', '<span class="mono" id="ctalk">' + mmss(st.talk) + '</span>' + (st.state === 'running' ? '<span class="cstate run">' + I('activity', 'sm') + 'läuft</span>' : '')) : '') +
+          (st.endN ? row('Ende', '<span class="mono">' + D.clock(st.t1, true).slice(0, 12) + '</span><span class="muted">' + esc(cstateSub(st)) + ', Paket ' + nlink(st.endN) + '</span>') : '') +
+          (R ? row('Codec', st.codec + ' (' + (R.pt === 8 ? 'PCMA' : 'PCMU') + '), 8 kHz<span class="links">· ausgehandelt in Paket ' + nlink(R.setup) + '</span>') : row('Angeboten', 'G.711 A-law, G.711 µ-law<span class="links">· SDP in Paket ' + nlink(st.inv.n) + '</span>')) +
+          row('Programm', '<b>linphone</b><span class="muted mono small">' + esc(D.PROGS.linphone) + '</span>') +
+          row('Anbieter', 'sip.example.net <span class="muted mono small">203.0.113.60</span>' + (R ? '<span class="muted">· Sprache über media.example.net</span>' : '')) +
+          row('Call-ID', '<span class="mono">' + esc(k.cid) + '</span>') +
+          (k.out ? row('Anmeldung', 'Digest im Kopf <span class="mono small">Proxy-Authorization</span><span class="muted">' + (id === 'C' ? 'nach 407 in Paket ' + nlink(12001) : 'ohne neue Rückfrage') + '; für KI-Assistenten (MCP) immer geschwärzt</span>') : '');
+      }
+      h += row('Pakete', '<span class="mono">' + D.fnum(st.packets) + '</span><span class="muted">' + (k.rtpOnly ? 'RTP' : st.rtp ? st.sip + ' SIP, ' + D.fnum(st.rtp) + ' RTP, ' + st.rtcp + ' RTCP' : 'SIP') + ' · ' + D.fbytes(st.bytes) + '</span><span class="links">· <a href="' + pf + '">anzeigen</a></span>');
+      $('#cfacts').innerHTML = h;
+    }
+
+    function ladder() {
+      const lanes = k.rtpOnly ? [['Dieser Rechner', D.LOCAL + ' · firefox'], ['kein SIP', '–'], [D.H.meet.name, '198.51.100.90']] :
+        [['Dieser Rechner', D.LOCAL + ' · linphone'], ['sip.example.net', '203.0.113.60 · SIP'], ['media.example.net', '203.0.113.61 · RTP']];
+      const pos = function (a, b) { const lo = Math.min(a, b), hi = Math.max(a, b); return 'left:' + ((lo * 2 + 1) / 6 * 100).toFixed(3) + '%;width:' + ((hi - lo) * 2 / 6 * 100).toFixed(3) + '%'; };
+      const rel = function (n) { return '+' + D.fnum(D.time(n) - st.t0, 3) + ' s'; };
+      const band = function () {
+        const live = st.state === 'running';
+        return '<div class="lrow band-row"><span class="lt">' + rel(st.rtpFirst) + '</span><div class="lanes"><span class="band' + (R.enc ? ' enc' : '') + '" style="' + pos(0, 2) + '">' + (R.enc ? I('lock', 'sm') : '') +
+          '<b>RTP</b> ' + (R.enc ? 'Typ 111' : st.codec) + ' · ↑ ' + D.fnum(st.o.n) + ' · ↓ ' + D.fnum(st.i.n) + ' Pakete · ' + mmss(st.talk) + (st.rtcp ? ' · ' + st.rtcp + ' RTCP' : '') + (live ? ' · läuft' : '') + '</span></div>' +
+          '<a class="ln" href="' + url('pakete.html', { f: 'rtp.ssrc in {' + D.hx8(st.o.ssrc) + ' ' + D.hx8(st.i.ssrc) + '}' }) + '" title="Pakete der Sprachströme">' + st.rtpFirst + ' …</a></div>';
+      };
+      let rows = '<div class="lrow lhead"><span>Zeit</span><div class="lanes">' + lanes.map(function (l) { return '<b>' + esc(l[0]) + '<small>' + esc(l[1]) + '</small></b>'; }).join('') + '</div><span>Paket</span></div>';
+      let banded = false;
+      st.msgs.forEach(function (m) {
+        if (R && !banded && st.rtpFirst && m.n > st.rtpFirst) { rows += band(); banded = true; }
+        const out = m.dir === 'out';
+        const cls = (out ? 'r' : 'l') + (!m.req && m.what >= 400 && m.what !== 401 && m.what !== 407 ? ' bad' : '') + (!m.req && m.what === 200 && m.cm === 'INVITE' ? ' ok' : '');
+        rows += '<div class="lrow" data-n="' + m.n + '"><span class="lt" title="' + D.clock(D.time(m.n), true).slice(0, 12) + ' Uhr">' + rel(m.n) + '</span><div class="lanes"><span class="arr ' + cls + '" style="' + pos(0, 1) + '"><span>' + esc(m.label) + '</span></span></div><a class="ln" href="paket.html?n=' + m.n + '">' + m.n + '</a></div>';
+      });
+      if (R && !banded && st.rtpFirst) rows += band();
+      $('#ladder').innerHTML = rows;
+    }
+
+    function streams() {
+      if (!R) return;
+      const row = function (dir, sd) {
+        const src = dir === 'o' ? D.LOCAL + ':' + k.media.lport : (R.enc ? '198.51.100.90' : '203.0.113.61') + ':' + k.media.rport;
+        const dst = dir === 'o' ? (R.enc ? '198.51.100.90' : '203.0.113.61') + ':' + k.media.rport : D.LOCAL + ':' + k.media.lport;
+        return '<tr><td><span class="dirc">' + (dir === 'o' ? I('arrow-up', 'sm') + 'gesendet' : I('arrow-down', 'sm') + 'empfangen') + '</span></td><td class="mono">' + src + ' → ' + dst + '</td>' +
+          '<td class="mono hide-md"><a href="' + url('pakete.html', { f: 'rtp.ssrc == ' + D.hx8(sd.ssrc) }) + '">' + D.hx8(sd.ssrc) + '</a></td><td class="num">' + D.fnum(sd.n) + '</td>' +
+          '<td class="num">' + (sd.lost ? '<span class="count warn">' + D.fnum(sd.lost) + '</span> <span class="muted">(' + D.fnum(sd.loss, 1) + ' %)</span>' : '0') + '</td>' +
+          '<td class="num">' + (sd.jit ? D.fnum(sd.jit[0], 1) + ' / ' + D.fnum(sd.jit[1], 1) + ' ms' : '<span class="muted" title="Ohne SDP ist die Taktrate unbekannt">unbekannt</span>') + '</td>' +
+          '<td class="num hide-sm">' + D.fnum(sd.gap, 1) + ' ms</td><td class="num hide-md">' + sd.ooo + '</td><td>' + rateTag(sd.rate, sd.jit ? '' : 'nur aus dem Verlust') + '</td></tr>';
+      };
+      $('#cstreams').innerHTML = row('o', st.o) + row('i', st.i);
+      $('#crtcp').innerHTML = '<span class="small muted">' + (st.rtcp ? 'RTCP: ' + st.rtcp + ' Berichte. Die Gegenseite meldet für den gesendeten Strom ' + D.fnum(st.o.loss, 1) + ' % Verlust und ' + D.fnum(st.o.jit ? st.o.jit[0] + 0.2 : 0, 1) + ' ms Jitter.' : 'Keine RTCP-Berichte gesehen; Verlust und Jitter stammen nur aus den eigenen Messungen.') + '</span>';
+    }
+
+    function player() {
+      const box = $('#cplay');
+      if (!st.playable) {
+        box.innerHTML = '<div class="empty" style="padding:var(--sp-4) 0">' + I(k.rtpOnly ? 'lock' : 'phone', 'xl') + '<h2>' + (k.rtpOnly ? 'Nicht abspielbar.' : 'Kein Gespräch zustande gekommen.') + '</h2><p class="small">' +
+          (k.rtpOnly ? 'Ohne SIP ist der Codec unbekannt, und der Inhalt ist vermutlich verschlüsselt (SRTP).' : st.state === 'missed' ? 'Der Anruf wurde nicht angenommen; es gibt keine Sprache.' : 'Die Gegenseite hat abgelehnt (' + esc(cstateSub(st)) + '); es gibt keine Sprache.') + '</p></div>';
+        return;
+      }
+      const BARS = 150, dur = Math.max(1, st.talk);
+      // Erfundene Hüllkurve: abwechselnd spricht eine Seite, die andere hört zu
+      function env(side) {
+        const out = []; let t = 0, speaker = 0, seg = 0;
+        const turns = []; while (t < dur) { const l = 2 + D.hash(seg + id.charCodeAt(0) * 31, 3) * 6; turns.push([t, t + l, seg % 2]); t += l; seg += 1; }
+        for (let b = 0; b < BARS; b += 1) {
+          const tt = (b + 0.5) / BARS * dur;
+          const tr = turns.filter(function (x) { return tt >= x[0] && tt < x[1]; })[0] || [0, 0, 0];
+          speaker = tr[2];
+          const talk = speaker === side && D.hash(b * 7 + side, 11) > 0.12;
+          out.push(talk ? 0.3 + D.hash(b * 13 + side, 12) * 0.7 : 0.04 + D.hash(b * 5 + side, 13) * 0.06);
+        }
+        return out;
+      }
+      const eo = env(0), ei = env(1);
+      const gaps = {}; if (st.i.lost) { for (let g = 0; g < Math.min(18, st.i.lost); g += 1) gaps[Math.floor(D.hash(g, 21) * BARS)] = 1; }
+      const lane = function (cls, lbl, sub, e, gp) { return '<div class="lane"><div class="lbl">' + lbl + '<small>' + sub + '</small></div><div class="wave ' + cls + '" data-w="' + cls + '">' + e.map(function (v, b) { return '<i' + (gp && gp[b] ? ' class="gap"' : '') + ' style="height:' + Math.round(8 + v * 92) + '%"></i>'; }).join('') + '<span class="head" style="left:0"></span></div></div>'; };
+      box.innerHTML = '<div class="player">' +
+        lane('out', I('arrow-up', 'sm') + ' Gesendet', ME.name, eo) +
+        lane('in', I('arrow-down', 'sm') + ' Empfangen', esc(k.peer.name || uriTxt(k.peer.uri)), ei, gaps) +
+        '<div class="axis"><span>0:00</span><span>' + mmss(dur / 2) + '</span><span>' + mmss(dur) + '</span></div>' +
+        '<div class="ctl"><button class="btn primary" type="button" id="playBtn">' + I('play', 'sm') + '<span>Abspielen</span></button><span class="time" id="ptime">0:00 / ' + mmss(dur) + '</span>' +
+        '<div class="seg sm" role="group" aria-label="Richtung" id="chSeg"><button type="button" data-v="both" aria-pressed="true">Beide</button><button type="button" data-v="out" aria-pressed="false">Gesendet</button><button type="button" data-v="in" aria-pressed="false">Empfangen</button></div></div>' +
+        '<p class="help" style="margin:0">' + (st.i.lost ? 'Rot: verlorene Pakete, sie werden als Stille gespielt. ' : '') + (st.state === 'running' ? 'Der Anruf läuft noch; abgespielt wird, was bis jetzt im Paketspeicher liegt. ' : '') + 'Braucht vollständige Pakete im Paketspeicher.</p></div>';
+      let pos = 0, playing = false, lastT = 0, toasted = false;
+      function draw() {
+        const f = Math.min(1, pos / dur);
+        $$('#cplay .head').forEach(function (h) { h.style.left = (f * 100).toFixed(2) + '%'; });
+        const k2 = Math.floor(f * BARS);
+        $$('#cplay .wave').forEach(function (w) { Array.prototype.forEach.call(w.querySelectorAll('i'), function (b, i) { b.classList.toggle('done', i < k2); }); });
+        $('#ptime').textContent = mmss(pos) + ' / ' + mmss(dur);
+      }
+      function frame(ts) { if (!playing) return; if (lastT) pos += (ts - lastT) / 1000; lastT = ts; if (pos >= dur) { pos = dur; stop(); } draw(); if (playing) requestAnimationFrame(frame); }
+      function stop() { playing = false; $('#playBtn').innerHTML = I('play', 'sm') + '<span>Abspielen</span>'; }
+      function start() {
+        if (pos >= dur) pos = 0;
+        playing = true; lastT = 0; $('#playBtn').innerHTML = I('pause', 'sm') + '<span>Anhalten</span>'; requestAnimationFrame(frame);
+        if (!toasted) { toasted = true; App.toast('Entwurf: spielt keinen Ton ab. Im Programm über die Soundausgabe des Systems.'); }
+      }
+      $('#playBtn').addEventListener('click', function () { if (playing) stop(); else withLaw('play', start); });
+      $$('#cplay .wave').forEach(function (w) { w.addEventListener('click', function (e) { const r = w.getBoundingClientRect(); pos = Math.max(0, Math.min(1, (e.clientX - r.left) / r.width)) * dur; draw(); }); });
+      bindSeg('chSeg', function (v) { $('#cplay .wave.out').classList.toggle('mute', v === 'in'); $('#cplay .wave.in').classList.toggle('mute', v === 'out'); });
+      if (location.hash === '#anhoeren') setTimeout(function () { $('#anhoeren').scrollIntoView({ block: 'start' }); }, 0);
+    }
+
+    facts(); ladder(); streams(); player();
+    if ($('#wavBtn')) $('#wavBtn').addEventListener('click', function () { withLaw('wav', function () { wavToast(st); }); });
+    $('#ladder').addEventListener('click', function (e) { if (e.target.closest('a')) return; const r = e.target.closest('.lrow[data-n]'); if (r) location.href = 'paket.html?n=' + r.dataset.n; });
+    if (st.state === 'running') {
+      let last = 0;
+      document.addEventListener('opm-tick', function () { const t = Date.now(); if (t - last < 1000) return; last = t; facts(); ladder(); streams(); });
+    }
   }
 
   /* ---------- Hosts, Dienste, Programme ---------- */
@@ -824,7 +1096,15 @@
         '<div class="field-row"><div class="field"><label for="pmax">Höchstens Pakete</label><input id="pmax" type="number" value="500000" step="10000" min="1000" max="2000000"></div>' +
         '<div class="field"><label for="pmem">Höchstens Arbeitsspeicher</label><select id="pmem"><option>256 MiB</option><option selected>512 MiB</option><option>1 GiB</option><option>2 GiB</option></select></div></div>' +
         '<label class="check"><input type="checkbox"> Nur Kopfdaten speichern (die ersten 128 Bytes jedes Pakets)</label>' +
-        '<p class="help" style="margin-top:var(--sp-2)">Gilt ab der nächsten Aufzeichnung (auch auf der Seite Aufzeichnung wählbar). Mit „Nur Kopfdaten“ fehlen Inhalte wie der TLS-Servername (SNI) teilweise, und Stream folgen ist unvollständig. Die Pakete liegen nur im Arbeitsspeicher; ist eine der Grenzen erreicht, fallen die ältesten heraus.</p></div>' + save + '</section>';
+        '<p class="help" style="margin-top:var(--sp-2)">Gilt ab der nächsten Aufzeichnung (auch auf der Seite Aufzeichnung wählbar). Mit „Nur Kopfdaten“ fehlen Inhalte wie der TLS-Servername (SNI) teilweise, Stream folgen ist unvollständig, und Anrufe lassen sich nicht anhören. Die Pakete liegen nur im Arbeitsspeicher; ist eine der Grenzen erreicht, fallen die ältesten heraus.</p></div>' + save + '</section>';
+    }],
+    ['anrufe', 'phone', 'Anrufe', function () {
+      const ok = App.store.get('voipOk');
+      return '<section class="card"><header><h2>Anrufe (VoIP)</h2></header><div class="cbody">' +
+        '<div class="field">' + sw('rtpH', 'RTP auch ohne SIP erkennen', true, true) + '<span class="help">Erkennt Sprach- und Videoströme an ihrer Form (Version 2, gleichbleibende SSRC, fortlaufende Nummern über mindestens 10 Pakete), auch wenn die Steuerung verschlüsselt lief, etwa bei einer Videokonferenz im Browser. Selten erscheint dabei anderer UDP-Verkehr fälschlich als RTP.</span></div>' +
+        '<div class="field">' + sw('sipAny', 'SIP auch auf anderen Ports als 5060 erkennen', true) + '<span class="help">An der ersten Zeile, z. B. „INVITE sip:…“ oder „SIP/2.0 200 OK“.</span></div>' +
+        '<dl class="facts"><dt>Anhören</dt><dd>G.711 A-law und µ-law, beide Richtungen; G.722 und Opus folgen später. Braucht vollständige Pakete im Paketspeicher.</dd>' +
+        '<dt>Hinweis zu § 201 StGB</dt><dd id="lawState">' + (ok ? 'bestätigt am ' + esc(ok) + ' <button class="btn sm" type="button" id="lawReset">wieder zeigen</button>' : 'kommt vor dem ersten Anhören oder Speichern') + '</dd></dl></div>' + save + '</section>';
     }],
     ['geodaten', 'globe', 'Geodaten', function () {
       return '<section class="card"><header><h2>Geodaten</h2></header><div class="cbody"><dl class="facts" style="margin-bottom:var(--sp-4)">' +
@@ -837,7 +1117,7 @@
     ['mcp', 'bot', 'KI-Assistenten (MCP)', function () {
       const m = App.mcp();
       return '<section class="card"><header><h2>KI-Assistenten (MCP)</h2>' + (m === 'off' ? '' : '<span class="st ' + (m === 'content' ? 'warn' : 'ok') + '">' + I(m === 'content' ? 'alert' : 'check-circle', 'sm') + (m === 'content' ? 'Paketinhalte erlaubt' : 'Aktiv') + '</span>') + '</header><div class="cbody">' +
-        '<div class="field">' + sw('mcpOn', 'KI-Assistenten den Zugriff erlauben', m !== 'off', true) + '<span class="help">Programme wie Claude Code können dann auf diesem Rechner über MCP die Aufzeichnung abfragen, solange dieses Fenster offen ist: Verbindungen, Pakete ohne Inhalt und Statistik. Die Abfragen lesen nur. Was ein Assistent abfragt, geht an seinen KI-Dienst.</span></div>' +
+        '<div class="field">' + sw('mcpOn', 'KI-Assistenten den Zugriff erlauben', m !== 'off', true) + '<span class="help">Programme wie Claude Code können dann auf diesem Rechner über MCP die Aufzeichnung abfragen, solange dieses Fenster offen ist: Verbindungen, Pakete ohne Inhalt, Statistik und Anrufe (ohne Ton; Rufnummern bis auf die letzten zwei Ziffern gekürzt). Die Abfragen lesen nur. Was ein Assistent abfragt, geht an seinen KI-Dienst.</span></div>' +
         (m === 'off' ? '' : '<p class="small">Aktiv, Abfragen seit dem Einschalten: <b class="mono">14</b></p><div class="field"><span class="label">Einrichten in Claude Code:</span><div class="codebox"><code>claude mcp add openpacketmon -- openpacketmon mcp</code><button class="iconbtn sm" type="button" aria-label="Kopieren" data-draft-toast="Befehl kopiert (Entwurf)">' + I('copy', 'sm') + '</button></div></div>' +
           '<fieldset class="fset"><legend>Nur für diese Sitzung</legend><div class="field">' + sw('mcpContent', 'Paketinhalte erlauben (Stream folgen, Bytes eines Pakets)', m === 'content') + '<span class="help">Gilt nur, bis openpacketmon geschlossen wird. Assistenten lesen dann auch den Inhalt unverschlüsselter Verbindungen. Werte geheimer Köpfe wie Cookie und Authorization, URL-Queries und Passwörter nach PASS oder AUTH werden durch x ersetzt; Geheimnisse an anderen Stellen bleiben sichtbar.</span></div></fieldset>') +
         '</div></section><p class="muted small">Der Schalter wirkt sofort, ohne Speichern. Unten in der Statusleiste steht, solange Assistenten Zugriff haben (grün) oder Paketinhalte lesen dürfen (orange).</p>';
@@ -900,6 +1180,7 @@
     $('#ps').value = App.store.get('ps') || '30';
     $('#ps').addEventListener('change', function () { App.store.set('ps', this.value); });
     $$('#p-anzeige [data-theme-btn]').forEach(function (b) { b.setAttribute('aria-pressed', String(b.dataset.themeBtn === (App.store.get('theme') || 'system'))); b.addEventListener('click', function () { $$('#draftbar [data-theme-btn="' + b.dataset.themeBtn + '"]')[0].click(); $$('#p-anzeige [data-theme-btn]').forEach(function (o) { o.setAttribute('aria-pressed', String(o === b)); }); }); });
+    const lr = $('#lawReset'); if (lr) lr.addEventListener('click', function () { App.store.set('voipOk', ''); $('#lawState').textContent = 'kommt vor dem ersten Anhören oder Speichern'; });
     const on = $('#mcpOn'); if (on) on.addEventListener('change', function () { App.store.set('mcp', this.checked ? 'on' : 'off'); location.reload(); });
     const ct = $('#mcpContent'); if (ct) ct.addEventListener('change', function () { App.store.set('mcp', this.checked ? 'content' : 'on'); location.reload(); });
   }
@@ -937,7 +1218,7 @@
   /* ---------- Breiten ---------- */
   function pageWidths() {
     const p = q.get('p') || 'pakete';
-    const PG = [['uebersicht', 'Übersicht'], ['pakete', 'Pakete'], ['paket', 'Paket'], ['verbindungen', 'Verbindungen'], ['statistik', 'Statistik'], ['aufzeichnung', 'Aufzeichnung'], ['einstellungen', 'Einstellungen']];
+    const PG = [['uebersicht', 'Übersicht'], ['pakete', 'Pakete'], ['paket', 'Paket'], ['verbindungen', 'Verbindungen'], ['statistik', 'Statistik'], ['anrufe', 'Anrufe'], ['anruf', 'Anruf'], ['aufzeichnung', 'Aufzeichnung'], ['einstellungen', 'Einstellungen']];
     const sets = [[1440, 900, 0.5, '1440 × 900'], [1280, 820, 0.5, '1280 × 820 (Standardgröße des Fensters)'], [1024, 720, 0.5, '1024 × 720'], [760, 480, 0.62, '760 × 480 (Mindestgröße)']];
     $('#main').innerHTML = pagehead('Breiten', 'Dieselbe Seite bei vier Fenstergrößen (verkleinert dargestellt). Maßgeblich ist 1280 × 820, die Standardgröße des Fensters (Nutzer, 2026-11-09); die kleineren Größen zeigen nur, wie die Seite enger wird, und sind nicht eigens gestaltet.',
       '<div class="seg" role="group" aria-label="Seite">' + PG.map(function (x) { return '<a href="breiten.html?p=' + x[0] + '"' + (x[0] === p ? ' aria-current="page"' : '') + '>' + x[1] + '</a>'; }).join('') + '</div>') +
@@ -949,13 +1230,13 @@
   /* ---------- Entwurf (Start) ---------- */
   function pageIndex() {
     const sw = [['--bg', 'Hintergrund'], ['--surface', 'Fläche'], ['--surface-2', 'Fläche 2'], ['--border', 'Linie'], ['--text', 'Text'], ['--text-3', 'Text gedämpft'], ['--accent', 'Akzent'], ['--ok', 'In Ordnung'], ['--warn', 'Warnung'], ['--err', 'Fehler'], ['--s1', 'Eingehend'], ['--s2', 'Ausgehend']];
-    const rows = [['--row-bad', 'Fehler, Reset, TCP-Probleme'], ['--row-tcp', 'TCP-Auf-/Abbau'], ['--row-dns', 'DNS'], ['--row-local', 'ARP, DHCP, SSDP, NTP'], ['--row-tls', 'TLS'], ['--row-http', 'HTTP'], ['--row-icmp', 'ICMP'], ['--row-udp', 'QUIC, UDP'], ['--cli-bg', 'Stream: Client'], ['--srv-bg', 'Stream: Server'], ['--hl', 'Hex: Auswahl']];
+    const rows = [['--row-bad', 'Fehler, Reset, TCP-Probleme'], ['--row-tcp', 'TCP-Auf-/Abbau'], ['--row-dns', 'DNS'], ['--row-local', 'ARP, DHCP, SSDP, NTP'], ['--row-tls', 'TLS'], ['--row-http', 'HTTP'], ['--row-icmp', 'ICMP'], ['--row-udp', 'QUIC, UDP'], ['--row-voip', 'SIP, RTP, RTCP'], ['--cli-bg', 'Stream: Client'], ['--srv-bg', 'Stream: Server'], ['--hl', 'Hex: Auswahl']];
     $('#main').innerHTML = pagehead('openpacketmon – Entwurf der neuen Oberfläche', 'Gestaltung und Farben wie opensecmon und der Entwurf von opennetmon; Inhalt und Funktionen wie openpacketmon ' + App.VERSION + '.') +
       '<div class="notice info">' + I('info') + '<div><b>Kein Anwendungscode.</b> Klickbare Seiten mit erfundenen Daten; die Anwendung zeichnet weiter mit egui. Oben die Entwurfsleiste: Seite, Zustand der Aufzeichnung („läuft“, „pausiert“, „keine“), neue Version („mit Launcher“, „ohne Launcher“, „keins“) und Thema (System, Hell, Dunkel). Läuft die Aufzeichnung, kommen wie im Programm alle 0,3 s neue Pakete dazu.</div></div>' +
       '<h3 style="margin-bottom:var(--sp-2)">Seiten</h3><div class="cards3" style="margin-bottom:var(--sp-5)">' +
       [['aufzeichnung', 'capture', 'Aufzeichnung', 'Quelle, Filter, Paketspeicher; läuft sie, Zustand und Knöpfe'], ['uebersicht', 'overview', 'Übersicht', 'Kacheln, „Auffällig“, Verkehr pro Sekunde, Top-Listen'], ['verbindungen', 'connections', 'Verbindungen', 'Filter mit Vorschlägen, Seiten, Favoriten'],
         ['verbindung', 'connections', 'Verbindung', 'Fakten, Gegenstelle, Sprünge zu Paketen und Stream'], ['pakete', 'packets', 'Pakete', 'durchgehende Liste mit Live-Folgen, Anzeigefilter, Gehe zu'], ['paket', 'layers', 'Paket', 'Schichten und Bytes, Felder markieren ihre Bytes'],
-        ['stream', 'stream', 'Stream folgen', 'Client und Server farbig, Text oder Hex'], ['statistik', 'statistics', 'Statistik', 'Diagramm, Protokollhierarchie, TCP-Analyse, Antwortzeiten'], ['hosts', 'hosts', 'Hosts, Dienste, Programme', 'Listen mit Verkehrsbalken und Favoriten'],
+        ['stream', 'stream', 'Stream folgen', 'Client und Server farbig, Text oder Hex'], ['statistik', 'statistics', 'Statistik', 'Reiter Protokolle (Diagramm, Hierarchie, TCP-Analyse, Antwortzeiten) und Anrufe'], ['anrufe', 'phone', 'Anrufe', 'unter Statistik: SIP und RTP, Ablauf, Sprachqualität, Anhören (G.711); neu'], ['hosts', 'hosts', 'Hosts, Dienste, Programme', 'Listen mit Verkehrsbalken und Favoriten'],
         ['benachrichtigungen', 'bell', 'Benachrichtigungen', 'Verkehr der Favoriten'], ['einstellungen', 'settings', 'Einstellungen', 'ein Bereich mit Unternavigation, „Über und Lizenzen“ darin'], ['logo', 'm-c', 'Logo', 'fünf Entwürfe, gewählt C „Lupe über Paketen“'], ['breiten', 'display', 'Breiten', '1440 px bis 760 px; maßgeblich ist 1280 × 820']].map(function (x) {
         return '<a class="tile" href="' + x[0] + '.html"><div class="k">' + I(x[1], 'sm') + x[2] + '</div><div class="s" style="margin-top:4px;white-space:normal">' + x[3] + '</div></a>';
       }).join('') + '</div>' +
@@ -968,6 +1249,7 @@
       '<li><b>Schrift:</b> Fira Sans und Fira Code (Adressen, Zeiten, Hex) statt Inter; dichte Zeilen (Tabellen 34 px, Paketliste 26 px).</li>' +
       '<li><b>Einstellungen</b> als ein Bereich mit Unternavigation; „Lizenzen“ wandert dorthin („Über und Lizenzen“), der Link in der Statusleiste bleibt.</li>' +
       '<li><b>Neu:</b> „Auffällig“ auf der Übersicht, Tastenkürzel-Hilfe mit „?“, „/“ für das Filterfeld, Leiste über der Paketliste für das gewählte Paket, Rückfrage beim Beenden. Das gibt es heute nicht; vom Nutzer alle übernommen.</li>' +
+      '<li><b>Neu: Anrufe (VoIP).</b> SIP, SDP, RTP und RTCP in der Paketliste (eigene Farbe, Filter <code>sip</code>, <code>rtp</code>, <code>voip.call_id</code> …) und unter Statistik der Reiter „Anrufe“ mit Ablauf, Sprachqualität und Anhören von G.711 (nicht in der Kopfleiste, weil selten gebraucht); vor dem ersten Anhören ein Hinweis auf § 201 StGB.</li>' +
       '<li><b>Logo:</b> neues Zeichen im Stil der beiden anderen Programme, gewählt C „Lupe über Paketen“ (Seite Logo).</li></ul></div></section>' +
       '<h3 style="margin:var(--sp-5) 0 var(--sp-2)">Farben</h3><div class="swatches">' + sw.map(function (x) { return '<div class="sw"><i style="background:var(' + x[0] + ')"></i><div>' + x[1] + '<br><code>' + x[0] + '</code></div></div>'; }).join('') + '</div>' +
       '<h3 style="margin:var(--sp-4) 0 var(--sp-2)">Paketliste, Stream, Hex</h3><div class="swatches">' + rows.map(function (x) { return '<div class="sw"><i style="background:var(' + x[0] + ')"></i><div>' + x[1] + '<br><code>' + x[0] + '</code></div></div>'; }).join('') + '</div>' +
@@ -976,9 +1258,9 @@
 
   document.addEventListener('DOMContentLoaded', function () {
     const page = document.body.dataset.page;
-    const active = { uebersicht: 'uebersicht', verbindungen: 'verbindungen', verbindung: 'verbindungen', pakete: 'pakete', paket: 'pakete', stream: 'pakete', statistik: 'statistik', hosts: 'hosts', dienste: 'dienste', programme: 'programme', benachrichtigungen: 'benachrichtigungen', einstellungen: 'einstellungen' }[page] || '';
+    const active = { uebersicht: 'uebersicht', verbindungen: 'verbindungen', verbindung: 'verbindungen', pakete: 'pakete', paket: 'pakete', stream: 'pakete', statistik: 'statistik', anrufe: 'statistik', anruf: 'statistik', hosts: 'hosts', dienste: 'dienste', programme: 'programme', benachrichtigungen: 'benachrichtigungen', einstellungen: 'einstellungen' }[page] || '';
     App.shell(active);
-    ({ index: pageIndex, aufzeichnung: pageCapture, uebersicht: pageOverview, verbindungen: pageConnections, verbindung: pageConnection, pakete: pagePackets, paket: pagePacket, stream: pageStream, statistik: pageStatistics,
+    ({ index: pageIndex, aufzeichnung: pageCapture, uebersicht: pageOverview, verbindungen: pageConnections, verbindung: pageConnection, pakete: pagePackets, paket: pagePacket, stream: pageStream, statistik: pageStatistics, anrufe: pageCalls, anruf: pageCall,
       hosts: function () { pageEntries('hosts'); }, dienste: function () { pageEntries('dienste'); }, programme: function () { pageEntries('programme'); },
       benachrichtigungen: pageNotifications, einstellungen: pageSettings, logo: pageLogo, breiten: pageWidths })[page]();
     document.addEventListener('click', function (e) { const b = e.target.closest('[data-back]'); if (b) { e.preventDefault(); App.back(b.dataset.back); } });

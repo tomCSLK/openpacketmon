@@ -13,7 +13,7 @@ Logo C „Lupe über Paketen“ ersetzt (`PLAN.md` 5.6).
 |---|---|---|
 | `CLAUDE.md` | Regeln und Grundwissen für jede Sitzung | automatisch |
 | `CLAUDE.local.md` | Laptop, gemeldeter Befund beim Original, Pfade zu nicht öffentlichen Projekten (gitignored) | automatisch |
-| `PLAN.md` | oben der Stand; Entscheidungen (0), Lizenzprüfung (1), Bestandsaufnahme und Phasen 1–4 (2–4, Verlauf), Vorhaben 5.1–5.6, offene Punkte (5) | **maßgeblich**, vor Arbeit am Vorhaben lesen |
+| `PLAN.md` | oben der Stand; Entscheidungen (0), Lizenzprüfung (1), Bestandsaufnahme und Phasen 1–4 (2–4, Verlauf), Vorhaben 5.1–5.7, offene Punkte (5) | **maßgeblich**, vor Arbeit am Vorhaben lesen |
 | `docs/windows.md` | alles zu Windows: Einrichten, Code-Unterschiede, Tests, Installer, Code-Signatur, CI, offene Punkte | vor Arbeit unter oder für Windows |
 | `docs/entwurf/` | klickbarer Entwurf der neuen Oberfläche (HTML, erfundene Daten), `README.md` dort | vor Arbeit an der Oberfläche |
 | `README.md`, `CHANGELOG.md`, `SECURITY.md`, `CONTRIBUTING.md`, `NOTICE` | öffentlich, Englisch | bei Bedarf |
@@ -97,13 +97,17 @@ Fassung bis 2026-11-09 (mit dem Verlauf der Browser-Oberfläche) steht in der Gi
 
 ## Stand und offene Punkte
 
-Maßgeblich ist `PLAN.md` (oben „Stand“, Abschnitt 5). Kurz (2026-11-09):
+Maßgeblich ist `PLAN.md` (oben „Stand“, Abschnitt 5). Kurz (2026-11-10):
 
 - **v0.4.0** ist released (2026-11-02, Linux; signierter Windows-Installer seit 2026-11-03).
 - **Neue Oberfläche im Stil von opensecmon** (`PLAN.md` 5.6, `docs/entwurf/`): Entwurf abgenommen (Kopfleiste, Aufzeichnung rechts oben,
   Statusleiste, grau mit `#1c5ea8`, Fira Sans/Code, Logo C, 1280 × 820, mindestens 760 × 480). Die **Ergänzung zu den Updates** (Hinweis auf
   neue Versionen mit und ohne Launcher, Release-Notes unter Einstellungen → Aktualisierungen, abgestimmt mit dem Entwurf des Launchers) ist am
-  2026-11-09 eingebaut und **wartet auf Abnahme**. Umsetzung in egui in vier Stufen erst danach und nach „go“.
+  2026-11-09 eingebaut und **abgenommen**. Umsetzung in egui in vier Stufen nach „go“.
+- **VoIP** (`PLAN.md` 5.7): SIP/SDP/RTP/RTCP in Paketliste und Filter, unter Statistik der Reiter „Anrufe“ (Ablauf, Sprachqualität, Anhören
+  von G.711 mit Hinweis auf § 201 StGB; nicht in der Kopfleiste, weil selten gebraucht), Entwurf **abgenommen** (2026-11-10, samt leicht
+  verschobenen Grenzen der Kopfleiste). Umsetzung nach „go“, Zerleger und Filter zuerst; keine echten Mitschnitte oder Rufnummern ins Repo, Ton
+  nie über MCP, Rufnummern über MCP bis auf die letzten zwei Ziffern gekürzt.
 - Windows-Reste (`docs/windows.md` 8): CI-Job, Test auf sauberem System, MCP-Einrichtung für Tester, MCP-Tests unter Windows von den echten
   Einstellungen trennen (`confy` ignoriert dort `XDG_CONFIG_HOME`).
 - Pull Request mit der Korrektur des Befunds beim Original offen (`CLAUDE.local.md`).

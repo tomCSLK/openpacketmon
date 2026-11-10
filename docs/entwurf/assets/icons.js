@@ -16,6 +16,8 @@
     capture: '<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="3.5"/>',
     settings: '<path d="M4 7h16"/><circle cx="9" cy="7" r="2.2"/><path d="M4 17h16"/><circle cx="15" cy="17" r="2.2"/>',
     back: '<polyline points="15 5 8 12 15 19"/>',
+    phone: '<path d="M5 4h3.5l1.8 4.6-2.3 1.5a11 11 0 0 0 5.9 5.9l1.5-2.3L20 15.5V19a1.5 1.5 0 0 1-1.6 1.5A16.5 16.5 0 0 1 3.5 5.6 1.5 1.5 0 0 1 5 4z"/>',
+    lock: '<rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/>',
     star: '<path d="M12 3.5l2.6 5.3 5.9.9-4.25 4.1 1 5.8L12 16.9l-5.25 2.7 1-5.8L3.5 9.7l5.9-.9z"/>',
     // allgemein
     search: '<circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/>',

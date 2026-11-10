@@ -1,11 +1,13 @@
 # PLAN.md – Fork von Sniffnet
 
-**Stand: 2026-11-09.**
+**Stand: 2026-11-10.**
 
 - **v0.4.0** ist das erste öffentliche Release (2026-11-02, Linux; signierter Windows-Installer seit 2026-11-03), Repo https://github.com/tomCSLK/openpacketmon
   öffentlich. Oberfläche egui (5.5), Mitschnitt-Helfer mit Rechten, MCP-Anbindung (5.4), Windows (5.3, Reste in `docs/windows.md` 8).
 - **Als Nächstes:** neue Oberfläche im Stil von opensecmon (5.6). Entwurf abgenommen; die Ergänzung zu den Updates (Hinweis auf neue Versionen,
-  abgestimmt mit dem geplanten Launcher) ist eingebaut und wartet auf Abnahme. Umsetzung erst danach und nach „go“.
+  abgestimmt mit dem geplanten Launcher) ist eingebaut und abgenommen (2026-11-09). Umsetzung nach „go“.
+- **VoIP** (5.7): SIP, SDP, RTP und RTCP in Paketliste und Filter, unter Statistik der Reiter „Anrufe“ mit Ablauf, Sprachqualität und
+  Anhören von G.711; Entwurf **abgenommen** (2026-11-10). Umsetzung nach „go“, Zerleger und Filter zuerst.
 - **Offen außerhalb:** Pull Request mit der Korrektur des Befunds aus 4.8 beim Original (Einzelheiten nur in `CLAUDE.local.md`).
 - Die Abschnitte 2 bis 4 und die Stände in 5.1 bis 5.5 sind **Verlauf** (die Lizenzprüfung in 1 gilt weiter); was dort über Browser-Oberfläche, `src/web/`, `templates/`,
   `static/`, Fenster-Programm oder privates Repo steht, gilt nicht mehr.
@@ -1529,7 +1531,7 @@ Stand egui (2026-11-01, Stufen 1 bis 4 freigegeben vom Nutzer, Test-Pakete **0.3
 Entschieden (Nutzer, 2026-10-31): Der Paketspeicher bleibt im RAM, die Grenze wird wählbar (bis etwa 2 GiB mit passender Paketzahl).
 Eine temporäre Datei wie bei Wireshark kommt nur, falls das später nicht reicht, weil sonst unverschlüsselter Verkehr auf der SSD läge.
 
-#### 5.6 Neue Oberfläche im Stil von opensecmon (Wunsch des Nutzers, 2026-11-09; Entwurf abgenommen, Ergänzung zu den Updates wartet auf Abnahme)
+#### 5.6 Neue Oberfläche im Stil von opensecmon (Wunsch des Nutzers, 2026-11-09; Entwurf abgenommen, Ergänzung zu den Updates abgenommen)
 
 Auftrag: klickbarer Entwurf wie bei opennetmon (`../opennetmon/docs/entwurf/`, dort lokal, am 2026-11-09 abgenommen), Farben und Gestaltung
 von dort, Logo im selben Stil. Ergebnis in **`docs/entwurf/`** (statisches HTML, kein Anwendungscode; Start `index.html`, Einzelheiten
@@ -1554,10 +1556,11 @@ und offene Punkte in `docs/entwurf/README.md`). Inhalt und Funktionen wie 0.4.0,
   Lupensymbol); alle neuen Teile bleiben; maßgeblich ist **1280 × 820** (Desktop-Programm, heute schon die Standardgröße), kleinere Größen
   werden nicht eigens gestaltet. **Mindestgröße bleibt 760 × 480** wie heute (`src/gui/mod.rs`, `with_min_inner_size`; Vorschlag vom
   Nutzer bestätigt, 2026-11-09), nicht 1280 × 820, sonst passt das Fenster auf 1366 × 768 nicht mehr ganz. Zwischen 760 und 1280 px gelten
-  nur die Regeln aus dem Entwurf (unter 1180 px „Mehr“, unter 900 px nur Symbole, Statusleiste kürzt in fester Reihenfolge, DB-IP bleibt).
+  nur die Regeln aus dem Entwurf (unter 1180 px „Mehr“, unter 900 px nur Symbole, Statusleiste kürzt in fester Reihenfolge, DB-IP bleibt;
+  seit 2026-11-10 leicht verschobene Grenzen, siehe 5.7).
 - **Vorerst nur dokumentiert und geplant** (Nutzer, 2026-11-09): keine Umsetzung; Entwurf und Plan auf Wunsch des Nutzers committet
   (2026-11-09).
-- **Ergänzung zu den Updates** (vom Nutzer angekündigt, am 2026-11-09 eingebaut, **noch nicht abgenommen**): der Hinweis auf neue Versionen nach
+- **Ergänzung zu den Updates** (vom Nutzer angekündigt, am 2026-11-09 eingebaut, **vom Nutzer abgenommen am 2026-11-09**): der Hinweis auf neue Versionen nach
   der Absprache im Entwurf des geplanten Launchers („Aufruf aus den Apps“, vereinbart 2026-11-09; Pfad in `CLAUDE.local.md`), wie bei opennetmon
   (dort Vorhaben P). openpacketmon sucht weiter selbst auf GitHub und lädt oder installiert nichts.
   - Statusleiste: „Version x.y verfügbar“ öffnet ein kleines Fenster („openpacketmon x.y ist erschienen“, installierte Version, Datum).
@@ -1573,19 +1576,88 @@ und offene Punkte in `docs/entwurf/README.md`). Inhalt und Funktionen wie 0.4.0,
     Antwort. Die Release-Notes sind Fremdtext (nur `https://`-Links, kein HTML, Länge begrenzen) und brauchen einen kleinen Markdown-Renderer
     (eigener Code oder Crate mit passender Lizenz). Der Launcher wird ohne Shell gestartet. Name und Aufruf des Launchers erst ins Repo, wenn er
     öffentlich ist.
-- **Umsetzung** erst nach Abnahme der Ergänzung zu den Updates und nach „go“, in vier Stufen mit Test-Paket (Vorschlag in `docs/entwurf/README.md`):
+- **Umsetzung** nach „go“, in vier Stufen mit Test-Paket (Vorschlag in `docs/entwurf/README.md`):
   A Farben/Schriften (`src/gui/theme.rs`, Fira als TTF, Lizenzliste), B Kopf- und Statusleiste mit dem Hinweis auf neue Versionen
   (`src/gui/mod.rs`, `widgets.rs`, `locales/`; Fenster bleibt 1280 × 820 mit Mindestgröße 760 × 480), C Seite für Seite (`src/gui/pages/`,
   Seitendaten bleiben in `src/view/`; darin Einstellungen → Aktualisierungen mit Release-Notes), D Symbole, Logo C, Programmsymbole, README-Bild.
 
+#### 5.7 VoIP: SIP, RTP und Anrufe (Wunsch des Nutzers, 2026-11-09; Entwurf abgenommen 2026-11-10, Umsetzung nach „go“)
+
+Auftrag: was Wireshark dafür bietet, mit eigenem Code: Anzeigefilter `sip` und `rtp`, eine Liste der erkannten Telefonate (dort
+„Telephony → VoIP Calls“) und Anhören unverschlüsselter Gespräche. **Wireshark ist GPL:** nichts daraus übernehmen; Grundlage sind die
+Standards (SIP RFC 3261, SDP RFC 8866, RTP/RTCP RFC 3550, Payload-Typen RFC 3551, G.711 nach ITU-T).
+
+- **Entscheidungen (Nutzer, 2026-11-09):**
+  - Anhören: ja, für **G.711** A-law und µ-law (PCMA/PCMU), beide Richtungen, dazu „Als WAV speichern“. G.722 und Opus später.
+  - Vor dem ersten Anhören oder Speichern einmal ein Hinweis auf **§ 201 StGB** (Vertraulichkeit des Wortes); bestätigt wird je Benutzer,
+    wieder anzeigen lässt er sich unter Einstellungen → Anrufe.
+  - Reihenfolge: **Zerleger und Filter zuerst** (unabhängig von 5.6, in der heutigen Oberfläche), die Seiten „Anrufe“ und „Anruf“ danach mit
+    der neuen Oberfläche (nach 5.6 Stufe B).
+  - Entwurf: beide Seiten in `docs/entwurf/` mit erfundenen Anrufen, `sip`/`rtp` im Anzeigefilter des Entwurfs.
+  - **Platz (2026-11-10):** „Anrufe“ steht **nicht in der Kopfleiste**, weil Telefonie seltener gebraucht wird (Variante D von vier
+    verglichenen: A kompakt mit acht Reitern, B Hosts/Dienste/Programme nur als Symbol, C diese drei als ein Reiter, D Anrufe unter Statistik).
+    Statistik bekommt die Unterreiter **„Protokolle“** (der bisherige Inhalt) und **„Anrufe“** (mit Zahl der Anrufe). Weitere Wege: Knopf
+    „Anruf“ in der Leiste über der Paketliste, „Gehört zum Anruf …“ in den Paketdetails, „Auffällig“ in der Übersicht.
+- **Im Entwurf** (2026-11-09; Einzelheiten und „Zum Ausprobieren“ in `docs/entwurf/README.md`):
+  - Paketliste: SIP, SDP, RTP und RTCP mit eigener Zeilenfarbe (`--row-voip`), Info wie „Request: INVITE sip:…“, „Status: 200 OK (INVITE)“,
+    „PT=ITU-T G.711 PCMA, SSRC=…, Seq=…“. Paketdetails mit den Schichten SIP (alle Kopfzeilen, Antworten mit Paket und Zeit), SDP, RTP
+    („Ausgehandelt per SDP in Paket …“) und RTCP (Sender Report, Source Description); oben der Link „Gehört zum Anruf …“.
+  - Filterfelder: `sip`, `sdp`, `rtp`, `rtcp`, `sip.method`, `sip.status_code`, `sip.call_id`, `sip.from`, `sip.to`, `rtp.ssrc`, `rtp.seq`,
+    `rtp.p_type` und `voip.call_id` (alle Pakete eines Anrufs: SIP und die darin ausgehandelten RTP-/RTCP-Ströme). Statistik: SIP, SDP, RTP
+    und RTCP in der Protokollhierarchie.
+  - Reiter **Anrufe** (Statistik): Kacheln; Liste mit Zustand (läuft, beendet, verpasst, abgelehnt, nur RTP), Beginn, Dauer,
+    Richtung, Von, An, Codec, Qualität, Pakete, Anhören; die Anmeldung (REGISTER) als Fußzeile; Hilfe „So kommen Anrufe in die Aufzeichnung“
+    (Softphone auf dem Rechner; Telefon am Router: Mitschnitt der FRITZ!Box oder Port-Spiegelung; SIP über TLS und SRTP bleiben unlesbar).
+  - Seite **Anruf** (Statistik › Anrufe › Anruf): Fakten (Von, An, Richtung, Zeiten, Codec mit SDP-Paket, Programm, Anbieter, Call-ID, Anmeldung per Digest); **Anhören**
+    (Wellenform je Richtung, verlorene Pakete rot und als Stille, Beide/Gesendet/Empfangen, Klick springt); **Ablauf** als Leiterdiagramm
+    (SIP-Nachrichten, Sprache als Band); **Sprachströme** mit Paketen, Verlust, Jitter (RFC 3550), größtem Abstand, Folgefehlern, Bewertung
+    und den RTCP-Berichten. Bewertung: gut unter 1 % Verlust und unter 30 ms Jitter, schlecht ab 3 % oder 50 ms, dazwischen mäßig; bei
+    „schlecht“ ein Hinweis auf der Seite und unter „Auffällig“ in der Übersicht.
+  - Einstellungen → Anrufe: „RTP auch ohne SIP erkennen“ (an der Form: Version 2, gleichbleibende SSRC, fortlaufende Nummern über mindestens
+    10 Pakete; **standardmäßig an**, Nutzer 2026-11-10), „SIP auch auf anderen Ports als 5060 erkennen“ (an der ersten Zeile; im Entwurf an);
+    Stand des Hinweises zu § 201.
+  - Beispiele: ausgehend mit 407 und „486 Busy Here“, ausgehend angenommen (PCMA, 1:31), eingehend mit schlechter Verbindung (PCMU, 4,3 %
+    Verlust, 41,7 ms Jitter), eingehend mit unterdrückter Nummer verpasst (CANCEL, 487), ausgehend laufend, ein RTP-Strom ohne SIP (Typ 111,
+    vermutlich SRTP) und die Anmeldung mit 401/200. Der Entwurf rechnet mit 60 ms je Paket und spielt keinen Ton.
+  - **Kopfleiste:** bleibt wie abgenommen (sieben Reiter, „Aufzeichnung läuft“). Beim Messen fielen Überläufe der abgenommenen Fassung auf:
+    900–906 px (6 px), 1260–1264 px (5 px), 1360–1439 px (bis 32 px), ohne Aufzeichnung auch 920–936 px (16 px). Behoben (**abgenommen**, Nutzer 2026-11-10):
+    Programmname neben dem Logo erst ab 1440 px (bisher ab 1360), „Aufzeichnung läuft“ erst ab 1280 px (bisher ab 1260), Reiter nur als
+    Symbol unter 960 px (bisher unter 900). Gemessen von 760 bis 1920 px, laufend, pausiert und ohne Aufzeichnung: kein Überlauf, mindestens
+    15 px Luft.
+  - Geprüft (2026-11-09, nach dem Umzug unter Statistik erneut 2026-11-10): alle Seiten ohne Skriptfehler; Bildschirmfotos bei 1280 × 820
+    hell und dunkel und bei 760 × 480 (Liste, Anrufe A–F, Pakete mit `sip or rtp` samt Knopf „Anruf“, SIP- und RTCP-Paket, Statistik mit
+    Unterreitern, Einstellungen, leere Liste, ohne Aufzeichnung, Hinweis zu § 201, Abspielen); die Anrufliste passt ohne Querscrollen von 760
+    bis 1920 px.
+- **Umsetzung** (Vorschlag, je Stufe nach „go“ mit Test-Paket):
+  1. **Zerleger** `src/dissect/sip.rs` (SIP über UDP und TCP, Port 5060 und an der ersten Zeile; SDP im Körper) und `rtp.rs` (RTP; RTCP SR,
+     RR, SDES, BYE). RTP läuft auf ausgehandelten, wechselnden Ports: Die Zerlegung bekommt dafür eine kleine Tabelle der im SDP
+     ausgehandelten Endpunkte (je Aufzeichnung, in `src/engine/`), sonst greift die Heuristik. SIP über TLS (5061) und SRTP bleiben
+     „verschlüsselt“.
+  2. **Filter und Statistik:** die Felder oben in `src/filter/fields.rs`, Zeilenfarbe und Info in `src/view/packets.rs`, Protokollhierarchie
+     in `src/view/statistics.rs`. Tests mit selbst erzeugten Paketen (Sinuston als G.711); keine echten Mitschnitte und keine echten
+     Rufnummern im Repo.
+  3. **Anrufe** (nach 5.6 Stufe B): Seitendaten `src/view/calls.rs` (Anrufe aus den SIP-Dialogen nach Call-ID, Ströme nach SSRC, Verlust und
+     Jitter nach RFC 3550), Seiten in `src/gui/pages/` (Statistik mit Unterreitern), Texte in `locales/`.
+  4. **Anhören:** G.711 dekodieren (eigener Code nach der ITU-T-Norm), Wiedergabe über `rodio` (schon für die Töne im Programm), WAV schreiben
+     (8 kHz, 16 bit, Stereo: links gesendet, rechts empfangen; eigener kleiner Schreiber oder eine Crate mit passender Lizenz), Lücken als
+     Stille. Braucht vollständige Pakete im Paketspeicher; mit „Nur Kopfdaten“ nicht abspielbar.
+  5. **MCP:** ein Lesewerkzeug `calls` (Liste, Ablauf, Qualität), **nie Ton**. `Authorization`, `Proxy-Authorization` und die
+     `…-Authenticate`-Köpfe fallen schon unter `auth` in `SECRET_HEADERS` (`src/mcp/privacy.rs`); prüfen, dass das auch bei SIP über UDP
+     greift. **Rufnummern gekürzt** (Nutzer, 2026-11-10): in SIP-URIs, `tel:`-URIs und Kopfzeilen (From, To, Contact,
+     P-Asserted-Identity …) bleiben nur die letzten zwei Ziffern, die übrigen werden `x` (`sip:+xxxxxxxxxx67@sip.example.net`), in den
+     Antworten der Werkzeuge wie in Paketinhalten; Anzeigenamen und Domains bleiben.
+- **Abgenommen (Nutzer, 2026-11-10):** der Entwurf („schaut gut aus“, 2026-11-09), Anrufe unter Statistik (Variante D), die verschobenen
+  Grenzen der Kopfleiste, „RTP auch ohne SIP erkennen“ standardmäßig an, Rufnummern über MCP gekürzt auf die letzten zwei Ziffern.
+
 ---
 
-## 5. Offene Punkte (Stand 2026-11-09)
+## 5. Offene Punkte (Stand 2026-11-10)
 
-1. Abnahme der Ergänzung zu den Updates im Entwurf (5.6), danach „go“ für die Umsetzung der neuen Oberfläche.
-2. Windows-Reste (`docs/windows.md` 8): CI-Job, Test auf sauberem System, MCP-Einrichtung in `docs/windows-tester.md`, MCP-Integrationstests
+1. „go“ für die Umsetzung der neuen Oberfläche (5.6; Entwurf samt Ergänzung zu den Updates abgenommen).
+2. „go“ für VoIP (5.7, Entwurf abgenommen), zuerst Zerleger und Filter (Stufen 1–2).
+3. Windows-Reste (`docs/windows.md` 8): CI-Job, Test auf sauberem System, MCP-Einrichtung in `docs/windows-tester.md`, MCP-Integrationstests
    unter Windows von den echten Einstellungen trennen.
-3. Rückmeldung des Originals zum Pull Request mit der Korrektur aus 4.8 (Einzelheiten nur in `CLAUDE.local.md`).
-4. Weitere Ideen in 5.2, noch nicht beschlossen.
+4. Rückmeldung des Originals zum Pull Request mit der Korrektur aus 4.8 (Einzelheiten nur in `CLAUDE.local.md`).
+5. Weitere Ideen in 5.2, noch nicht beschlossen.
 
 Die Namenssuche (früher Abschnitt 6, 2026-10-28) ist erledigt: **openpacketmon**, Marke vom Nutzer geprüft.

@@ -73,7 +73,7 @@
     ['programme', 'programme.html', 'programs', 'Programme', 1]
   ];
   const PAGES = [['index.html', 'Entwurf'], ['aufzeichnung.html', 'Aufzeichnung'], ['uebersicht.html', 'Übersicht'], ['verbindungen.html', 'Verbindungen'], ['verbindung.html', 'Verbindung'],
-    ['pakete.html', 'Pakete'], ['paket.html', 'Paket'], ['stream.html', 'Stream'], ['statistik.html', 'Statistik'], ['hosts.html', 'Hosts'], ['dienste.html', 'Dienste'], ['programme.html', 'Programme'],
+    ['pakete.html', 'Pakete'], ['paket.html', 'Paket'], ['stream.html', 'Stream'], ['statistik.html', 'Statistik'], ['anrufe.html', 'Anrufe'], ['anruf.html', 'Anruf'], ['hosts.html', 'Hosts'], ['dienste.html', 'Dienste'], ['programme.html', 'Programme'],
     ['benachrichtigungen.html', 'Benachrichtigungen'], ['einstellungen.html', 'Einstellungen'], ['logo.html', 'Logo'], ['breiten.html', 'Breiten']];
 
   function capChip() {

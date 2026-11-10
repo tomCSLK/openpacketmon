@@ -87,6 +87,7 @@
   --row-http:  #e1f1e6;   /* HTTP */
   --row-icmp:  #f7e5ee;   /* ICMP */
   --row-udp:   #dff0f1;   /* übriges UDP, QUIC */
+  --row-voip:  #fbe4d2;   /* SIP, RTP, RTCP (Anrufe) */
 
   /* Stream folgen: Client wie Eingehend-Blau, Server wie Ausgehend-Orange, je Text auf Tönung ≥ 4,5:1 */
   --cli: #174f8f;  --cli-bg: #e8f0fa;
@@ -134,6 +135,7 @@
   --row-http:  #172a1f;
   --row-icmp:  #321b2a;
   --row-udp:   #142c2e;
+  --row-voip:  #3a2516;
   --cli: #9cc3f0;  --cli-bg: #19283a;
   --srv: #f5b77a;  --srv-bg: #33240f;
   --hl: #24405f;
@@ -177,6 +179,7 @@
     --row-http:  #172a1f;
     --row-icmp:  #321b2a;
     --row-udp:   #142c2e;
+    --row-voip:  #3a2516;
     --cli: #9cc3f0;  --cli-bg: #19283a;
     --srv: #f5b77a;  --srv-bg: #33240f;
     --hl: #24405f;

@@ -2,13 +2,18 @@
 
 **Stand: 2026-11-12.**
 
+- **v0.5.2** ist released (2026-11-12, auf Ansage des Nutzers, zunächst nur Linux) mit Promiscuous Mode (5.8) und dem Startknopf oben
+  (5.6). Vorher war die CI unter Rust 1.100 rot: Clippy (pedantic `map_unwrap_or`) schlägt dort `map_or_default` vor, das es erst ab
+  1.100 gibt; der Lint ist im Workspace abgeschaltet, weil Windows mit 1.99 baut (`rust-version` 1.99 hatte nicht gereicht). Die `.deb`
+  des Releases ist neu gebaut (Rust 1.100) und nicht bitgleich mit dem Test-Paket 0.5.2; der Programmcode ist derselbe. Offen: signierter
+  Windows-Installer (`docs/windows.md` oben unter „0.5.1 und 0.5.2“, dann `--add-windows`).
 - **Startknopf oben** (5.6, Rückmeldung 2026-11-12, umgesetzt, Test-Paket **0.5.2**, 2026-11-12): Auf der Seite Aufzeichnung startet jetzt auch der
   Knopf „Aufzeichnung starten“ der Kopfleiste die Aufzeichnung (vorher führte er nur zur Seite, auf der man schon war).
 - **Befund am TAP (5.8, 2026-11-12):** Am Monitoring-Port eines Netzwerk-TAPs zeigte openpacketmon unter Linux und Windows nicht einmal
   die Hälfte dessen, was Wireshark zeigte. Ursache nach dem Aufbau: Der Helfer öffnete den Adapter fest ohne Promiscuous Mode.
   **Schritt 2 umgesetzt** (2026-11-12, Test-Paket **0.5.1**): Promiscuous Mode als Einstellung, standardmäßig an, mit Rückfall, wenn der
   Adapter ihn ablehnt; die laufende Aufzeichnung zeigt den Zustand. **Am TAP unter Linux bestätigt** (Nutzer, 2026-11-12). Offen:
-  Windows (Anleitung in `docs/windows.md` oben unter „0.5.1 und 0.5.2“), Schritte 3 und 4 in 5.8. Kein Release ohne Ansage (Test-Paket zurzeit 0.5.2).
+  Windows (Anleitung in `docs/windows.md` oben unter „0.5.1 und 0.5.2“), Schritte 3 und 4 in 5.8. Unter Linux in **v0.5.2** released.
 
 - **v0.5.0** ist released (2026-11-10, auf Ansage des Nutzers, zuerst nur Linux) mit der neuen Oberfläche (5.6) und VoIP (5.7); die `.deb`
   ist bitgleich mit dem Test-Paket 0.5.0 (gleiche Prüfsumme). Test durch den Nutzer steht aus. Unter Windows am selben Tag gebaut und

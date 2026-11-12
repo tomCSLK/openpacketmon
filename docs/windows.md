@@ -11,14 +11,14 @@ Beschreibung, ohne Npcap startet das Programm mit einem Hinweis, die C-Laufzeit 
 am Ende von Abschnitt 8. Die Punkte in Abschnitt 4 stammen aus einer Durchsicht des Codes auf dem Linux-Rechner, ergänzt um das, was unter
 Windows aufgefallen ist.
 
-**0.5.1 und 0.5.2 (Test-Pakete, 2026-11-12, kein Release):** Promiscuous Mode (`PLAN.md` 5.8, ab 0.5.1); in 0.5.2 dazu der Knopf
+**0.5.1 und 0.5.2 (Test-Pakete 2026-11-12; v0.5.2 unter Linux released am 2026-11-12, Windows-Installer fehlt noch):** Promiscuous Mode (`PLAN.md` 5.8, ab 0.5.1); in 0.5.2 dazu der Knopf
 „Aufzeichnung starten“ der Kopfleiste, der auf der Seite Aufzeichnung jetzt startet (`PLAN.md` 5.6). Am Monitoring-Port eines Netzwerk-TAPs zeigte
 openpacketmon unter Linux und Windows nicht einmal die Hälfte dessen, was Wireshark zeigte, weil der Helfer den Adapter fest ohne
 Promiscuous Mode öffnete. Seit 0.5.1 ist er eine Einstellung, standardmäßig an (Schalter unter der Adaptertabelle der Seite
 Aufzeichnung); lehnt der Adapter ihn ab, öffnet der Helfer ohne ihn, und die laufende Aufzeichnung zeigt „aus (vom Adapter abgelehnt)“.
 Unter Linux am TAP vom Nutzer bestätigt (2026-11-12). Windows-spezifischer Code ist nicht dazugekommen; unbekannt ist nur, wie Npcap
 sich bei WLAN-Adaptern verhält. Reihenfolge unter Windows:
-1. `git pull` (Stand mindestens `a7a4b4d`; Version 0.5.2 in `Cargo.toml`), dann `cargo build --release --workspace` und
+1. `git pull`, dann `git checkout v0.5.2` (der Installer muss zum Tag passen; danach `git checkout main`), dann `cargo build --release --workspace` und
    `cargo test --workspace` (Smart App Control: Abschnitt „Proc-Macro-DLLs“ unten, falls Bau-Skripte gesperrt werden). Neu sind die Tests
    der Option `--promisc` in `capture/src/main.rs`, des Felds `promiscuous` der Meldung `Ready` in `capture/src/lib.rs` und der
    Einstellung in `src/config/capture.rs`; der Live-Test auf dem Npcap-Loopback läuft weiter ohne Promiscuous Mode.
@@ -28,9 +28,9 @@ sich bei WLAN-Adaptern verhält. Reihenfolge unter Windows:
    steht „Promiscuous Mode: an“, Vergleich gleichzeitig mit Wireshark am selben Adapter; (b) auf dem WLAN-Adapter: Was zeigt die Zeile
    („an“ oder „aus (vom Adapter abgelehnt)“), und läuft die Aufzeichnung? (c) Haken aus → „aus“. Ergebnisse hier und in `PLAN.md` 5.8
    eintragen.
-4. Release nur auf Ansage des Nutzers: erst unter Linux (`dev/release.sh`, CHANGELOG-Abschnitt `## [0.5.1]`), dann
-   `dev/release.sh --add-windows target/installer/openpacketmon-<Version>-setup.exe --publish` in Git Bash. Ein schon vorher gebauter
-   Installer passt nur, solange seit dem Tag kein Programmcode geändert wurde.
+4. v0.5.2 ist unter Linux released (2026-11-12). Den Installer auf Ansage des Nutzers hinzufügen:
+   `dev/release.sh --add-windows target/installer/openpacketmon-0.5.2-setup.exe --publish` in Git Bash, danach in den Release-Notes
+   den Windows-Absatz ersetzen (Vorlage: Release v0.5.0). Seit dem Tag `v0.5.2` ist kein Programmcode geändert worden.
 
 **v0.5.0 (2026-11-10):** Unter Linux released, der signierte Windows-Installer **am selben Tag hinzugefügt** (Schritt 3 unten). Vorher war der
 Code von 0.5.0 (neue Oberfläche nach `PLAN.md` 5.6, VoIP nach 5.7) unter Windows noch nie gebaut oder getestet. Neue
@@ -455,6 +455,6 @@ Update über eine ältere Version, Start ohne Npcap (Abschnitt 5 Punkt 8).
 **Beginn (Nutzer, 2026-11-02):** Windows wird **vor** dem ersten Release gemacht, weil andere Tester eine Windows-Fassung
 brauchen; MCP ist fertig. Der Haltepunkt aus `PLAN.md` 4.10 ist seit 2026-11-02 aufgehoben.
 
-**Noch offen (Stand 2026-11-12):** 0.5.2 unter Windows bauen und am TAP prüfen (oben unter „0.5.1 und 0.5.2“), Test von 0.5.0 unter Windows zu Ende führen (oben unter „v0.5.0“, Schritt 2; das Update von 0.4.0
+**Noch offen (Stand 2026-11-12):** 0.5.2 unter Windows bauen, signieren, zum Release v0.5.2 hinzufügen und am TAP prüfen (oben unter „0.5.1 und 0.5.2“), Test von 0.5.0 unter Windows zu Ende führen (oben unter „v0.5.0“, Schritt 2; das Update von 0.4.0
 mit dem Installer lief beim Nutzer reibungslos), CI-Job für Windows (Abschnitt 7), Test auf einem sauberen System (Deinstallation, Update über eine
 ältere Version, Start ohne Npcap), MCP-Einrichtung in `docs/windows-tester.md`, MCP-Integrationstests von den echten Einstellungen trennen.

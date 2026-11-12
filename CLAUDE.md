@@ -101,6 +101,9 @@ Fassung bis 2026-11-09 (mit dem Verlauf der Browser-Oberfläche) steht in der Gi
 
 Maßgeblich ist `PLAN.md` (oben „Stand“, Abschnitt 5). Kurz (2026-11-12):
 
+- **v0.5.2** ist released (2026-11-12, Linux) mit Promiscuous Mode und dem Startknopf oben; der signierte Windows-Installer fehlt noch
+  (`docs/windows.md` oben unter „0.5.1 und 0.5.2“). Clippy-Lint `map_unwrap_or` im Workspace aus (Rust 1.100 schlägt `map_or_default` vor,
+  Windows baut mit 1.99).
 - **Befund am TAP** (`PLAN.md` 5.8, 2026-11-12): Am Monitoring-Port eines Netzwerk-TAPs fehlte unter Linux und Windows mehr als die
   Hälfte der Pakete gegenüber Wireshark, weil der Helfer fest ohne Promiscuous Mode öffnete. **Umgesetzt** (Schritt 2, Test-Paket 0.5.1):
   Einstellung `capture.promiscuous` (Standard an), Schalter auf der Seite Aufzeichnung, Helfer-Option `--promisc on|off` mit Rückfall

@@ -18,7 +18,7 @@ Promiscuous Mode öffnete. Seit 0.5.1 ist er eine Einstellung, standardmäßig a
 Aufzeichnung); lehnt der Adapter ihn ab, öffnet der Helfer ohne ihn, und die laufende Aufzeichnung zeigt „aus (vom Adapter abgelehnt)“.
 Unter Linux am TAP vom Nutzer bestätigt (2026-11-12). Windows-spezifischer Code ist nicht dazugekommen; unbekannt ist nur, wie Npcap
 sich bei WLAN-Adaptern verhält. Reihenfolge unter Windows:
-1. `git pull` (Stand mindestens `687664c`; Version 0.5.1 in `Cargo.toml`), dann `cargo build --release --workspace` und
+1. `git pull` (Stand mindestens `a7a4b4d`; Version 0.5.2 in `Cargo.toml`), dann `cargo build --release --workspace` und
    `cargo test --workspace` (Smart App Control: Abschnitt „Proc-Macro-DLLs“ unten, falls Bau-Skripte gesperrt werden). Neu sind die Tests
    der Option `--promisc` in `capture/src/main.rs`, des Felds `promiscuous` der Meldung `Ready` in `capture/src/lib.rs` und der
    Einstellung in `src/config/capture.rs`; der Live-Test auf dem Npcap-Loopback läuft weiter ohne Promiscuous Mode.
@@ -278,7 +278,7 @@ die Handle-Liste mit `unsafe`, falls das einmal stört.
    nicht geprüft; das gehört zum Test auf einem sauberen System (Punkt 8).
 3. Mitschnitt auf WLAN, Ethernet und dem Npcap-Loopback-Adapter, jeweils als normaler Benutzer und als Administrator. Der Helfer
    allein ist auf dem Loopback-Adapter geprüft (Punkt 1, Link-Typ 0 = Null/Loopback); im Fenster noch nicht. Seit 0.5.1 dazu der
-   Promiscuous Mode (oben unter „0.5.1“, Schritt 3): an einem TAP oder Spiegel-Port gegen Wireshark, und ob Npcap ihn auf WLAN ablehnt.
+   Promiscuous Mode (oben unter „0.5.1 und 0.5.2“, Schritt 3): an einem TAP oder Spiegel-Port gegen Wireshark, und ob Npcap ihn auf WLAN ablehnt.
 4. Zerleger und Paketliste: Link-Typen unter Windows (kein „Linux cooked capture“), TCP-Analyse mit Offloading (große
    Segmente).
 5. Programme je Verbindung, Latenzmessung, Geodaten-Download, Benachrichtigungen mit Ton, PCAP-Download und -Import.
@@ -455,6 +455,6 @@ Update über eine ältere Version, Start ohne Npcap (Abschnitt 5 Punkt 8).
 **Beginn (Nutzer, 2026-11-02):** Windows wird **vor** dem ersten Release gemacht, weil andere Tester eine Windows-Fassung
 brauchen; MCP ist fertig. Der Haltepunkt aus `PLAN.md` 4.10 ist seit 2026-11-02 aufgehoben.
 
-**Noch offen (Stand 2026-11-12):** 0.5.1 unter Windows bauen und am TAP prüfen (oben unter „0.5.1“), Test von 0.5.0 unter Windows zu Ende führen (oben unter „v0.5.0“, Schritt 2; das Update von 0.4.0
+**Noch offen (Stand 2026-11-12):** 0.5.2 unter Windows bauen und am TAP prüfen (oben unter „0.5.1 und 0.5.2“), Test von 0.5.0 unter Windows zu Ende führen (oben unter „v0.5.0“, Schritt 2; das Update von 0.4.0
 mit dem Installer lief beim Nutzer reibungslos), CI-Job für Windows (Abschnitt 7), Test auf einem sauberen System (Deinstallation, Update über eine
 ältere Version, Start ohne Npcap), MCP-Einrichtung in `docs/windows-tester.md`, MCP-Integrationstests von den echten Einstellungen trennen.

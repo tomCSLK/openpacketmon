@@ -8,7 +8,7 @@
   die Hälfte dessen, was Wireshark zeigte. Ursache nach dem Aufbau: Der Helfer öffnete den Adapter fest ohne Promiscuous Mode.
   **Schritt 2 umgesetzt** (2026-11-12, Test-Paket **0.5.1**): Promiscuous Mode als Einstellung, standardmäßig an, mit Rückfall, wenn der
   Adapter ihn ablehnt; die laufende Aufzeichnung zeigt den Zustand. **Am TAP unter Linux bestätigt** (Nutzer, 2026-11-12). Offen:
-  Windows (Anleitung in `docs/windows.md` oben unter „0.5.1“), Schritte 3 und 4 in 5.8. Kein Release von 0.5.1 ohne Ansage.
+  Windows (Anleitung in `docs/windows.md` oben unter „0.5.1 und 0.5.2“), Schritte 3 und 4 in 5.8. Kein Release ohne Ansage (Test-Paket zurzeit 0.5.2).
 
 - **v0.5.0** ist released (2026-11-10, auf Ansage des Nutzers, zuerst nur Linux) mit der neuen Oberfläche (5.6) und VoIP (5.7); die `.deb`
   ist bitgleich mit dem Test-Paket 0.5.0 (gleiche Prüfsumme). Test durch den Nutzer steht aus. Unter Windows am selben Tag gebaut und
@@ -24,7 +24,8 @@
   Zeilenfarbe, Protokollhierarchie; Reiter „Anrufe“, Seite „Anruf“, Einstellungen → Anrufe; Anhören von G.711 mit Wellenform, WAV und
   Hinweis zu § 201; MCP-Werkzeug `calls`, Rufnummern über MCP auf die letzten zwei Ziffern gekürzt, Ton nie über MCP). Als Nächstes
   der Test mit einem echten Anruf.
-- **Offen außerhalb:** Pull Request mit der Korrektur des Befunds aus 4.8 beim Original (Einzelheiten nur in `CLAUDE.local.md`).
+- **Außerhalb:** Der Pull Request mit der Korrektur des Befunds aus 4.8 ist beim Original angenommen (2026-11-12, in den Zweig `v1.6.0`,
+  noch nicht in einem Release; Einzelheiten nur in `CLAUDE.local.md`).
 - Die Abschnitte 2 bis 4 und die Stände in 5.1 bis 5.5 sind **Verlauf** (die Lizenzprüfung in 1 gilt weiter); was dort über Browser-Oberfläche, `src/web/`, `templates/`,
   `static/`, Fenster-Programm oder privates Repo steht, gilt nicht mehr.
 
@@ -1007,8 +1008,9 @@ Release wird 0.4.0 oder 0.5.0. Vor dem Release erledigt (2026-11-02, auf Ansage,
 Noch offen, in dieser Reihenfolge:
 1. ~~Antwort von Sniffnet~~ Haltepunkt am 2026-11-02 aufgehoben, Sniffnet vorher benachrichtigt (Einzelheiten
    `CLAUDE.local.md`). Sniffnet hat am 2026-11-08 geantwortet und einen Pull Request erlaubt; der Fix liegt als
-   GyulyVGC/sniffnet#1357 vor (2026-11-09), die Rückmeldung dazu steht aus. Herkunftsangabe im Advisory prüfen, sobald
-   der Pull Request übernommen oder abgelehnt ist.
+   GyulyVGC/sniffnet#1357 vor (2026-11-09). **Am 2026-11-12 vom Entwickler angenommen** (Review „approved“, in den Zweig
+   `v1.6.0` übernommen, mit eigener Überarbeitung; Einzelheiten in `CLAUDE.local.md`). Herkunftsangabe im Advisory prüfen,
+   sobald Sniffnet 1.6.0 erschienen ist.
 2. ~~Nutzertest der egui-Fassung abschließen~~ erledigt: Test-Paket 0.3.10 ohne Befund (2026-11-02, 5.5).
 3. ~~Version setzen~~ erledigt 2026-11-02: **0.4.0** (Nutzer), Commit `4e94702`, CI grün. Ursprünglich: Version **0.4.0 oder 0.5.0** setzen: `Cargo.toml`, `capture/Cargo.toml`, `cargo update --workspace --offline`; in
    `CHANGELOG.md` `## [Unreleased]` zu `## [X.Y.Z] - Datum`; Release-Hinweise (Englisch) als Datei; committen, pushen, CI grün.
@@ -1885,7 +1887,7 @@ Wireshark dient nur als Vergleichswerkzeug; kein Code daraus.
   grün; `cargo deny` meldete neu RUSTSEC-2026-0486 (`rustix` 1.1.5, xattr-Funktionen, von uns nicht benutzt) → `rustix` 1.1.6 im
   `Cargo.lock`, `THIRD-PARTY-LICENSES.txt` neu erzeugt, danach alles grün. Das installierte Test-Paket 0.5.1 enthält noch 1.1.5;
   das nächste Paket bzw. der Windows-Bau nimmt 1.1.6.
-- Offen: der Vergleich unter Windows (Bau dort, Anleitung in `docs/windows.md` oben unter „0.5.1“), Schritt 3 (Live-Test für den Modus fest in `capture/tests/live.rs`, Bildtest der
+- Offen: der Vergleich unter Windows (Bau dort, Anleitung in `docs/windows.md` oben unter „0.5.1 und 0.5.2“), Schritt 3 (Live-Test für den Modus fest in `capture/tests/live.rs`, Bildtest der
   laufenden Aufzeichnung, Verhalten von Npcap bei WLAN-Adaptern), Schritt 4 (Durchsatz, Ringspeicher, Zählweise, `savefile`).
 
 ---
@@ -1899,10 +1901,11 @@ Wireshark dient nur als Vergleichswerkzeug; kein Code daraus.
    mit dem Installer beim Nutzer reibungslos (2026-11-10); in der Testphase.
 4. Windows-Reste (`docs/windows.md` 8): CI-Job, Test auf sauberem System, MCP-Einrichtung in `docs/windows-tester.md`, MCP-Integrationstests
    unter Windows von den echten Einstellungen trennen.
-5. Rückmeldung des Originals zum Pull Request mit der Korrektur aus 4.8 (Einzelheiten nur in `CLAUDE.local.md`).
+5. Pull Request mit der Korrektur aus 4.8 beim Original angenommen (2026-11-12, Zweig `v1.6.0`); offen nur, ob wir die Grenzen an die
+   Fassung des Originals angleichen (Einzelheiten nur in `CLAUDE.local.md`).
 6. Weitere Ideen in 5.2, noch nicht beschlossen.
 7. Fehlende Pakete am Monitoring-Port eines TAPs (5.8, Befund 2026-11-12): Promiscuous Mode als Einstellung (Standard an) umgesetzt
-   (Schritt 2, Test-Paket 0.5.1); am TAP unter Linux bestätigt (2026-11-12); offen Windows (`docs/windows.md` oben unter „0.5.1“),
+   (Schritt 2, Test-Paket 0.5.1); am TAP unter Linux bestätigt (2026-11-12); offen Windows (`docs/windows.md` oben unter „0.5.1 und 0.5.2“),
    dann Schritte 3 und 4.
 
 Die Namenssuche (früher Abschnitt 6, 2026-10-28) ist erledigt: **openpacketmon**, Marke vom Nutzer geprüft.

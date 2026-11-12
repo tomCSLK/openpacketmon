@@ -105,7 +105,7 @@ Maßgeblich ist `PLAN.md` (oben „Stand“, Abschnitt 5). Kurz (2026-11-12):
   Hälfte der Pakete gegenüber Wireshark, weil der Helfer fest ohne Promiscuous Mode öffnete. **Umgesetzt** (Schritt 2, Test-Paket 0.5.1):
   Einstellung `capture.promiscuous` (Standard an), Schalter auf der Seite Aufzeichnung, Helfer-Option `--promisc on|off` mit Rückfall
   ohne den Modus, Zustand in `Ready` und in der laufenden Aufzeichnung. Am TAP unter Linux bestätigt; offen Windows
-  (`docs/windows.md` oben unter „0.5.1“), Schritte 3 und 4.
+  (`docs/windows.md` oben unter „0.5.1 und 0.5.2“), Schritte 3 und 4.
 - **Startknopf oben** (`PLAN.md` 5.6, 2026-11-12, Test-Paket 0.5.2): startet auf der Seite Aufzeichnung jetzt wie der untere (vorher nur Seitenwechsel).
 - **v0.5.0** ist released (2026-11-10) mit neuer Oberfläche und VoIP, für Linux und mit **signiertem Windows-Installer** (am selben Tag
   hinzugefügt); Test durch den Nutzer steht aus. Unter Windows alle Tests grün; Smart App Control sperrt dort Proc-Macro-DLLs, Abhilfe
@@ -124,5 +124,5 @@ Maßgeblich ist `PLAN.md` (oben „Stand“, Abschnitt 5). Kurz (2026-11-12):
   Ziffern gekürzt.
 - Windows-Reste (`docs/windows.md` 8): CI-Job, Test auf sauberem System, MCP-Einrichtung für Tester, MCP-Tests unter Windows von den echten
   Einstellungen trennen (`confy` ignoriert dort `XDG_CONFIG_HOME`).
-- Pull Request mit der Korrektur des Befunds beim Original offen (`CLAUDE.local.md`).
+- Pull Request mit der Korrektur des Befunds beim Original angenommen (2026-11-12, Zweig `v1.6.0`, `CLAUDE.local.md`).
 - Ideen ohne Beschluss in `PLAN.md` 5.2.

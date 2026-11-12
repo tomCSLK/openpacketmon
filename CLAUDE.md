@@ -104,7 +104,7 @@ Maßgeblich ist `PLAN.md` (oben „Stand“, Abschnitt 5). Kurz (2026-11-12):
 - **Befund am TAP** (`PLAN.md` 5.8, 2026-11-12): Am Monitoring-Port eines Netzwerk-TAPs fehlte unter Linux und Windows mehr als die
   Hälfte der Pakete gegenüber Wireshark, weil der Helfer fest ohne Promiscuous Mode öffnete. **Umgesetzt** (Schritt 2, Test-Paket 0.5.1):
   Einstellung `capture.promiscuous` (Standard an), Schalter auf der Seite Aufzeichnung, Helfer-Option `--promisc on|off` mit Rückfall
-  ohne den Modus, Zustand in `Ready` und in der laufenden Aufzeichnung. Offen: Vergleich am TAP, Schritte 3–5.
+  ohne den Modus, Zustand in `Ready` und in der laufenden Aufzeichnung. Am TAP unter Linux bestätigt; offen Windows, Schritte 3–5.
 - **v0.5.0** ist released (2026-11-10) mit neuer Oberfläche und VoIP, für Linux und mit **signiertem Windows-Installer** (am selben Tag
   hinzugefügt); Test durch den Nutzer steht aus. Unter Windows alle Tests grün; Smart App Control sperrt dort Proc-Macro-DLLs, Abhilfe
   in `docs/windows.md` oben. Update von 0.4.0 mit dem Installer beim Nutzer reibungslos; Test läuft.

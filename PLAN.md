@@ -5,7 +5,8 @@
 - **Befund am TAP (5.8, 2026-11-12):** Am Monitoring-Port eines Netzwerk-TAPs zeigte openpacketmon unter Linux und Windows nicht einmal
   die Hälfte dessen, was Wireshark zeigte. Ursache nach dem Aufbau: Der Helfer öffnete den Adapter fest ohne Promiscuous Mode.
   **Schritt 2 umgesetzt** (2026-11-12, Test-Paket **0.5.1**): Promiscuous Mode als Einstellung, standardmäßig an, mit Rückfall, wenn der
-  Adapter ihn ablehnt; die laufende Aufzeichnung zeigt den Zustand. Offen: Vergleich am TAP, Schritte 3 bis 5 in 5.8.
+  Adapter ihn ablehnt; die laufende Aufzeichnung zeigt den Zustand. **Am TAP unter Linux bestätigt** (Nutzer, 2026-11-12). Offen:
+  Windows, Schritte 3 bis 5 in 5.8.
 
 - **v0.5.0** ist released (2026-11-10, auf Ansage des Nutzers, zuerst nur Linux) mit der neuen Oberfläche (5.6) und VoIP (5.7); die `.deb`
   ist bitgleich mit dem Test-Paket 0.5.0 (gleiche Prüfsumme). Test durch den Nutzer steht aus. Unter Windows am selben Tag gebaut und
@@ -1866,8 +1867,9 @@ Wireshark dient nur als Vergleichswerkzeug; kein Code daraus.
   `cargo test --workspace`, `clippy -D warnings`, `fmt` grün. Von Hand im Netz-Namensraum: Helfer mit `--promisc on` → `lo` zeigt
   `promiscuity 1`, `Ready` meldet 1; mit `off` → 0; nach dem Ende wieder 0. Bild der Seite Aufzeichnung (`GUI_SHOTS_ONLY=capture`)
   angesehen.
-- Offen: Schritt 3 (Live-Test für den Modus fest in `capture/tests/live.rs`, Bildtest der laufenden Aufzeichnung, Vergleich am TAP unter
-  Linux und Windows, Verhalten von Npcap bei WLAN-Adaptern), Schritte 4 und 5 (README, `docs/windows.md`).
+- **Am TAP bestätigt** (2026-11-12, Nutzer, Test-Paket 0.5.1 unter Linux): openpacketmon zeigt jetzt den Verkehr wie Wireshark.
+- Offen: der Vergleich unter Windows (Bau dort), Schritt 3 (Live-Test für den Modus fest in `capture/tests/live.rs`, Bildtest der
+  laufenden Aufzeichnung, Verhalten von Npcap bei WLAN-Adaptern), Schritte 4 und 5 (README, `docs/windows.md`).
 
 ---
 
@@ -1883,6 +1885,6 @@ Wireshark dient nur als Vergleichswerkzeug; kein Code daraus.
 5. Rückmeldung des Originals zum Pull Request mit der Korrektur aus 4.8 (Einzelheiten nur in `CLAUDE.local.md`).
 6. Weitere Ideen in 5.2, noch nicht beschlossen.
 7. Fehlende Pakete am Monitoring-Port eines TAPs (5.8, Befund 2026-11-12): Promiscuous Mode als Einstellung (Standard an) umgesetzt
-   (Schritt 2, Test-Paket 0.5.1); offen der Vergleich am TAP unter Linux und Windows, dann Schritte 3 bis 5.
+   (Schritt 2, Test-Paket 0.5.1); am TAP unter Linux bestätigt (2026-11-12); offen Windows, dann Schritte 3 bis 5.
 
 Die Namenssuche (früher Abschnitt 6, 2026-10-28) ist erledigt: **openpacketmon**, Marke vom Nutzer geprüft.

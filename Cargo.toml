@@ -10,6 +10,7 @@ keywords = ["network", "packet", "traffic", "monitor", "pcap"]
 categories = ["network-programming", "visualization"]
 authors.workspace = true
 edition.workspace = true
+rust-version.workspace = true
 homepage.workspace = true
 repository.workspace = true
 license.workspace = true
@@ -144,6 +145,8 @@ default-members = [".", "capture", "lib/sniffnet-packet-parser"]
 
 [workspace.package]
 authors = ["Thomas Cieslik", "Giuliano Bellini <gyulyvgc99@gmail.com> (Sniffnet)"]
+# the oldest Rust that builds openpacketmon; clippy suggests no newer standard functions
+rust-version = "1.99"
 edition = "2024"
 homepage = "https://github.com/tomCSLK/openpacketmon"
 repository = "https://github.com/tomCSLK/openpacketmon"

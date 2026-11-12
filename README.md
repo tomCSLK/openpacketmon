@@ -88,7 +88,9 @@ context menu, follows TCP and UDP streams and saves the packets as a PCAP file f
 measures round trip, handshake and DNS response times; the *Statistics* page shows the protocol hierarchy, these findings and
 a traffic chart for any display filter. The capture page also chooses whether the packets are kept whole, as headers only
 (less memory) or not at all. The packets stay in memory, up to the limits chosen in the settings (2 million packets, 2 GiB);
-when a limit is reached, the oldest ones are dropped.
+when a limit is reached, the oldest ones are dropped. Adapters are opened in promiscuous mode, like Wireshark does, so a
+mirror port or a network TAP shows the traffic of all devices; a switch on the capture page turns it off. Wi-Fi adapters
+mostly ignore it: it is not monitor mode and does not show the radio traffic of other devices.
 
 ```sh
 openpacketmon                        # open the window

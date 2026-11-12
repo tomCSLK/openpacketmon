@@ -1,6 +1,6 @@
 # Windows-Version von openpacketmon
 
-Angelegt 2026-10-30, ergänzt bis 2026-11-10. Diese Datei beschreibt, was nötig ist, um das Projekt auf einem Windows-Rechner fortzusetzen und dort eine
+Angelegt 2026-10-30, ergänzt bis 2026-11-12. Diese Datei beschreibt, was nötig ist, um das Projekt auf einem Windows-Rechner fortzusetzen und dort eine
 Windows-Version zu bauen und zu testen.
 
 **Stand (2026-11-09):** Windows läuft auf `main` (der Zweig `windows` ist seit 2026-11-02 übernommen). Debug- und Release-Fassung bauen,
@@ -10,6 +10,26 @@ Beschreibung, ohne Npcap startet das Programm mit einem Hinweis, die C-Laufzeit 
 **signiert** und seit 2026-11-03 im Release `v0.4.0` (Abschnitt 6.1). Mitschnitt im Fenster und MCP sind geprüft. Was noch offen ist, steht
 am Ende von Abschnitt 8. Die Punkte in Abschnitt 4 stammen aus einer Durchsicht des Codes auf dem Linux-Rechner, ergänzt um das, was unter
 Windows aufgefallen ist.
+
+**0.5.1 (Test-Paket, 2026-11-12, kein Release):** Promiscuous Mode (`PLAN.md` 5.8). Am Monitoring-Port eines Netzwerk-TAPs zeigte
+openpacketmon unter Linux und Windows nicht einmal die Hälfte dessen, was Wireshark zeigte, weil der Helfer den Adapter fest ohne
+Promiscuous Mode öffnete. Seit 0.5.1 ist er eine Einstellung, standardmäßig an (Schalter unter der Adaptertabelle der Seite
+Aufzeichnung); lehnt der Adapter ihn ab, öffnet der Helfer ohne ihn, und die laufende Aufzeichnung zeigt „aus (vom Adapter abgelehnt)“.
+Unter Linux am TAP vom Nutzer bestätigt (2026-11-12). Windows-spezifischer Code ist nicht dazugekommen; unbekannt ist nur, wie Npcap
+sich bei WLAN-Adaptern verhält. Reihenfolge unter Windows:
+1. `git pull` (Stand mindestens `687664c`; Version 0.5.1 in `Cargo.toml`), dann `cargo build --release --workspace` und
+   `cargo test --workspace` (Smart App Control: Abschnitt „Proc-Macro-DLLs“ unten, falls Bau-Skripte gesperrt werden). Neu sind die Tests
+   der Option `--promisc` in `capture/src/main.rs`, des Felds `promiscuous` der Meldung `Ready` in `capture/src/lib.rs` und der
+   Einstellung in `src/config/capture.rs`; der Live-Test auf dem Npcap-Loopback läuft weiter ohne Promiscuous Mode.
+2. Installer bauen und signieren (Abschnitt 6.1): `powershell -ExecutionPolicy Bypass -File dev\build-installer.ps1 -CertSha1 …` →
+   `target\installer\openpacketmon-0.5.1-setup.exe`; als Update über 0.5.0 installieren.
+3. Von Hand: (a) am TAP über den Ethernet-Adapter (auch USB-Ethernet): Haken „Promiscuous Mode“ gesetzt, in der laufenden Aufzeichnung
+   steht „Promiscuous Mode: an“, Vergleich gleichzeitig mit Wireshark am selben Adapter; (b) auf dem WLAN-Adapter: Was zeigt die Zeile
+   („an“ oder „aus (vom Adapter abgelehnt)“), und läuft die Aufzeichnung? (c) Haken aus → „aus“. Ergebnisse hier und in `PLAN.md` 5.8
+   eintragen.
+4. Release nur auf Ansage des Nutzers: erst unter Linux (`dev/release.sh`, CHANGELOG-Abschnitt `## [0.5.1]`), dann
+   `dev/release.sh --add-windows target/installer/openpacketmon-0.5.1-setup.exe --publish` in Git Bash. Ein schon vorher gebauter
+   Installer passt nur, solange seit dem Tag kein Programmcode geändert wurde.
 
 **v0.5.0 (2026-11-10):** Unter Linux released, der signierte Windows-Installer **am selben Tag hinzugefügt** (Schritt 3 unten). Vorher war der
 Code von 0.5.0 (neue Oberfläche nach `PLAN.md` 5.6, VoIP nach 5.7) unter Windows noch nie gebaut oder getestet. Neue
@@ -256,7 +276,8 @@ die Handle-Liste mit `unsafe`, falls das einmal stört.
    einem falschen `SystemRoot`: Dialog „Npcap is missing“ mit Ja/Nein, kein Fenster, keine Helfer. Ohne echtes Deinstallieren von Npcap
    nicht geprüft; das gehört zum Test auf einem sauberen System (Punkt 8).
 3. Mitschnitt auf WLAN, Ethernet und dem Npcap-Loopback-Adapter, jeweils als normaler Benutzer und als Administrator. Der Helfer
-   allein ist auf dem Loopback-Adapter geprüft (Punkt 1, Link-Typ 0 = Null/Loopback); im Fenster noch nicht.
+   allein ist auf dem Loopback-Adapter geprüft (Punkt 1, Link-Typ 0 = Null/Loopback); im Fenster noch nicht. Seit 0.5.1 dazu der
+   Promiscuous Mode (oben unter „0.5.1“, Schritt 3): an einem TAP oder Spiegel-Port gegen Wireshark, und ob Npcap ihn auf WLAN ablehnt.
 4. Zerleger und Paketliste: Link-Typen unter Windows (kein „Linux cooked capture“), TCP-Analyse mit Offloading (große
    Segmente).
 5. Programme je Verbindung, Latenzmessung, Geodaten-Download, Benachrichtigungen mit Ton, PCAP-Download und -Import.
@@ -433,6 +454,6 @@ Update über eine ältere Version, Start ohne Npcap (Abschnitt 5 Punkt 8).
 **Beginn (Nutzer, 2026-11-02):** Windows wird **vor** dem ersten Release gemacht, weil andere Tester eine Windows-Fassung
 brauchen; MCP ist fertig. Der Haltepunkt aus `PLAN.md` 4.10 ist seit 2026-11-02 aufgehoben.
 
-**Noch offen (Stand 2026-11-10):** Test von 0.5.0 unter Windows zu Ende führen (oben unter „v0.5.0“, Schritt 2; das Update von 0.4.0
+**Noch offen (Stand 2026-11-12):** 0.5.1 unter Windows bauen und am TAP prüfen (oben unter „0.5.1“), Test von 0.5.0 unter Windows zu Ende führen (oben unter „v0.5.0“, Schritt 2; das Update von 0.4.0
 mit dem Installer lief beim Nutzer reibungslos), CI-Job für Windows (Abschnitt 7), Test auf einem sauberen System (Deinstallation, Update über eine
 ältere Version, Start ohne Npcap), MCP-Einrichtung in `docs/windows-tester.md`, MCP-Integrationstests von den echten Einstellungen trennen.

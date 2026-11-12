@@ -8,6 +8,11 @@ The history of Sniffnet itself is in its own changelog: <https://github.com/Gyul
 
 ## [Unreleased]
 
+### Dependencies
+
+- toml is only used by the tests now; the build checks the service names with rustrict in release builds too, not only
+  in debug builds
+
 ## [0.5.2] - 2026-11-12
 
 ### Interface

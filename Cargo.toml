@@ -66,7 +66,6 @@ serde_json = { version = "1.0.154", features = ["preserve_order"] }
 sha2 = "0.11.1"
 surge-ping = "0.9.1"
 tokio = { version = "1.53.3", features = ["macros", "rt-multi-thread", "sync", "time"] }
-toml = "1.1.8"
 
 # opens the download page of Npcap when it is missing (src/npcap.rs); egui uses it for links anyway
 [target.'cfg(windows)'.dependencies]
@@ -80,6 +79,8 @@ webbrowser = "1.2.6"
 rstest = "0.27.0"
 serde_test = "1.0.177"
 serial_test = { version = "4.0.1", default-features = false }
+# reads and writes conf.toml in the tests of src/config
+toml = "1.1.8"
 egui_kittest = { version = "0.37.0", features = ["wgpu", "snapshot", "eframe"] }
 
 #───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────

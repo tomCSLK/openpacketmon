@@ -38,9 +38,11 @@ pub struct Stats {
 /// A message of the helper; [`read_frame`] puts the bytes of a packet or an error message aside
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum Frame {
-    /// The adapter is open and the rights are gone; `link_type` is the `pcap` data link type
+    /// The adapter is open and the rights are gone; `link_type` is the `pcap` data link type,
+    /// `promiscuous` whether the adapter is in promiscuous mode (it can refuse it)
     Ready {
         link_type: i32,
+        promiscuous: bool,
     },
     /// A packet: its time and its length on the wire
     Packet {
@@ -55,9 +57,10 @@ pub enum Frame {
     Failed,
 }
 
-pub fn write_ready(w: &mut impl Write, link_type: i32) -> io::Result<()> {
+pub fn write_ready(w: &mut impl Write, link_type: i32, promiscuous: bool) -> io::Result<()> {
     w.write_all(&[READY])?;
-    w.write_all(&link_type.to_le_bytes())
+    w.write_all(&link_type.to_le_bytes())?;
+    w.write_all(&[u8::from(promiscuous)])
 }
 
 pub fn write_packet(
@@ -105,6 +108,11 @@ pub fn read_frame(r: &mut impl Read, data: &mut Vec<u8>) -> io::Result<Frame> {
     match read_array::<1>(r)?[0] {
         READY => Ok(Frame::Ready {
             link_type: i32::from_le_bytes(read_array(r)?),
+            promiscuous: match read_array::<1>(r)?[0] {
+                0 => false,
+                1 => true,
+                _ => return Err(Error::new(ErrorKind::InvalidData, "bad promiscuous flag")),
+            },
         }),
         PACKET => {
             let secs = i64::from_le_bytes(read_array(r)?);
@@ -167,7 +175,8 @@ mod tests {
             if_dropped: 1,
         };
         let mut wire = Vec::new();
-        write_ready(&mut wire, 113).unwrap();
+        write_ready(&mut wire, 113, true).unwrap();
+        write_ready(&mut wire, 1, false).unwrap();
         write_packet(&mut wire, 1_800_000_000, 999_999, 1514, b"abc").unwrap();
         write_stats(&mut wire, stats).unwrap();
         write_timeout(&mut wire).unwrap();
@@ -177,7 +186,17 @@ mod tests {
         let mut data = Vec::new();
         assert_eq!(
             read_frame(&mut r, &mut data).unwrap(),
-            Frame::Ready { link_type: 113 }
+            Frame::Ready {
+                link_type: 113,
+                promiscuous: true
+            }
+        );
+        assert_eq!(
+            read_frame(&mut r, &mut data).unwrap(),
+            Frame::Ready {
+                link_type: 1,
+                promiscuous: false
+            }
         );
         assert_eq!(
             read_frame(&mut r, &mut data).unwrap(),
@@ -220,6 +239,12 @@ mod tests {
         assert!(data.capacity() <= MAX_PACKET_BYTES);
 
         let error = read_frame(&mut Cursor::new(vec![200]), &mut data).unwrap_err();
+        assert_eq!(error.kind(), ErrorKind::InvalidData);
+
+        let mut ready = Vec::new();
+        write_ready(&mut ready, 1, true).unwrap();
+        *ready.last_mut().unwrap() = 2;
+        let error = read_frame(&mut Cursor::new(ready), &mut data).unwrap_err();
         assert_eq!(error.kind(), ErrorKind::InvalidData);
     }
 

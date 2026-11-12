@@ -1,6 +1,7 @@
 // Modified for openpacketmon (2026), see NOTICE. Based on `src/gui/types/conf.rs` of Sniffnet
 // (https://github.com/GyulyVGC/sniffnet), Copyright (c) 2022 Giuliano Bellini, MIT OR Apache-2.0.
 
+use crate::config::capture::CaptureConf;
 use crate::config::config_device::ConfigDevice;
 use crate::config::config_updates::ConfigUpdates;
 use crate::config::export_pcap::ExportPcap;
@@ -92,6 +93,9 @@ pub struct Conf {
     /// BPF filter program to be applied to the capture
     #[serde(deserialize_with = "deserialize_or_default")]
     pub filters: Filters,
+    /// How adapters are opened (promiscuous mode)
+    #[serde(deserialize_with = "deserialize_or_default")]
+    pub capture: CaptureConf,
     /// Information about PCAP file export
     #[serde(deserialize_with = "deserialize_or_default")]
     pub export_pcap: ExportPcap,

@@ -37,17 +37,19 @@ pub enum CaptureError {
 }
 
 impl CaptureContext {
-    /// `full_packets`: the packet store keeps whole packets, so they must be captured in full
+    /// `full_packets`: the packet store keeps whole packets, so they must be captured in full;
+    /// `promiscuous`: open an adapter in promiscuous mode
     pub fn new(
         source: &CaptureSource,
         pcap_out_path: Option<&String>,
         filters: &Filters,
         full_packets: bool,
+        promiscuous: bool,
     ) -> Self {
         let mut cap_type = match source {
             CaptureSource::Device(device) => {
                 let full = pcap_out_path.is_some() || full_packets;
-                match CaptureType::from_device(device, full, filters) {
+                match CaptureType::from_device(device, full, filters, promiscuous) {
                     Ok(c) => c,
                     Err(e) => return Self::Error(e),
                 }
@@ -117,6 +119,15 @@ impl CaptureContext {
             }
             Self::Offline(off) => (Some(CaptureType::Offline(off.cap)), None),
             Self::Ipfix(_) | Self::Error(_) => (None, None),
+        }
+    }
+
+    /// Whether the adapter is in promiscuous mode; `None` for sources that are no adapter
+    pub fn promiscuous(&self) -> Option<bool> {
+        match self {
+            Self::Live(on) => Some(on.cap.promiscuous()),
+            Self::LiveWithSavefile(onws) => Some(onws.live.cap.promiscuous()),
+            Self::Offline(_) | Self::Ipfix(_) | Self::Error(_) => None,
         }
     }
 
@@ -195,10 +206,16 @@ impl CaptureType {
 
     /// `full`: capture whole packets (for the PCAP export or the packet store), not only the
     /// first bytes the traffic statistics need
-    fn from_device(device: &MyDevice, full: bool, filters: &Filters) -> Result<Self, String> {
+    fn from_device(
+        device: &MyDevice,
+        full: bool,
+        filters: &Filters,
+        promiscuous: bool,
+    ) -> Result<Self, String> {
         let (snaplen, buffer_size) = live_limits(full);
         let bpf = filters.is_some_filter_active().then(|| filters.bpf());
-        let helper = CaptureHelper::start(device.get_name(), snaplen, buffer_size, bpf)?;
+        let helper =
+            CaptureHelper::start(device.get_name(), snaplen, buffer_size, bpf, promiscuous)?;
         Ok(Self::Live(helper))
     }
 

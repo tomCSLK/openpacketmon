@@ -125,7 +125,13 @@ fn inside_the_namespace() {
     let other_receiver = UdpSocket::bind(("127.0.0.1", OTHER_PORT)).unwrap();
 
     let mut helper = Helper::start("lo", &format!("udp port {PORT}"));
-    assert_eq!(helper.next(), Frame::Ready { link_type: 1 });
+    assert_eq!(
+        helper.next(),
+        Frame::Ready {
+            link_type: 1,
+            promiscuous: false
+        }
+    );
 
     // the rights are gone before the first packet, for good
     assert_eq!(helper.status("CapEff:"), "0000000000000000");
@@ -152,7 +158,7 @@ fn captures_on_the_npcap_loopback_adapter() {
     // under Npcap a blocking read without packets might never return; then this test would hang
     let done = watchdog(helper.child.id());
     match helper.next() {
-        Frame::Ready { link_type } => eprintln!("loopback adapter, link type {link_type}"),
+        Frame::Ready { link_type, .. } => eprintln!("loopback adapter, link type {link_type}"),
         Frame::Failed => {
             eprintln!(
                 "skipped: no loopback adapter ({})",

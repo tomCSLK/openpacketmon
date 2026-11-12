@@ -23,17 +23,21 @@ pub struct CaptureHelper {
     header: PacketHeader,
     data: Vec<u8>,
     stats: Stat,
+    /// Whether the adapter is in promiscuous mode, as the helper reported
+    promiscuous: bool,
     /// Why the helper stopped, once it has
     ended: Option<String>,
 }
 
 impl CaptureHelper {
-    /// Starts the helper and waits until it has opened the adapter
+    /// Starts the helper and waits until it has opened the adapter; `promiscuous` asks for
+    /// promiscuous mode, which the adapter may refuse (see [`Self::promiscuous`])
     pub fn start(
         device: &str,
         snaplen: i32,
         buffer: i32,
         bpf: Option<&str>,
+        promiscuous: bool,
     ) -> Result<Self, String> {
         #[cfg(test)]
         if !tests::REAL_HELPERS.load(std::sync::atomic::Ordering::Relaxed) {
@@ -48,6 +52,8 @@ impl CaptureHelper {
             .arg(snaplen.to_string())
             .arg("--buffer")
             .arg(buffer.to_string())
+            .arg("--promisc")
+            .arg(if promiscuous { "on" } else { "off" })
             .stdin(Stdio::piped())
             .stdout(Stdio::piped());
         if let Some(bpf) = bpf {
@@ -92,14 +98,19 @@ impl CaptureHelper {
                 dropped: 0,
                 if_dropped: 0,
             },
+            promiscuous: false,
             ended: None,
         }
     }
 
     fn wait_until_ready(&mut self) -> Result<(), String> {
         match read_frame(&mut self.output, &mut self.data) {
-            Ok(Frame::Ready { link_type }) => {
+            Ok(Frame::Ready {
+                link_type,
+                promiscuous,
+            }) => {
                 self.link_type = link_type;
+                self.promiscuous = promiscuous;
                 Ok(())
             }
             Ok(Frame::Failed) => Err(String::from_utf8_lossy(&self.data).into_owned()),
@@ -109,6 +120,11 @@ impl CaptureHelper {
     }
 
     /// The `pcap` data link type of the adapter
+    /// Whether the adapter is in promiscuous mode
+    pub fn promiscuous(&self) -> bool {
+        self.promiscuous
+    }
+
     pub fn link_type(&self) -> i32 {
         self.link_type
     }
@@ -244,7 +260,7 @@ pub(crate) mod tests {
     #[test]
     fn hands_on_packets_and_counters() {
         let mut wire = Vec::new();
-        write_ready(&mut wire, 1).unwrap();
+        write_ready(&mut wire, 1, true).unwrap();
         write_stats(
             &mut wire,
             Stats {
@@ -260,6 +276,7 @@ pub(crate) mod tests {
         let mut helper = reading(wire);
         helper.wait_until_ready().unwrap();
         assert_eq!(helper.link_type(), 1);
+        assert!(helper.promiscuous());
         let packet = helper.next_packet().unwrap();
         assert_eq!(i64::from(packet.header.ts.tv_sec), 1_800_000_000);
         assert_eq!(i64::from(packet.header.ts.tv_usec), 250);

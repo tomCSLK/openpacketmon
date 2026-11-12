@@ -52,6 +52,7 @@ struct Form {
     ipfix_addr: String,
     ipfix_port: String,
     bpf: String,
+    promiscuous: bool,
     export: bool,
     export_dir: String,
     export_name: String,
@@ -72,6 +73,7 @@ impl Form {
             ipfix_addr: setup.ipfix_addr.clone(),
             ipfix_port: setup.ipfix_port.clone(),
             bpf: setup.bpf.clone(),
+            promiscuous: setup.promiscuous,
             export: setup.export_enabled,
             export_dir: setup.export_dir.clone(),
             export_name: setup.export_name.clone(),
@@ -87,6 +89,7 @@ impl Form {
             ipfix_addr: self.ipfix_addr.clone(),
             ipfix_port: self.ipfix_port.clone(),
             bpf: self.bpf.clone(),
+            promiscuous: self.promiscuous,
             export: self.export,
             export_dir: self.export_dir.clone(),
             export_name: self.export_name.clone(),
@@ -279,6 +282,7 @@ enum Fact {
     Source,
     Link,
     Listening,
+    Promiscuous,
     Filter,
     Store,
     Export,
@@ -294,6 +298,9 @@ fn facts(ui: &mut Ui, t: Lang, run: &RunningCapture) {
     }
     if !run.listening.is_empty() {
         shown.push((Fact::Listening, t.get("capture-listening")));
+    }
+    if run.promiscuous.is_some() {
+        shown.push((Fact::Promiscuous, t.get("capture-promisc")));
     }
     if run.filter.is_some() {
         shown.push((Fact::Filter, t.get("capture-filter")));
@@ -327,6 +334,9 @@ fn facts(ui: &mut Ui, t: Lang, run: &RunningCapture) {
         }
         Fact::Listening => {
             widgets::code(ui, &run.listening.join(", "));
+        }
+        Fact::Promiscuous => {
+            ui.label(run.promiscuous.clone().unwrap_or_default());
         }
         Fact::Filter => match run.filter.as_deref() {
             Some(filter) if !filter.is_empty() => {
@@ -463,7 +473,10 @@ fn setup(app: &mut App, ui: &mut Ui) {
             next_source = widgets::segmented_icons(ui, &labels, &icons, chosen);
         },
         |ui| match form.source {
-            CaptureSourcePicklist::Device => adapters(ui, t, form, snapshot),
+            CaptureSourcePicklist::Device => {
+                adapters(ui, t, form, snapshot);
+                promiscuous(ui, t, form);
+            }
             CaptureSourcePicklist::File => body(ui, |ui| {
                 field_label(ui, &t.get("capture-file-path"));
                 ui.horizontal(|ui| {
@@ -682,6 +695,18 @@ fn body(ui: &mut Ui, add: impl FnOnce(&mut Ui)) {
             ui.set_width(ui.available_width());
             add(ui);
         });
+}
+
+/// Below the adapters: promiscuous mode, with a line above it
+fn promiscuous(ui: &mut Ui, t: Lang, form: &mut Form) {
+    let p = palette(ui.ctx());
+    let (line, _) = ui.allocate_exact_size(vec2(ui.available_width(), 1.0), Sense::hover());
+    ui.painter()
+        .hline(line.x_range(), line.center().y, Stroke::new(1.0, p.border));
+    body(ui, |ui| {
+        widgets::check(ui, &mut form.promiscuous, &t.get("capture-promisc-enable"));
+        field_help(ui, &t.get("capture-promisc-hint"));
+    });
 }
 
 /// The adapters (`table.adapters`): the hint, then a row for each with a radio button, name and

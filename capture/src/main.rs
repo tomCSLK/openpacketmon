@@ -36,11 +36,14 @@ struct Options {
     snaplen: i32,
     buffer: i32,
     bpf: String,
+    /// Asked for promiscuous mode; the adapter may refuse it
+    promisc: bool,
 }
 
 impl Options {
     fn parse(mut args: impl Iterator<Item = String>) -> Result<Self, String> {
         let (mut device, mut snaplen, mut buffer, mut bpf) = (None, None, None, String::new());
+        let mut promisc = false;
         while let Some(name) = args.next() {
             let value = args.next().ok_or(format!("{name} needs a value"))?;
             match name.as_str() {
@@ -49,6 +52,13 @@ impl Options {
                 "--buffer" => buffer = Some(number(&value, MAX_BUFFER_BYTES)?),
                 "--bpf" if value.len() <= MAX_BPF_BYTES => bpf = value,
                 "--bpf" => return Err("the BPF filter is too long".to_string()),
+                "--promisc" => {
+                    promisc = match value.as_str() {
+                        "on" => true,
+                        "off" => false,
+                        _ => return Err(format!("--promisc is on or off, not {value}")),
+                    }
+                }
                 _ => return Err(format!("unknown option {name}")),
             }
         }
@@ -57,6 +67,7 @@ impl Options {
             snaplen: snaplen.ok_or("--snaplen is missing")?,
             buffer: buffer.ok_or("--buffer is missing")?,
             bpf,
+            promisc,
         })
     }
 }
@@ -82,7 +93,7 @@ fn main() -> ExitCode {
 
 fn run() -> Result<(), String> {
     let options = Options::parse(std::env::args().skip(1))?;
-    let mut cap = open(&options)?;
+    let (mut cap, promiscuous) = open(&options)?;
     // nothing below needs the rights any more: the open socket keeps working without them
     drop_rights()?;
     // the filter is compiled from text only now, so a flaw in the BPF compiler of libpcap gets no rights
@@ -92,7 +103,7 @@ fn run() -> Result<(), String> {
     enlarge_pipe();
     let link_type = cap.get_datalink().0;
     let mut out = BufWriter::with_capacity(64 * 1024, stdout().lock());
-    if write_ready(&mut out, link_type)
+    if write_ready(&mut out, link_type, promiscuous)
         .and_then(|()| out.flush())
         .is_err()
     {
@@ -106,16 +117,32 @@ fn run() -> Result<(), String> {
 }
 
 /// Opens the adapter with the settings of openpacketmon (without the filter, which comes after the
-/// rights are gone); only an existing adapter is accepted
-fn open(options: &Options) -> Result<Capture<Active>, String> {
+/// rights are gone); only an existing adapter is accepted. Tells whether it is in promiscuous mode:
+/// an adapter that refuses it (some Wi-Fi drivers under Npcap, the `any` device of Linux) is opened
+/// without it rather than not at all.
+fn open(options: &Options) -> Result<(Capture<Active>, bool), String> {
     let device = Device::list()
         .map_err(|e| e.to_string())?
         .into_iter()
         .find(|d| d.name == options.device)
         .ok_or_else(|| format!("unknown adapter {}", options.device))?;
+    if options.promisc
+        && let Ok(cap) = open_device(device.clone(), options, true)
+    {
+        return Ok((cap, true));
+    }
+    Ok((open_device(device, options, false)?, false))
+}
+
+/// `pcap` takes the warnings of libpcap for errors, also "promiscuous mode not supported"
+fn open_device(
+    device: Device,
+    options: &Options,
+    promisc: bool,
+) -> Result<Capture<Active>, String> {
     let cap = Capture::from_device(device)
         .map_err(|e| e.to_string())?
-        .promisc(false)
+        .promisc(promisc)
         .buffer_size(options.buffer)
         .snaplen(options.snaplen)
         .immediate_mode(false)
@@ -316,8 +343,14 @@ mod tests {
                 snaplen: 200,
                 buffer: 2_000_000,
                 bpf: "tcp".to_string(),
+                promisc: false,
             }
         );
+        let promisc = ["--device", "eth0", "--snaplen", "1", "--buffer", "1"];
+        let on = parse(&[&promisc[..], &["--promisc", "on"]].concat()).unwrap();
+        assert!(on.promisc);
+        let off = parse(&[&promisc[..], &["--promisc", "off"]].concat()).unwrap();
+        assert!(!off.promisc);
     }
 
     #[test]
@@ -332,7 +365,10 @@ mod tests {
     #[test]
     fn the_filter_is_optional() {
         let args = ["--device", "lo", "--snaplen", "1", "--buffer", "1"];
-        assert_eq!(parse(&args).unwrap().bpf, "");
+        let options = parse(&args).unwrap();
+        assert_eq!(options.bpf, "");
+        // without the option the adapter is not put into promiscuous mode
+        assert!(!options.promisc);
     }
 
     #[test]
@@ -354,6 +390,16 @@ mod tests {
                 "/etc/passwd",
             ],
             &["--device"],
+            &[
+                "--device",
+                "lo",
+                "--snaplen",
+                "1",
+                "--buffer",
+                "1",
+                "--promisc",
+                "yes",
+            ],
         ] {
             assert!(parse(args).is_err(), "{args:?}");
         }

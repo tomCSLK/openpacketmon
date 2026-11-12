@@ -82,6 +82,9 @@ pub struct EngineState {
     pub mmdb_readers: MmdbReaders,
     /// Results of latency measurements
     pub latency_statuses: HashMap<IpAddr, LatencyStatus>,
+    /// Promiscuous mode of the current capture on an adapter: asked for, and got (the adapter
+    /// may refuse it); `None` for other sources
+    pub promiscuous: Option<(bool, bool)>,
     /// Whether the current capture is paused
     pub frozen: bool,
     freeze_tx: Option<tokio::sync::broadcast::Sender<()>>,
@@ -128,6 +131,7 @@ impl EngineState {
             preview_rx: None,
             mmdb_readers,
             latency_statuses: HashMap::new(),
+            promiscuous: None,
             frozen: false,
             freeze_tx: None,
             capture_ended: None,
@@ -279,7 +283,10 @@ impl EngineState {
             pcap_path.as_ref(),
             &self.conf.filters,
             self.conf.packet_store.full_packets(),
+            self.conf.capture.promiscuous,
         );
+        let asked = self.conf.capture.promiscuous;
+        self.promiscuous = capture_context.promiscuous().map(|got| (asked, got));
         self.capture_error = capture_context
             .error()
             .map(|e| CaptureError::Fatal(e.to_string()));
@@ -378,6 +385,7 @@ impl EngineState {
         self.unread_notifications = 0;
         self.capture_error = None;
         self.traffic_history = TrafficHistory::new(true);
+        self.promiscuous = None;
         self.frozen = false;
         self.freeze_tx = None;
         self.program_lookup = None;

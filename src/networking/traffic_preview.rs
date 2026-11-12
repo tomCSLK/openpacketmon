@@ -79,7 +79,9 @@ fn handle_devices_and_previews(
         traffic_preview.data.push((my_dev.clone(), 0));
         let capture_source = CaptureSource::Device(my_dev);
         let capture_context =
-            CaptureContext::new(&capture_source, None, &Filters::default(), false);
+            // the curves only show which adapter has traffic: no adapter is put into
+            // promiscuous mode just for them
+            CaptureContext::new(&capture_source, None, &Filters::default(), false, false);
         let Some(link_type) = capture_context.link_type() else {
             continue;
         };

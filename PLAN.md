@@ -1,6 +1,11 @@
 # PLAN.md – Fork von Sniffnet
 
-**Stand: 2026-11-10.**
+**Stand: 2026-11-12.**
+
+- **Befund am TAP (5.8, 2026-11-12):** Am Monitoring-Port eines Netzwerk-TAPs zeigte openpacketmon unter Linux und Windows nicht einmal
+  die Hälfte dessen, was Wireshark zeigte. Ursache nach dem Aufbau: Der Helfer öffnete den Adapter fest ohne Promiscuous Mode.
+  **Schritt 2 umgesetzt** (2026-11-12, Test-Paket **0.5.1**): Promiscuous Mode als Einstellung, standardmäßig an, mit Rückfall, wenn der
+  Adapter ihn ablehnt; die laufende Aufzeichnung zeigt den Zustand. Offen: Vergleich am TAP, Schritte 3 bis 5 in 5.8.
 
 - **v0.5.0** ist released (2026-11-10, auf Ansage des Nutzers, zuerst nur Linux) mit der neuen Oberfläche (5.6) und VoIP (5.7); die `.deb`
   ist bitgleich mit dem Test-Paket 0.5.0 (gleiche Prüfsumme). Test durch den Nutzer steht aus. Unter Windows am selben Tag gebaut und
@@ -1785,9 +1790,88 @@ Standards (SIP RFC 3261, SDP RFC 8866, RTP/RTCP RFC 3550, Payload-Typen RFC 3551
     Benutzerteil mit Ziffern (`anna2024@…` → `annaxx24@…`); Nummern an anderen Stellen (etwa im Text einer SIP-MESSAGE, in XML-Körpern oder
     im Betreff) bleiben, wie Geheimnisse an anderen Stellen.
 
+#### 5.8 Fehlende Pakete am Monitoring-Port (Befund des Nutzers, 2026-11-12; „go“ für Schritt 2 am 2026-11-12, umgesetzt)
+
+**Befund:** Der Laptop hing am Monitoring-Port eines Netzwerk-TAPs (Modell in `CLAUDE.local.md`), der den Verkehr eines
+WLAN-Access-Points abgriff. Wireshark zeigte die ganze Kommunikation, openpacketmon nicht einmal die Hälfte; unter Linux und Windows
+gleich.
+
+**Wahrscheinliche Ursache (noch nicht gemessen):** Der Helfer öffnet den Adapter fest **ohne Promiscuous Mode**
+(`capture/src/main.rs`, `open`: `.promisc(false)`). Am TAP tragen fast alle Rahmen fremde MAC-Adressen (die Clients des Access Points,
+der Router); ohne Promiscuous Mode verwirft die Netzwerkkarte sie, übrig bleiben Broadcast, abonniertes Multicast und was an den Laptop
+selbst geht. Wireshark schaltet den Modus standardmäßig ein.
+
+**Weitere mögliche Lücken** (kleiner, in Schritt 4 mitprüfen):
+- Ringspeicher: standardmäßig 100 000 Pakete (`src/config/packet_store.rs`), danach fallen die ältesten heraus; Wireshark behält alles.
+- Durchsatz: Ein TAP fasst beide Richtungen auf einem Port zusammen (bis zur doppelten Leitungsrate). Der Weg Helfer → Pipe → Kanal
+  (10 000 Plätze, `src/networking/parse_packets.rs`) → Auswertung nimmt den Lock des Paketspeichers je Paket; hält die Oberfläche ihn
+  lange (Filter-Index, Analyse), staut es sich bis zum Kernel-Puffer (16 MB) zurück, der dann verwirft (Kachel „Verworfen“).
+- Zählweise: Die Übersicht zählt nur IP-Pakete (ARP, LLDP, STP fehlen dort), die Paketliste alle.
+- Nebenbefund: Der Mitschnitt in eine Datei (`savefile` in `parse_packets.rs`) schreibt nur Pakete, die `ParsedPacket` versteht, also
+  keine ohne IP; prüfen, ob und wo die Option in der Oberfläche noch erreichbar ist (der PCAP-Download aus dem Paketspeicher ist
+  davon nicht betroffen).
+
+**Schritte:**
+1. **Gegenprobe ohne Code (Nutzer):** vom Nutzer übersprungen (2026-11-12), der Aufbau spricht klar für den Promiscuous Mode.
+   Ursprünglicher Plan: Am TAP Wireshark mit ausgeschaltetem Promiscuous Mode (Aufzeichnung → Optionen) neben
+   openpacketmon laufen lassen, gleicher Adapter, gleicher Zeitraum. Sieht Wireshark dann auch nur den Rest, ist die Ursache bestätigt.
+   Dazu in openpacketmon ablesen: Kachel „Verworfen“, Kopf der Paketliste („im Speicher“, „ältere verworfen“), kein Mitschnitt- und
+   kein Anzeigefilter.
+2. **Promiscuous Mode als Einstellung** – **umgesetzt 2026-11-12** (Stand unten nach der Liste):
+   - `Conf`: neues Feld, Standard **an** wie bei Wireshark; eine alte `conf.toml` ohne das Feld bekommt ebenfalls „an“.
+   - Seite Aufzeichnung (`src/gui/pages/capture.rs`): Schalter neben Adapter und Mitschnittfilter, Texte in `locales/de` und
+     `locales/en` mit Hinweis: nötig an Spiegel-Port oder TAP; WLAN-Adapter ignorieren ihn meist (Promiscuous Mode ist kein Monitor-Modus,
+     fremder WLAN-Verkehr bleibt unsichtbar).
+   - Helfer: neue Option `--promisc` (Wert wie die übrigen Optionen), Test in `Options::parse`. Der Modus wird beim Öffnen gesetzt, also
+     vor `drop_rights`; die vorhandenen Rechte (`cap_net_raw,cap_net_admin`) reichen. Unter Linux hängt er am Socket des Helfers
+     (libpcap, `PACKET_MR_PROMISC`) und endet mit ihm, kein dauerhaftes `ip link set promisc`.
+   - Windows (Npcap): Manche Adapter, vor allem WLAN, lehnen den Modus ab, dann scheitert das Öffnen. Dann ohne Promiscuous Mode neu
+     öffnen und das sichtbar melden (Statusleiste), nicht still weitermachen. Unter Windows prüfen.
+   - Den Zustand bei den Angaben zur Aufzeichnung zeigen, damit ein Vergleich mit Wireshark nachvollziehbar ist.
+3. **Tests:**
+   - Einheitstests: Optionen des Helfers, Standard der Einstellung, alte `conf.toml`.
+   - Live-Test im Netz-Namensraum (`capture/tests/live.rs`): mit `--promisc` ist der Adapter im Modus (`ip -d link` zeigt
+     `promiscuity 1`), ohne nicht, und nach dem Ende des Helfers wieder `0`. Rahmen an eine fremde MAC über ein veth-Paar taugen als
+     Gegenprobe nur, wenn veth sie ohne den Modus nicht schon durchlässt (keine Hardware-Filterung); erst prüfen.
+   - Bildtest der Seite Aufzeichnung mit dem Schalter.
+   - Von Hand am TAP unter Linux und Windows gegen Wireshark (beide gleichzeitig, gleicher Zeitraum); dazu den Zähler „empfangen“ des
+     Helfers (meldet er schon, die Oberfläche zeigt ihn noch nicht, siehe 4) gegen die gespeicherten Pakete halten: Fehlt schon bei
+     „empfangen“, liegt es vor dem Helfer, sonst in openpacketmon.
+4. **Danach messen, ob noch etwas fehlt** (am TAP unter Last), und nur bei Bedarf und nach Freigabe:
+   - Durchsatz: Zähler empfangen / gespeichert / verworfen sichtbar machen; bei Verlusten Pakete gebündelt in den Speicher schreiben
+     (ein Lock je Bündel), größerer Kanal, kürzere Locks der Oberfläche.
+   - Ringspeicher: in der Paketliste deutlich zeigen, dass ältere Pakete wegen der Grenze herausgefallen sind; höhere Grenze möglich
+     (Wert legt der Nutzer fest).
+   - Übersicht: kennzeichnen, dass sie nur IP-Pakete zählt.
+   - Nebenbefund `savefile`: alle Pakete schreiben, falls die Option noch erreichbar ist.
+5. **Doku:** README (Aufzeichnung an Spiegel-Port oder TAP), CHANGELOG, `docs/windows.md` (Verhalten von Npcap), Stände. Die Version
+   nennt der Nutzer.
+
+Wireshark dient nur als Vergleichswerkzeug; kein Code daraus.
+
+**Stand Schritt 2 (2026-11-12, committet, Test-Paket 0.5.1 auf Ansage des Nutzers):**
+- Einstellung `capture.promiscuous` in `conf.toml` (`src/config/capture.rs`, `CaptureConf`), Standard **an**; fehlt das Feld (ältere
+  Fassung) oder ist es ungültig, gilt ebenfalls „an“ (eigener `deserialize_or_on`, weil `deserialize_or_default` „aus“ ergäbe).
+- Seite Aufzeichnung: unter der Adaptertabelle (nur bei Quelle Netzwerkadapter) der Schalter „Promiscuous Mode: auch Pakete an andere
+  Geräte annehmen“ mit Hinweis (Spiegel-Port, TAP; WLAN meist ohne Wirkung, kein Monitor-Modus). Er wird beim Start mit den übrigen
+  Angaben gespeichert (`StartRequest.promiscuous`, `apply_start`). Die laufende Aufzeichnung zeigt die Zeile „Promiscuous Mode“: an,
+  aus oder „aus (vom Adapter abgelehnt)“ (`EngineState.promiscuous` = gewünscht und erreicht, `src/view/capture.rs`).
+- Helfer: Option `--promisc on|off` (ohne Option aus). `open` versucht es mit dem Modus und öffnet bei einem Fehler ohne ihn neu;
+  nötig, weil das Crate `pcap` auch Warnungen von `pcap_activate` (etwa „promiscuous mode not supported“, z. B. Gerät `any`) als Fehler
+  meldet. Der erreichte Zustand steht in der Meldung `Ready` (neues Byte `promiscuous`, `capture/src/lib.rs`; Helfer und Programm
+  kommen immer zusammen, deshalb ohne Rückwärtsverträglichkeit des Protokolls). Rechte: unverändert.
+- Die Kurven der Adapterauswahl (`traffic_preview.rs`) öffnen weiter ohne Promiscuous Mode; sie zeigen nur, wo Verkehr ist.
+- Tests: Optionen des Helfers (`on`, `off`, ohne, ungültig), `Ready` mit beiden Werten und ungültigem Byte, `CaptureHelper` übernimmt
+  den Zustand, Standard und alte/ungültige/abgeschaltete `conf.toml` (`src/config/capture.rs`), Konfigurationstest in `src/cli`.
+  `cargo test --workspace`, `clippy -D warnings`, `fmt` grün. Von Hand im Netz-Namensraum: Helfer mit `--promisc on` → `lo` zeigt
+  `promiscuity 1`, `Ready` meldet 1; mit `off` → 0; nach dem Ende wieder 0. Bild der Seite Aufzeichnung (`GUI_SHOTS_ONLY=capture`)
+  angesehen.
+- Offen: Schritt 3 (Live-Test für den Modus fest in `capture/tests/live.rs`, Bildtest der laufenden Aufzeichnung, Vergleich am TAP unter
+  Linux und Windows, Verhalten von Npcap bei WLAN-Adaptern), Schritte 4 und 5 (README, `docs/windows.md`).
+
 ---
 
-## 5. Offene Punkte (Stand 2026-11-10)
+## 5. Offene Punkte (Stand 2026-11-12)
 
 1. Neue Oberfläche (5.6): in v0.5.0 released (2026-11-10); Test durch den Nutzer.
 2. VoIP (5.7, „go“ am 2026-11-10): Stufen 1–5 (Zerleger, Filter, Anrufe, Anhören, MCP) in v0.5.0 released; Test mit einem echten Anruf
@@ -1798,5 +1882,7 @@ Standards (SIP RFC 3261, SDP RFC 8866, RTP/RTCP RFC 3550, Payload-Typen RFC 3551
    unter Windows von den echten Einstellungen trennen.
 5. Rückmeldung des Originals zum Pull Request mit der Korrektur aus 4.8 (Einzelheiten nur in `CLAUDE.local.md`).
 6. Weitere Ideen in 5.2, noch nicht beschlossen.
+7. Fehlende Pakete am Monitoring-Port eines TAPs (5.8, Befund 2026-11-12): Promiscuous Mode als Einstellung (Standard an) umgesetzt
+   (Schritt 2, Test-Paket 0.5.1); offen der Vergleich am TAP unter Linux und Windows, dann Schritte 3 bis 5.
 
 Die Namenssuche (früher Abschnitt 6, 2026-10-28) ist erledigt: **openpacketmon**, Marke vom Nutzer geprüft.

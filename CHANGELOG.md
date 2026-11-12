@@ -8,6 +8,12 @@ The history of Sniffnet itself is in its own changelog: <https://github.com/Gyul
 
 ## [Unreleased]
 
+### Capture
+
+- Network adapters are opened in promiscuous mode, like Wireshark does; on a mirror port or a network TAP the adapter used
+  to drop every frame for other devices. A switch on the capture page turns it off; an adapter that refuses the mode (some
+  Wi-Fi adapters under Npcap, `any` under Linux) is opened without it, and the running capture says so
+
 ## [0.5.0] - 2026-11-10
 
 ### Interface

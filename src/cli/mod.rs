@@ -110,6 +110,7 @@ mod tests {
                 bpf: "tcp".to_string(),
                 expanded: true,
             },
+            capture: crate::config::capture::CaptureConf { promiscuous: false },
             import_pcap_path: "whole_day.pcapng".to_string(),
             ipfix_socket: Default::default(),
             export_pcap: ExportPcap::default(),

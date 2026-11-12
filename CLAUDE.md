@@ -13,7 +13,7 @@ Logo seit der neuen Oberfläche: Zeichen C „Lupe über Paketen“ (`resources/
 |---|---|---|
 | `CLAUDE.md` | Regeln und Grundwissen für jede Sitzung | automatisch |
 | `CLAUDE.local.md` | Laptop, gemeldeter Befund beim Original, Pfade zu nicht öffentlichen Projekten (gitignored) | automatisch |
-| `PLAN.md` | oben der Stand; Entscheidungen (0), Lizenzprüfung (1), Bestandsaufnahme und Phasen 1–4 (2–4, Verlauf), Vorhaben 5.1–5.7, offene Punkte (5) | **maßgeblich**, vor Arbeit am Vorhaben lesen |
+| `PLAN.md` | oben der Stand; Entscheidungen (0), Lizenzprüfung (1), Bestandsaufnahme und Phasen 1–4 (2–4, Verlauf), Vorhaben 5.1–5.8, offene Punkte (5) | **maßgeblich**, vor Arbeit am Vorhaben lesen |
 | `docs/windows.md` | alles zu Windows: Einrichten, Code-Unterschiede, Tests, Installer, Code-Signatur, CI, offene Punkte | vor Arbeit unter oder für Windows |
 | `docs/entwurf/` | klickbarer Entwurf der neuen Oberfläche (HTML, erfundene Daten), `README.md` dort | vor Arbeit an der Oberfläche |
 | `README.md`, `CHANGELOG.md`, `SECURITY.md`, `CONTRIBUTING.md`, `NOTICE` | öffentlich, Englisch | bei Bedarf |
@@ -24,8 +24,8 @@ Fassung bis 2026-11-09 (mit dem Verlauf der Browser-Oberfläche) steht in der Gi
 ## Aufbau
 
 - `capture/` – **`openpacketmon-capture`**, der Mitschnitt-Helfer: nur er hat Rechte (`cap_net_raw,cap_net_admin` per `setcap` im `.deb`), gibt sie
-  nach dem Öffnen des Adapters ab und reicht Pakete über eine Pipe weiter; übersetzt BPF erst ohne Rechte. `openpacketmon` selbst läuft ohne
-  Sonderrechte. Stirbt der Helfer, meldet das die Oberfläche (`CaptureStopped`). Live-Test `capture/tests/live.rs` im Netz-Namensraum.
+  nach dem Öffnen des Adapters ab und reicht Pakete über eine Pipe weiter (Promiscuous Mode mit `--promisc on`, Rückfall ohne);
+  übersetzt BPF erst ohne Rechte. `openpacketmon` selbst läuft ohne Sonderrechte. Stirbt der Helfer, meldet das die Oberfläche (`CaptureStopped`). Live-Test `capture/tests/live.rs` im Netz-Namensraum.
 - `src/engine/` – Zustand der Aufzeichnung, Paketspeicher `packets.rs` (nur im RAM, wählbar bis 2 GiB und 2 Millionen Pakete), TCP-Analyse
   `analysis.rs`. `Engine::stop` wartet, bis der Mitschnitt seine Dateien geschlossen hat.
 - `src/dissect/` – eigene Zerleger (DNS/mDNS/LLMNR, DHCP, TLS mit SNI, HTTP/1, SSDP, NTP, QUIC-Kopf); `src/filter/` – eigene Filtergrammatik.
@@ -99,8 +99,12 @@ Fassung bis 2026-11-09 (mit dem Verlauf der Browser-Oberfläche) steht in der Gi
 
 ## Stand und offene Punkte
 
-Maßgeblich ist `PLAN.md` (oben „Stand“, Abschnitt 5). Kurz (2026-11-10):
+Maßgeblich ist `PLAN.md` (oben „Stand“, Abschnitt 5). Kurz (2026-11-12):
 
+- **Befund am TAP** (`PLAN.md` 5.8, 2026-11-12): Am Monitoring-Port eines Netzwerk-TAPs fehlte unter Linux und Windows mehr als die
+  Hälfte der Pakete gegenüber Wireshark, weil der Helfer fest ohne Promiscuous Mode öffnete. **Umgesetzt** (Schritt 2, Test-Paket 0.5.1):
+  Einstellung `capture.promiscuous` (Standard an), Schalter auf der Seite Aufzeichnung, Helfer-Option `--promisc on|off` mit Rückfall
+  ohne den Modus, Zustand in `Ready` und in der laufenden Aufzeichnung. Offen: Vergleich am TAP, Schritte 3–5.
 - **v0.5.0** ist released (2026-11-10) mit neuer Oberfläche und VoIP, für Linux und mit **signiertem Windows-Installer** (am selben Tag
   hinzugefügt); Test durch den Nutzer steht aus. Unter Windows alle Tests grün; Smart App Control sperrt dort Proc-Macro-DLLs, Abhilfe
   in `docs/windows.md` oben. Update von 0.4.0 mit dem Installer beim Nutzer reibungslos; Test läuft.

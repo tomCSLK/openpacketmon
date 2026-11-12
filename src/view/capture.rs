@@ -52,6 +52,8 @@ pub struct RunningCapture {
     pub link_type: Option<String>,
     /// Addresses an IPFIX collector bound to the unspecified address listens on
     pub listening: Vec<String>,
+    /// Promiscuous mode of an adapter (on, off, refused by the adapter); `None` for other sources
+    pub promiscuous: Option<String>,
     /// The BPF filter, empty without one; `None` for sources without filters
     pub filter: Option<String>,
     /// What the packet store keeps (not shown for IPFIX, which has no packets)
@@ -79,6 +81,8 @@ pub struct CaptureSetup {
     pub ipfix_addr: String,
     pub ipfix_port: String,
     pub bpf: String,
+    /// Open the adapter in promiscuous mode
+    pub promiscuous: bool,
     pub export_enabled: bool,
     pub export_dir: String,
     pub export_name: String,
@@ -119,6 +123,7 @@ pub fn capture_setup(t: Lang, state: &EngineState) -> CaptureSetup {
         ipfix_addr: conf.ipfix_socket.addr().to_owned(),
         ipfix_port: conf.ipfix_socket.port().to_owned(),
         bpf: conf.filters.bpf().to_owned(),
+        promiscuous: conf.capture.promiscuous,
         export_enabled: conf.export_pcap.enabled(),
         export_dir: conf.export_pcap.directory().to_owned(),
         export_name: conf.export_pcap.file_name().to_owned(),
@@ -194,6 +199,7 @@ fn running_capture(t: Lang, state: &EngineState) -> RunningCapture {
             .iter()
             .map(|a| a.addr.to_string())
             .collect(),
+        promiscuous: state.promiscuous.map(|mode| t.get(promiscuous_text(mode))),
         filter: source.supports_filters().then(|| {
             if state.conf.filters.is_some_filter_active() {
                 state.conf.filters.bpf().to_owned()
@@ -232,6 +238,15 @@ fn running_capture(t: Lang, state: &EngineState) -> RunningCapture {
     }
 }
 
+/// The message id of the promiscuous mode, asked for and got
+fn promiscuous_text((asked, got): (bool, bool)) -> &'static str {
+    match (asked, got) {
+        (_, true) => "capture-promisc-on",
+        (true, false) => "capture-promisc-refused",
+        (false, false) => "capture-promisc-off",
+    }
+}
+
 /// What a capture is to analyze and how
 pub struct StartRequest {
     pub source: CaptureSourcePicklist,
@@ -240,6 +255,8 @@ pub struct StartRequest {
     pub ipfix_addr: String,
     pub ipfix_port: String,
     pub bpf: String,
+    /// Open the adapter in promiscuous mode
+    pub promiscuous: bool,
     pub export: bool,
     pub export_dir: String,
     pub export_name: String,
@@ -281,6 +298,7 @@ pub fn apply_start(engine: &mut EngineState, request: &StartRequest) -> Option<&
             {
                 return Some("capture-adapter-no-ip");
             }
+            engine.conf.capture.promiscuous = request.promiscuous;
             let export = &mut engine.conf.export_pcap;
             export.set_enabled(request.export);
             export.set_directory(request.export_dir.trim().to_owned());
@@ -354,6 +372,7 @@ mod tests {
             ipfix_addr: String::new(),
             ipfix_port: String::new(),
             bpf: String::new(),
+            promiscuous: true,
             export: false,
             export_dir: String::new(),
             export_name: String::new(),

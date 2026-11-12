@@ -7,14 +7,15 @@
   1.100 gibt; der Lint ist im Workspace abgeschaltet, weil Windows mit 1.99 baut (`rust-version` 1.99 hatte nicht gereicht). Die `.deb`
   des Releases ist neu gebaut (Rust 1.100) und nicht bitgleich mit dem Test-Paket 0.5.2; der Programmcode ist derselbe. Der **signierte
   Windows-Installer** ist am selben Tag hinzugefügt (vom Stand des Tags, mit Rust 1.99.1 gebaut, alle Tests grün; `docs/windows.md` oben
-  unter „0.5.1 und 0.5.2“). Offen unter Windows: Update über 0.5.0 und der Test am TAP. Danach aufgeräumt (2026-11-12, nach dem Tag,
+  unter „0.5.1 und 0.5.2“). Als Update über 0.5.0 installiert (Nutzer, 2026-11-12); offen
+  unter Windows nur der Test am TAP, sobald wieder einer verfügbar ist. Danach aufgeräumt (2026-11-12, nach dem Tag,
   ohne Änderung am Programm): `toml` ist nur noch Test-Abhängigkeit (fällt aus `THIRD-PARTY-LICENSES.txt`), `build.rs` prüft die
   Dienstnamen mit `rustrict` in jedem Build statt nur im Debug-Build, `package.homepage` ist entfernt (`cargo deb` nimmt `repository`,
   das Feld `Homepage` der `.deb` bleibt gleich). Cargo baut seitdem ohne Warnung.
 - **Rust 1.100 unter Windows (2026-11-12):** Damit gebaut, stürzt der Helfer `openpacketmon-capture.exe` ab: Er importiert `WaitOnAddress`
   und `WakeByAddress*` aus `vertdll.dll` (VBS-Enklaven), weil die alte `windows.lib` von `windows-sys` 0.36.1 (über `pcap` 2.5.0) beim
   Linken vor `synchronization.lib` steht (windows-rs Issue #2027). Windows-Fassungen bis zur Korrektur mit Rust 1.99.1 bauen; Einzelheiten
-  und Prüfung mit `dumpbin` in `docs/windows.md` oben. Eine Korrektur im Code ist noch nicht geplant.
+  und Prüfung mit `dumpbin` in `docs/windows.md` oben. **Plan für die Korrektur in 5.9** (geprüft an einer Probe; Umsetzung nach „go“).
 - **Startknopf oben** (5.6, Rückmeldung 2026-11-12, umgesetzt, Test-Paket **0.5.2**, 2026-11-12): Auf der Seite Aufzeichnung startet jetzt auch der
   Knopf „Aufzeichnung starten“ der Kopfleiste die Aufzeichnung (vorher führte er nur zur Seite, auf der man schon war).
 - **Befund am TAP (5.8, 2026-11-12):** Am Monitoring-Port eines Netzwerk-TAPs zeigte openpacketmon unter Linux und Windows nicht einmal
@@ -1903,6 +1904,58 @@ Wireshark dient nur als Vergleichswerkzeug; kein Code daraus.
 - Offen: der Vergleich unter Windows (Bau dort, Anleitung in `docs/windows.md` oben unter „0.5.1 und 0.5.2“), Schritt 3 (Live-Test für den Modus fest in `capture/tests/live.rs`, Bildtest der
   laufenden Aufzeichnung, Verhalten von Npcap bei WLAN-Adaptern), Schritt 4 (Durchsatz, Ringspeicher, Zählweise, `savefile`).
 
+#### 5.9 Der Helfer unter Rust 1.100 auf Windows (Befund 2026-11-12; Plan, Umsetzung erst nach „go“)
+
+**Befund** (Einzelheiten in `docs/windows.md` oben): Mit Rust 1.100 gebaut, importiert `openpacketmon-capture.exe` die Funktionen
+`WaitOnAddress`, `WakeByAddressSingle` und `WakeByAddressAll` aus `vertdll.dll` (Laufzeit für VBS-Enklaven) statt aus
+`api-ms-win-core-synch-l1-2-0.dll` und stürzt beim ersten umkämpften Lock ab; ebenso die Testprogramme des Helfers und von
+`sniffnet-packet-parser`. Ursache: `pcap` 2.5.0 hängt an `windows-sys` 0.36.1, dessen `windows.lib` die drei Funktionen nur über
+`vertdll.dll` kennt (windows-rs Issue #2027). Auf der Link-Zeile stehen erst die rlibs, dann die nativen Bibliotheken in der
+Reihenfolge der Crates; `link.exe` sucht `WaitOnAddress` erst, wenn es die Standardbibliothek einbindet, und nimmt dann die nächste
+Bibliothek, die das Symbol hat: die alte `windows.lib` vor `synchronization.lib` der Standardbibliothek. `openpacketmon.exe` ist nur
+zufällig richtig, weil dort andere Crates die Funktionen über `windows-sys` 0.61 früher einbinden. `pcap` 2.5.0 ist die neueste
+Fassung; auf `main` von rust-pcap nutzt `pcap` schon `windows-sys` 0.61, unveröffentlicht als Vorbereitung von 3.0 (dazu Laden von
+`wpcap` zur Laufzeit, #416).
+
+**Probe (2026-11-12, Wegwerf-Crate im Scratchpad mit `pcap` 2.5.0, `+crt-static` wie bei uns, Rust 1.100, Mutex mit 8 Threads):**
+1. Ohne Korrektur: Import aus `vertdll.dll`, Absturz `0xc0000005`. Nachgestellt.
+2. `#[link(name = "synchronization")]` bzw. `cargo:rustc-link-lib=synchronization` im eigenen Crate: steht dann ganz vorn auf der
+   Link-Zeile, hilft aber nicht, weil dort noch niemand `WaitOnAddress` sucht. Weiter `vertdll.dll`, Absturz.
+3. Eigener `unsafe extern`-Block mit den drei Funktionen und Verweis darauf: scheitert an `unsafe_code = "forbid"` des Workspace.
+4. **Verweis auf die drei Funktionen aus `windows-sys` 0.61** (deren `raw-dylib` auf `api-ms-win-core-synch-l1-2-0.dll`) in drei
+   `#[used]`-Statics des eigenen Crates: Das eigene Objekt verlangt die Symbole schon vor jeder Bibliothek, die erste passende gewinnt.
+   Import aus `api-ms-win-core-synch-l1-2-0.dll`, Programm läuft (1,6 Mio. umkämpfte Sperren). Kein unsicherer Code nötig.
+
+**Abgewogen:**
+- **A (vorgeschlagen):** Variante 4 in jedem Crate, das unter Windows ein Programm oder Testprogramm mit `pcap` linkt. Klein, ohne
+  `unsafe`, nur `cfg(all(windows, target_env = "msvc"))`, Linux unberührt; `windows-sys` 0.61.2 ist schon im `Cargo.lock` und in
+  `THIRD-PARTY-LICENSES.txt`.
+- B: `pcap` 3.0 abwarten: richtig auf Dauer, aber ohne Termin; bis dahin baute Windows mit 1.99.1, und jedes neue Rust kann weitere
+  Abweichungen bringen. Kommt 3.0, Modul aus A wieder entfernen (und prüfen, ob dessen Laden zur Laufzeit unser `/DELAYLOAD` ersetzt).
+- C: Linker-Argumente in `.cargo/config.toml`: `-C link-arg` landet am Ende der Zeile, `-l` im eigenen Crate reicht nicht (Probe 2).
+- D: `windows-sys` 0.36 per `[patch]` ersetzen oder `pcap` forken: zu viel Pflege für drei Symbole.
+- E: Rust fest auf 1.99 setzen (`rust-toolchain.toml`): bremst auch Linux und die CI; nein.
+
+**Schritte (nach „go“):**
+1. Modul `capture/src/link_order.rs` (Name offen) mit den drei `#[used]`-Statics und einem Kommentar zur Ursache, eingebunden in
+   `capture/src/main.rs` mit `#[cfg(all(windows, target_env = "msvc"))]`; deckt den Helfer und seine Testprogramme ab.
+   `capture/Cargo.toml`: `[target.'cfg(windows)'.dependencies] windows-sys = { version = "0.61", features = ["Win32_System_Threading"] }`.
+2. Dasselbe Modul in `src/main.rs` (heute nur zufällig richtig) mit derselben Abhängigkeit im Haupt-`Cargo.toml`.
+3. `lib/sniffnet-packet-parser/src/lib.rs`: Modul nur für `cfg(all(test, windows, target_env = "msvc"))`, `windows-sys` als
+   Windows-Dev-Abhängigkeit. Die Datei ist bisher unverändert aus dem Original: oben die zwei Zeilen „Modified for openpacketmon …“,
+   Eintrag in `NOTICE`, Prüfung mit `dev/check-notices.sh`.
+4. Schutz: `dev/build-installer.ps1` prüft nach dem Bau mit `dumpbin /dependents` (aus Visual Studio, gesucht wie `signtool`), dass
+   keines der Programme `vertdll.dll` importiert, und bricht sonst vor dem Signieren ab. Einen eigenen Test braucht es nicht: Die
+   vorhandenen Testprogramme stürzen mit dem Fehler sofort ab (`cargo test` hat ihn gefunden).
+5. Prüfen unter Windows mit Rust 1.100: Release-Bau, `dumpbin` für beide Programme und die Testprogramme ohne `vertdll.dll`,
+   `cargo test --workspace`, `cargo clippy -- -D warnings` (der Windows-Code wird unter Linux nicht geprüft), `cargo fmt --check`;
+   zur Gegenprobe der Release-Bau mit 1.99.1. Unter Linux: `cargo test --workspace`, `clippy`, `dev/check-notices.sh`, `cargo deny`
+   (CI).
+6. Doku: `docs/windows.md` (Hinweis oben: erledigt, Windows wieder mit dem aktuellen stable), `CLAUDE.md`, Stände, CHANGELOG (nur
+   intern: die veröffentlichten Installer sind mit 1.99.1 gebaut und nicht betroffen). Die Version nennt der Nutzer.
+7. Optional, nur auf Ansage (öffentlich): bei rust-pcap nach einer Fassung mit neuerem `windows-sys` fragen; bei rust-lang prüfen, ob
+   die geänderte Link-Reihenfolge der Standardbibliothek schon gemeldet ist.
+
 ---
 
 ## 5. Offene Punkte (Stand 2026-11-12)
@@ -1919,7 +1972,9 @@ Wireshark dient nur als Vergleichswerkzeug; kein Code daraus.
    Advisory nach dem Release von Sniffnet 1.6.0 (4.10; Einzelheiten nur in `CLAUDE.local.md`).
 6. Weitere Ideen in 5.2, noch nicht beschlossen.
 7. Fehlende Pakete am Monitoring-Port eines TAPs (5.8, Befund 2026-11-12): Promiscuous Mode als Einstellung (Standard an) umgesetzt
-   (Schritt 2, Test-Paket 0.5.1); am TAP unter Linux bestätigt (2026-11-12); offen Windows (`docs/windows.md` oben unter „0.5.1 und 0.5.2“),
-   dann Schritte 3 und 4.
+   (Schritt 2, Test-Paket 0.5.1); am TAP unter Linux bestätigt (2026-11-12); offen Windows (`docs/windows.md` oben unter „0.5.1 und 0.5.2“,
+   0.5.2 dort installiert, TAP zurzeit nicht verfügbar), dann Schritte 3 und 4.
+8. Helfer unter Rust 1.100 auf Windows (5.9, Befund 2026-11-12): stürzt ab (`vertdll.dll`); bis zur Korrektur Windows mit Rust 1.99.1
+   bauen. Plan in 5.9, an einer Probe geprüft; Umsetzung nach „go“.
 
 Die Namenssuche (früher Abschnitt 6, 2026-10-28) ist erledigt: **openpacketmon**, Marke vom Nutzer geprüft.

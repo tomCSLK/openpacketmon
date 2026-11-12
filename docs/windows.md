@@ -21,8 +21,8 @@ Issue #2027, behoben ab `windows-sys` 0.42). Sie steht in der Link-Reihenfolge v
 Rust 1.99 hat die Standardbibliothek die Funktionen vorher selbst aufgelöst, seit 1.100 nicht mehr. Der Helfer aus 0.5.0 (Rust
 1.99.1) importiert richtig. Prüfen: `dumpbin /dependents target\release\openpacketmon-capture.exe` darf `vertdll.dll` nicht nennen.
 Bauen mit `rustup toolchain install 1.99.1 --profile minimal`, dann `$env:RUSTUP_TOOLCHAIN = '1.99.1'` vor `cargo` und
-`dev\build-installer.ps1`. Eine Korrektur im Code (etwa `synchronization` im `build.rs` des Helfers vorziehen oder `pcap` mit neuerem
-`windows-sys`) ist noch nicht beschlossen.
+`dev\build-installer.ps1`. **Plan für die Korrektur in `PLAN.md` 5.9** (Verweis auf die drei Funktionen aus `windows-sys` 0.61 im
+eigenen Crate; an einer Probe mit Rust 1.100 geprüft; `synchronization.lib` allein vorzuziehen hilft nicht). Umsetzung nach „go“.
 
 **0.5.1 und 0.5.2 (Test-Pakete 2026-11-12; v0.5.2 unter Linux released am 2026-11-12, signierter Windows-Installer am selben Tag hinzugefügt):** Promiscuous Mode (`PLAN.md` 5.8, ab 0.5.1); in 0.5.2 dazu der Knopf
 „Aufzeichnung starten“ der Kopfleiste, der auf der Seite Aufzeichnung jetzt startet (`PLAN.md` 5.6). Am Monitoring-Port eines Netzwerk-TAPs zeigte
@@ -44,11 +44,11 @@ sich bei WLAN-Adaptern verhält. Reihenfolge unter Windows:
    **Gebaut und signiert (2026-11-12, Rust 1.99.1):** `openpacketmon-0.5.2-setup.exe`, 10 653 200 Bytes, SHA-256
    `637e7c2e65f0667df2ca969e1a92974fdf2aecaeeaede4cfde564e49c012a248`; Installer und beide Programme `Valid` mit Zeitstempel von
    Certum, die signierten Programme starten unter Smart App Control, der Helfer importiert `api-ms-win-core-synch-l1-2-0.dll`.
-   Als Update über 0.5.0 noch nicht installiert.
+   **Als Update über 0.5.0 installiert** (Nutzer, 2026-11-12).
 3. Von Hand: (a) am TAP über den Ethernet-Adapter (auch USB-Ethernet): Haken „Promiscuous Mode“ gesetzt, in der laufenden Aufzeichnung
    steht „Promiscuous Mode: an“, Vergleich gleichzeitig mit Wireshark am selben Adapter; (b) auf dem WLAN-Adapter: Was zeigt die Zeile
    („an“ oder „aus (vom Adapter abgelehnt)“), und läuft die Aufzeichnung? (c) Haken aus → „aus“. Ergebnisse hier und in `PLAN.md` 5.8
-   eintragen.
+   eintragen. **Offen:** Zurzeit ist kein TAP verfügbar; getestet wird, sobald wieder einer da ist (Nutzer, 2026-11-12).
 4. v0.5.2 ist unter Linux released (2026-11-12). Den Installer auf Ansage des Nutzers hinzufügen:
    `dev/release.sh --add-windows target/installer/openpacketmon-0.5.2-setup.exe --publish` in Git Bash, danach in den Release-Notes
    den Windows-Absatz ersetzen (Vorlage: Release v0.5.0). Seit dem Tag `v0.5.2` ist kein Programmcode geändert worden.
@@ -483,6 +483,6 @@ Update über eine ältere Version, Start ohne Npcap (Abschnitt 5 Punkt 8).
 **Beginn (Nutzer, 2026-11-02):** Windows wird **vor** dem ersten Release gemacht, weil andere Tester eine Windows-Fassung
 brauchen; MCP ist fertig. Der Haltepunkt aus `PLAN.md` 4.10 ist seit 2026-11-02 aufgehoben.
 
-**Noch offen (Stand 2026-11-12):** Rust 1.100 und `vertdll.dll` im Code beheben (oben), 0.5.2 als Update über 0.5.0 installieren und am TAP prüfen (oben unter „0.5.1 und 0.5.2“), Test von 0.5.0 unter Windows zu Ende führen (oben unter „v0.5.0“, Schritt 2; das Update von 0.4.0
+**Noch offen (Stand 2026-11-12):** Rust 1.100 und `vertdll.dll` im Code beheben (oben), 0.5.2 am TAP prüfen, sobald einer verfügbar ist (oben unter „0.5.1 und 0.5.2“), Test von 0.5.0 unter Windows zu Ende führen (oben unter „v0.5.0“, Schritt 2; das Update von 0.4.0
 mit dem Installer lief beim Nutzer reibungslos), CI-Job für Windows (Abschnitt 7), Test auf einem sauberen System (Deinstallation, Update über eine
 ältere Version, Start ohne Npcap), MCP-Einrichtung in `docs/windows-tester.md`, MCP-Integrationstests von den echten Einstellungen trennen.

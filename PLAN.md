@@ -6,7 +6,10 @@
   (5.6). Vorher war die CI unter Rust 1.100 rot: Clippy (pedantic `map_unwrap_or`) schlägt dort `map_or_default` vor, das es erst ab
   1.100 gibt; der Lint ist im Workspace abgeschaltet, weil Windows mit 1.99 baut (`rust-version` 1.99 hatte nicht gereicht). Die `.deb`
   des Releases ist neu gebaut (Rust 1.100) und nicht bitgleich mit dem Test-Paket 0.5.2; der Programmcode ist derselbe. Offen: signierter
-  Windows-Installer (`docs/windows.md` oben unter „0.5.1 und 0.5.2“, dann `--add-windows`).
+  Windows-Installer (`docs/windows.md` oben unter „0.5.1 und 0.5.2“, dann `--add-windows`). Danach aufgeräumt (2026-11-12, nach dem Tag,
+  ohne Änderung am Programm): `toml` ist nur noch Test-Abhängigkeit (fällt aus `THIRD-PARTY-LICENSES.txt`), `build.rs` prüft die
+  Dienstnamen mit `rustrict` in jedem Build statt nur im Debug-Build, `package.homepage` ist entfernt (`cargo deb` nimmt `repository`,
+  das Feld `Homepage` der `.deb` bleibt gleich). Cargo baut seitdem ohne Warnung.
 - **Startknopf oben** (5.6, Rückmeldung 2026-11-12, umgesetzt, Test-Paket **0.5.2**, 2026-11-12): Auf der Seite Aufzeichnung startet jetzt auch der
   Knopf „Aufzeichnung starten“ der Kopfleiste die Aufzeichnung (vorher führte er nur zur Seite, auf der man schon war).
 - **Befund am TAP (5.8, 2026-11-12):** Am Monitoring-Port eines Netzwerk-TAPs zeigte openpacketmon unter Linux und Windows nicht einmal

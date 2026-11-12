@@ -1901,8 +1901,9 @@ Wireshark dient nur als Vergleichswerkzeug; kein Code daraus.
    mit dem Installer beim Nutzer reibungslos (2026-11-10); in der Testphase.
 4. Windows-Reste (`docs/windows.md` 8): CI-Job, Test auf sauberem System, MCP-Einrichtung in `docs/windows-tester.md`, MCP-Integrationstests
    unter Windows von den echten Einstellungen trennen.
-5. Pull Request mit der Korrektur aus 4.8 beim Original angenommen (2026-11-12, Zweig `v1.6.0`); offen nur, ob wir die Grenzen an die
-   Fassung des Originals angleichen (Einzelheiten nur in `CLAUDE.local.md`).
+5. Pull Request mit der Korrektur aus 4.8 beim Original angenommen (2026-11-12, Zweig `v1.6.0`); unsere Grenzen bleiben wie sie sind,
+   keine Angleichung an die Fassung des Originals (Nutzer, 2026-11-12); Zweig im Fork gelöscht. Offen nur die Herkunftsangabe im
+   Advisory nach dem Release von Sniffnet 1.6.0 (4.10; Einzelheiten nur in `CLAUDE.local.md`).
 6. Weitere Ideen in 5.2, noch nicht beschlossen.
 7. Fehlende Pakete am Monitoring-Port eines TAPs (5.8, Befund 2026-11-12): Promiscuous Mode als Einstellung (Standard an) umgesetzt
    (Schritt 2, Test-Paket 0.5.1); am TAP unter Linux bestätigt (2026-11-12); offen Windows (`docs/windows.md` oben unter „0.5.1 und 0.5.2“),

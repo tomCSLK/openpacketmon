@@ -8,6 +8,8 @@ The history of Sniffnet itself is in its own changelog: <https://github.com/Gyul
 
 ## [Unreleased]
 
+## [0.5.2] - 2026-11-12
+
 ### Interface
 
 - On the capture page the start button of the top bar starts the capture with the choices of the page, like the button at
@@ -18,6 +20,10 @@ The history of Sniffnet itself is in its own changelog: <https://github.com/Gyul
 - Network adapters are opened in promiscuous mode, like Wireshark does; on a mirror port or a network TAP the adapter used
   to drop every frame for other devices. A switch on the capture page turns it off; an adapter that refuses the mode (some
   Wi-Fi adapters under Npcap, `any` under Linux) is opened without it, and the running capture says so
+
+### Dependencies
+
+- rustix 1.1.6 (RUSTSEC-2026-0486 concerns its xattr functions, which openpacketmon does not use)
 
 ## [0.5.0] - 2026-11-10
 

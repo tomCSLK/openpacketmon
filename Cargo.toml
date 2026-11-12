@@ -10,7 +10,6 @@ keywords = ["network", "packet", "traffic", "monitor", "pcap"]
 categories = ["network-programming", "visualization"]
 authors.workspace = true
 edition.workspace = true
-homepage.workspace = true
 repository.workspace = true
 license.workspace = true
 publish = false
@@ -146,7 +145,6 @@ default-members = [".", "capture", "lib/sniffnet-packet-parser"]
 [workspace.package]
 authors = ["Thomas Cieslik", "Giuliano Bellini <gyulyvgc99@gmail.com> (Sniffnet)"]
 edition = "2024"
-homepage = "https://github.com/tomCSLK/openpacketmon"
 repository = "https://github.com/tomCSLK/openpacketmon"
 license = "MIT OR Apache-2.0"
 

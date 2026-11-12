@@ -105,6 +105,20 @@ pub struct State {
     start: Task<Result<(), String>>,
     file_dialog: Task<Option<String>>,
     error: Option<String>,
+    /// The start button of the top bar was clicked while this page was open
+    start_from_top: bool,
+}
+
+impl State {
+    /// The start button of the top bar on this page: starts like the button at its end
+    pub fn start_from_top(&mut self) {
+        self.start_from_top = true;
+    }
+
+    /// A capture is being started
+    pub fn starting(&self) -> bool {
+        self.start.busy()
+    }
 }
 
 fn read(t: Lang, engine: &Engine) -> Snapshot {
@@ -148,6 +162,8 @@ pub fn show(app: &mut App, ui: &mut Ui) {
     let ctx = ui.ctx().clone();
     let t = app.t;
     let state = &mut app.pages.capture;
+    // taken right away: a click before the page could show its choices is not kept for later
+    let from_top = std::mem::take(&mut state.start_from_top);
     state.snapshot.poll();
     if let Some(result) = state.start.take() {
         match result {
@@ -184,7 +200,7 @@ pub fn show(app: &mut App, ui: &mut Ui) {
     if running.is_some() {
         running_card(app, ui);
     } else {
-        setup(app, ui);
+        setup(app, ui, from_top);
     }
 }
 
@@ -428,8 +444,9 @@ pub fn stop(app: &mut App) {
     app.go(Page::Capture);
 }
 
-/// The choices before a capture: the source, the filter, the packet store, the PCAP file
-fn setup(app: &mut App, ui: &mut Ui) {
+/// The choices before a capture: the source, the filter, the packet store, the PCAP file;
+/// `from_top`: the start button of the top bar was clicked
+fn setup(app: &mut App, ui: &mut Ui, from_top: bool) {
     let ctx = ui.ctx().clone();
     let t = app.t;
     let capture_id = app.live.capture_id;
@@ -682,7 +699,7 @@ fn setup(app: &mut App, ui: &mut Ui) {
                 .map(|p| p.display().to_string())
         });
     }
-    if clicked {
+    if (clicked || from_top) && !busy {
         start(app, &ctx, request);
     }
 }

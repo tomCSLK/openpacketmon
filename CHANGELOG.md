@@ -8,6 +8,11 @@ The history of Sniffnet itself is in its own changelog: <https://github.com/Gyul
 
 ## [Unreleased]
 
+### Interface
+
+- On the capture page the start button of the top bar starts the capture with the choices of the page, like the button at
+  its end; before, it only opened the page that was already open
+
 ### Capture
 
 - Network adapters are opened in promiscuous mode, like Wireshark does; on a mirror port or a network TAP the adapter used

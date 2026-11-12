@@ -402,7 +402,8 @@ fn bell(app: &mut App, ui: &mut Ui, current: bool) {
 }
 
 /// The capture at the top right (`.cap`): state, source and time, pause or resume and stop; without
-/// a capture the button to start one
+/// a capture the button to start one: it opens the capture page, and on that page it starts the
+/// capture with the choices there, like the button at the end of the page
 #[allow(clippy::many_single_char_names)] // coordinates of the drawing
 fn capture_chip(app: &mut App, ui: &mut Ui, w: f32) {
     let t = app.t;
@@ -418,15 +419,23 @@ fn capture_chip(app: &mut App, ui: &mut Ui, w: f32) {
             time: c.time.clone(),
         })
     else {
-        if widgets::icon_text_button(
-            ui,
-            Some(icons::PLAY),
-            &t.get("no-capture-start"),
-            Kind::Primary,
-            true,
-        )
-        .clicked()
-        {
+        let on_page = app.page == Page::Capture;
+        let starting = on_page && app.pages.capture.starting();
+        let clicked = ui
+            .add_enabled_ui(!starting, |ui| {
+                widgets::icon_text_button(
+                    ui,
+                    Some(icons::PLAY),
+                    &t.get("no-capture-start"),
+                    Kind::Primary,
+                    true,
+                )
+                .clicked()
+            })
+            .inner;
+        if clicked && on_page {
+            app.pages.capture.start_from_top();
+        } else if clicked {
             app.go(Page::Capture);
         }
         return;

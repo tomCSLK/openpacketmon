@@ -2,6 +2,8 @@
 
 **Stand: 2026-11-12.**
 
+- **Startknopf oben** (5.6, Rückmeldung 2026-11-12, umgesetzt und committet, noch in keinem Test-Paket): Auf der Seite Aufzeichnung startet jetzt auch der
+  Knopf „Aufzeichnung starten“ der Kopfleiste die Aufzeichnung (vorher führte er nur zur Seite, auf der man schon war).
 - **Befund am TAP (5.8, 2026-11-12):** Am Monitoring-Port eines Netzwerk-TAPs zeigte openpacketmon unter Linux und Windows nicht einmal
   die Hälfte dessen, was Wireshark zeigte. Ursache nach dem Aufbau: Der Helfer öffnete den Adapter fest ohne Promiscuous Mode.
   **Schritt 2 umgesetzt** (2026-11-12, Test-Paket **0.5.1**): Promiscuous Mode als Einstellung, standardmäßig an, mit Rückfall, wenn der
@@ -1617,6 +1619,15 @@ und offene Punkte in `docs/entwurf/README.md`). Inhalt und Funktionen wie 0.4.0,
     „Gespeichert“ als kurze Meldung; „Höchstens Pakete“ als freie Zahl von 1.000 bis 2.000.000; auf der Seite Aufzeichnung Filter und
     Paketspeicher nur für Adapter und Datei, PCAP-Datei nur für Adapter (der Entwurf zeigt sie bei jeder Quelle, sie wirken dort aber
     nicht); die Adapter bleiben nach Verkehr sortiert. Texte zu Anrufen (Paketspeicher, KI-Assistenten, Einstellungen → Anrufe) kommen mit 5.7.
+  - **Rückmeldung des Nutzers (2026-11-12, „go“ am selben Tag, umgesetzt):** Auf der Seite Aufzeichnung standen oben (Kopfleiste) und
+    unten zwei gleiche Knöpfe „Aufzeichnung starten“, aber nur der untere startete; der obere führt (wie im Entwurf, dort ein Link) nur zur
+    Seite Aufzeichnung. Jetzt: Ist die Seite Aufzeichnung offen, startet der obere Knopf wie der untere mit den Angaben des Formulars
+    (Quelle, Adapter, Filter, Promiscuous Mode, Paketspeicher, PCAP-Datei) und ist während des Starts gesperrt; auf allen anderen Seiten
+    führt er weiter zur Seite Aufzeichnung (bewusst kein Start von dort, der gewählte Adapter wäre nicht zu sehen). Umsetzung:
+    `capture_chip` in `src/gui/frame.rs` setzt `State::start_from_top` der Seite, `show` in `src/gui/pages/capture.rs` nimmt die
+    Anforderung sofort (ein Klick, bevor die Seite ihr Formular zeigt, wird nicht aufgehoben). Bedientest
+    `the_start_button_at_the_top_starts_on_the_capture_page` (anderswo nur Seitenwechsel ohne Start; auf der Seite Start einer Datei, dann
+    Übersicht); gegen den alten Knopf geprüft: scheitert dort.
 
 #### 5.7 VoIP: SIP, RTP und Anrufe (Wunsch des Nutzers, 2026-11-09; Entwurf abgenommen 2026-11-10, Umsetzung nach „go“)
 

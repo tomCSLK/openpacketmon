@@ -1163,6 +1163,53 @@ fn the_way_back_retraces_the_steps() {
     assert!(!harness.state().can_go_back());
 }
 
+/// The start button of the top bar, above the one at the end of the capture page
+fn top_start_button<'a>(harness: &'a Harness<'static, App>) -> egui_kittest::Node<'a> {
+    harness
+        .get_all_by_label("Aufzeichnung starten")
+        .min_by(|a, b| a.rect().top().total_cmp(&b.rect().top()))
+        .unwrap()
+}
+
+#[test]
+#[serial]
+fn the_start_button_at_the_top_starts_on_the_capture_page() {
+    // elsewhere it only opens the capture page
+    let fixture = engine_with(0);
+    let mut harness = window(&fixture, Theme::Light, Lang::De);
+    harness.state_mut().go(Page::Overview);
+    settle(&mut harness);
+    top_start_button(&harness).click();
+    settle(&mut harness);
+    assert_eq!(harness.state().page, Page::Capture);
+    assert!(!fixture.engine.lock().is_running());
+
+    // on the capture page it starts with the choices there, here a capture file
+    let path = sample_file(5);
+    {
+        let mut state = fixture.engine.lock();
+        state.set_capture_source(CaptureSourcePicklist::File);
+        state.set_pcap_import(path.to_string_lossy().to_string());
+    }
+    let mut harness = window(&fixture, Theme::Light, Lang::De);
+    settle(&mut harness);
+    assert_eq!(harness.state().page, Page::Capture);
+    assert_eq!(harness.get_all_by_label("Aufzeichnung starten").count(), 2);
+    top_start_button(&harness).click();
+    for _ in 0..100 {
+        std::thread::sleep(Duration::from_millis(50));
+        settle(&mut harness);
+        if harness.state().page == Page::Overview {
+            break;
+        }
+    }
+    assert_eq!(harness.state().page, Page::Overview);
+    assert!(fixture.engine.lock().is_running());
+    if let Some(dir) = path.parent() {
+        let _ = std::fs::remove_dir_all(dir);
+    }
+}
+
 fn text_files(folder: &Path, found: &mut Vec<PathBuf>) {
     for entry in std::fs::read_dir(folder).unwrap() {
         let path = entry.unwrap().path();

@@ -5,11 +5,16 @@
 - **v0.5.2** ist released (2026-11-12, auf Ansage des Nutzers, zunächst nur Linux) mit Promiscuous Mode (5.8) und dem Startknopf oben
   (5.6). Vorher war die CI unter Rust 1.100 rot: Clippy (pedantic `map_unwrap_or`) schlägt dort `map_or_default` vor, das es erst ab
   1.100 gibt; der Lint ist im Workspace abgeschaltet, weil Windows mit 1.99 baut (`rust-version` 1.99 hatte nicht gereicht). Die `.deb`
-  des Releases ist neu gebaut (Rust 1.100) und nicht bitgleich mit dem Test-Paket 0.5.2; der Programmcode ist derselbe. Offen: signierter
-  Windows-Installer (`docs/windows.md` oben unter „0.5.1 und 0.5.2“, dann `--add-windows`). Danach aufgeräumt (2026-11-12, nach dem Tag,
+  des Releases ist neu gebaut (Rust 1.100) und nicht bitgleich mit dem Test-Paket 0.5.2; der Programmcode ist derselbe. Der **signierte
+  Windows-Installer** ist am selben Tag hinzugefügt (vom Stand des Tags, mit Rust 1.99.1 gebaut, alle Tests grün; `docs/windows.md` oben
+  unter „0.5.1 und 0.5.2“). Offen unter Windows: Update über 0.5.0 und der Test am TAP. Danach aufgeräumt (2026-11-12, nach dem Tag,
   ohne Änderung am Programm): `toml` ist nur noch Test-Abhängigkeit (fällt aus `THIRD-PARTY-LICENSES.txt`), `build.rs` prüft die
   Dienstnamen mit `rustrict` in jedem Build statt nur im Debug-Build, `package.homepage` ist entfernt (`cargo deb` nimmt `repository`,
   das Feld `Homepage` der `.deb` bleibt gleich). Cargo baut seitdem ohne Warnung.
+- **Rust 1.100 unter Windows (2026-11-12):** Damit gebaut, stürzt der Helfer `openpacketmon-capture.exe` ab: Er importiert `WaitOnAddress`
+  und `WakeByAddress*` aus `vertdll.dll` (VBS-Enklaven), weil die alte `windows.lib` von `windows-sys` 0.36.1 (über `pcap` 2.5.0) beim
+  Linken vor `synchronization.lib` steht (windows-rs Issue #2027). Windows-Fassungen bis zur Korrektur mit Rust 1.99.1 bauen; Einzelheiten
+  und Prüfung mit `dumpbin` in `docs/windows.md` oben. Eine Korrektur im Code ist noch nicht geplant.
 - **Startknopf oben** (5.6, Rückmeldung 2026-11-12, umgesetzt, Test-Paket **0.5.2**, 2026-11-12): Auf der Seite Aufzeichnung startet jetzt auch der
   Knopf „Aufzeichnung starten“ der Kopfleiste die Aufzeichnung (vorher führte er nur zur Seite, auf der man schon war).
 - **Befund am TAP (5.8, 2026-11-12):** Am Monitoring-Port eines Netzwerk-TAPs zeigte openpacketmon unter Linux und Windows nicht einmal

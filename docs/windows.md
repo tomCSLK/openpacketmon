@@ -11,7 +11,20 @@ Beschreibung, ohne Npcap startet das Programm mit einem Hinweis, die C-Laufzeit 
 am Ende von Abschnitt 8. Die Punkte in Abschnitt 4 stammen aus einer Durchsicht des Codes auf dem Linux-Rechner, ergänzt um das, was unter
 Windows aufgefallen ist.
 
-**0.5.1 und 0.5.2 (Test-Pakete 2026-11-12; v0.5.2 unter Linux released am 2026-11-12, Windows-Installer fehlt noch):** Promiscuous Mode (`PLAN.md` 5.8, ab 0.5.1); in 0.5.2 dazu der Knopf
+**Rust 1.100 baut einen kaputten Helfer (2026-11-12): Windows-Fassungen bis zur Korrektur mit Rust 1.99.1 bauen.** Mit Rust 1.100
+importiert `openpacketmon-capture.exe` die Funktionen `WaitOnAddress`, `WakeByAddressAll` und `WakeByAddressSingle` aus
+`vertdll.dll` (Laufzeit für VBS-Enklaven) statt aus `api-ms-win-core-synch-l1-2-0.dll` und stürzt beim ersten Sperren ab
+(`STATUS_ACCESS_VIOLATION` in `vertdll.dll`, Ereignis 1000 im Anwendungsprotokoll). Ebenso die Unit-Tests von `openpacketmon-capture`
+(Programm) und `sniffnet-packet-parser`. `openpacketmon.exe` ist nicht betroffen. Ursache: `pcap` 2.5.0 hängt an `windows-sys` 0.36.1,
+dessen mitgelieferte `windows.lib` (`windows_x86_64_msvc` 0.36.1) die drei Funktionen nur über `vertdll.dll` kennt (windows-rs
+Issue #2027, behoben ab `windows-sys` 0.42). Sie steht in der Link-Reihenfolge vor `synchronization.lib` aus dem Windows SDK; bis
+Rust 1.99 hat die Standardbibliothek die Funktionen vorher selbst aufgelöst, seit 1.100 nicht mehr. Der Helfer aus 0.5.0 (Rust
+1.99.1) importiert richtig. Prüfen: `dumpbin /dependents target\release\openpacketmon-capture.exe` darf `vertdll.dll` nicht nennen.
+Bauen mit `rustup toolchain install 1.99.1 --profile minimal`, dann `$env:RUSTUP_TOOLCHAIN = '1.99.1'` vor `cargo` und
+`dev\build-installer.ps1`. Eine Korrektur im Code (etwa `synchronization` im `build.rs` des Helfers vorziehen oder `pcap` mit neuerem
+`windows-sys`) ist noch nicht beschlossen.
+
+**0.5.1 und 0.5.2 (Test-Pakete 2026-11-12; v0.5.2 unter Linux released am 2026-11-12, signierter Windows-Installer am selben Tag hinzugefügt):** Promiscuous Mode (`PLAN.md` 5.8, ab 0.5.1); in 0.5.2 dazu der Knopf
 „Aufzeichnung starten“ der Kopfleiste, der auf der Seite Aufzeichnung jetzt startet (`PLAN.md` 5.6). Am Monitoring-Port eines Netzwerk-TAPs zeigte
 openpacketmon unter Linux und Windows nicht einmal die Hälfte dessen, was Wireshark zeigte, weil der Helfer den Adapter fest ohne
 Promiscuous Mode öffnete. Seit 0.5.1 ist er eine Einstellung, standardmäßig an (Schalter unter der Adaptertabelle der Seite
@@ -22,8 +35,16 @@ sich bei WLAN-Adaptern verhält. Reihenfolge unter Windows:
    `cargo test --workspace` (Smart App Control: Abschnitt „Proc-Macro-DLLs“ unten, falls Bau-Skripte gesperrt werden). Neu sind die Tests
    der Option `--promisc` in `capture/src/main.rs`, des Felds `promiscuous` der Meldung `Ready` in `capture/src/lib.rs` und der
    Einstellung in `src/config/capture.rs`; der Live-Test auf dem Npcap-Loopback läuft weiter ohne Promiscuous Mode.
+   **Erledigt (2026-11-12, Stand `b2e0ca9`, Programmcode gleich Tag `v0.5.2`), mit Rust 1.99.1** (mit 1.100 stürzt der Helfer ab, oben):
+   Release-Bau ohne Warnung, alle Tests grün (424 im Hauptprogramm, 6 MCP, 4 + 4 im Helfer, 2 im Live-Test, 2 im Parser; die zwei
+   ignorierten `the_imported_file_is_free_right_after_stopping` und `test_fetch_latest_release_from_github` einzeln grün). Der erste
+   Testlauf mit `-j` voll brach wegen Speichermangels ab, mit `-j 4` ging es.
 2. Installer bauen und signieren (Abschnitt 6.1): `powershell -ExecutionPolicy Bypass -File dev\build-installer.ps1 -CertSha1 …` →
    `target\installer\openpacketmon-<Version>-setup.exe` (Version aus `Cargo.toml`, zurzeit 0.5.2); als Update über 0.5.0 installieren.
+   **Gebaut und signiert (2026-11-12, Rust 1.99.1):** `openpacketmon-0.5.2-setup.exe`, 10 653 200 Bytes, SHA-256
+   `637e7c2e65f0667df2ca969e1a92974fdf2aecaeeaede4cfde564e49c012a248`; Installer und beide Programme `Valid` mit Zeitstempel von
+   Certum, die signierten Programme starten unter Smart App Control, der Helfer importiert `api-ms-win-core-synch-l1-2-0.dll`.
+   Als Update über 0.5.0 noch nicht installiert.
 3. Von Hand: (a) am TAP über den Ethernet-Adapter (auch USB-Ethernet): Haken „Promiscuous Mode“ gesetzt, in der laufenden Aufzeichnung
    steht „Promiscuous Mode: an“, Vergleich gleichzeitig mit Wireshark am selben Adapter; (b) auf dem WLAN-Adapter: Was zeigt die Zeile
    („an“ oder „aus (vom Adapter abgelehnt)“), und läuft die Aufzeichnung? (c) Haken aus → „aus“. Ergebnisse hier und in `PLAN.md` 5.8
@@ -31,6 +52,8 @@ sich bei WLAN-Adaptern verhält. Reihenfolge unter Windows:
 4. v0.5.2 ist unter Linux released (2026-11-12). Den Installer auf Ansage des Nutzers hinzufügen:
    `dev/release.sh --add-windows target/installer/openpacketmon-0.5.2-setup.exe --publish` in Git Bash, danach in den Release-Notes
    den Windows-Absatz ersetzen (Vorlage: Release v0.5.0). Seit dem Tag `v0.5.2` ist kein Programmcode geändert worden.
+   **Hochgeladen (Nutzer, 2026-11-12):** `--add-windows … --publish` hat `SHA256SUMS` neu geschrieben und alle drei Dateien nach dem
+   Herunterladen bestätigt; der Windows-Absatz der Release-Notes ist ersetzt (ohne Aussage zum Update über 0.5.0, das noch nicht geprüft ist).
 
 **v0.5.0 (2026-11-10):** Unter Linux released, der signierte Windows-Installer **am selben Tag hinzugefügt** (Schritt 3 unten). Vorher war der
 Code von 0.5.0 (neue Oberfläche nach `PLAN.md` 5.6, VoIP nach 5.7) unter Windows noch nie gebaut oder getestet. Neue
@@ -123,6 +146,11 @@ im Ereignisprotokoll lesen, genau diese DLLs löschen und neu bauen; der Linker 
 bewertet sie neu (2026-11-10: im Release `rmcp_macros`, `windows_implement`, im Debug-Profil `serde_derive`, `pnet_macros`; je ein zweiter
 Lauf genügte). `cargo clean -p <crate>` für die Bibliothek, die „nicht gefunden“ wird, hilft nicht, gesperrt ist das Makro dahinter.
 `cargo-deny.exe` (selbst gebaut, unsigniert) ist seit 2026-11-08 ganz gesperrt; `cargo deny` läuft in der CI.
+**Rust 1.100 (2026-11-12):** Nach `rustup update` sperrte Smart App Control die neuen, unsignierten Werkzeuge beim ersten Start
+(`cargo-clippy`, `cargo-fmt`, `rustdoc`); nach ein paar Sekunden bis zu einem Neustart liefen sie. Cargo 1.100 legt Build-Skripte und
+Proc-Makros unter `target\<profil>\build\<crate>\<hash>\out\` ab (`build_script_build.exe`, `<makro>-<hash>.dll`); nach einem
+Compilerwechsel ist alles neu und wird reihenweise gesperrt. Abhilfe wie oben, nur öfter: mit `cargo build --keep-going` alle
+Sperren eines Laufs sammeln, die Dateien aus den 3033-Einträgen löschen, erneut bauen (Release-Bau: acht Läufe, Tests: zwei).
 
 **Feste Vorgaben:** Npcap wird **nie mitgeliefert**, der Nutzer installiert es selbst (proprietäre Lizenz). Wireshark-Code
 bleibt tabu. Die Arbeitsregeln in `CLAUDE.md` gelten unverändert. Die Arbeit beginnt **vor dem ersten Release** (vorgezogen
@@ -455,6 +483,6 @@ Update über eine ältere Version, Start ohne Npcap (Abschnitt 5 Punkt 8).
 **Beginn (Nutzer, 2026-11-02):** Windows wird **vor** dem ersten Release gemacht, weil andere Tester eine Windows-Fassung
 brauchen; MCP ist fertig. Der Haltepunkt aus `PLAN.md` 4.10 ist seit 2026-11-02 aufgehoben.
 
-**Noch offen (Stand 2026-11-12):** 0.5.2 unter Windows bauen, signieren, zum Release v0.5.2 hinzufügen und am TAP prüfen (oben unter „0.5.1 und 0.5.2“), Test von 0.5.0 unter Windows zu Ende führen (oben unter „v0.5.0“, Schritt 2; das Update von 0.4.0
+**Noch offen (Stand 2026-11-12):** Rust 1.100 und `vertdll.dll` im Code beheben (oben), 0.5.2 als Update über 0.5.0 installieren und am TAP prüfen (oben unter „0.5.1 und 0.5.2“), Test von 0.5.0 unter Windows zu Ende führen (oben unter „v0.5.0“, Schritt 2; das Update von 0.4.0
 mit dem Installer lief beim Nutzer reibungslos), CI-Job für Windows (Abschnitt 7), Test auf einem sauberen System (Deinstallation, Update über eine
 ältere Version, Start ohne Npcap), MCP-Einrichtung in `docs/windows-tester.md`, MCP-Integrationstests von den echten Einstellungen trennen.

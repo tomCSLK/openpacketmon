@@ -11,7 +11,8 @@ Beschreibung, ohne Npcap startet das Programm mit einem Hinweis, die C-Laufzeit 
 am Ende von Abschnitt 8. Die Punkte in Abschnitt 4 stammen aus einer Durchsicht des Codes auf dem Linux-Rechner, ergänzt um das, was unter
 Windows aufgefallen ist.
 
-**0.5.1 (Test-Paket, 2026-11-12, kein Release):** Promiscuous Mode (`PLAN.md` 5.8). Am Monitoring-Port eines Netzwerk-TAPs zeigte
+**0.5.1 und 0.5.2 (Test-Pakete, 2026-11-12, kein Release):** Promiscuous Mode (`PLAN.md` 5.8, ab 0.5.1); in 0.5.2 dazu der Knopf
+„Aufzeichnung starten“ der Kopfleiste, der auf der Seite Aufzeichnung jetzt startet (`PLAN.md` 5.6). Am Monitoring-Port eines Netzwerk-TAPs zeigte
 openpacketmon unter Linux und Windows nicht einmal die Hälfte dessen, was Wireshark zeigte, weil der Helfer den Adapter fest ohne
 Promiscuous Mode öffnete. Seit 0.5.1 ist er eine Einstellung, standardmäßig an (Schalter unter der Adaptertabelle der Seite
 Aufzeichnung); lehnt der Adapter ihn ab, öffnet der Helfer ohne ihn, und die laufende Aufzeichnung zeigt „aus (vom Adapter abgelehnt)“.
@@ -22,13 +23,13 @@ sich bei WLAN-Adaptern verhält. Reihenfolge unter Windows:
    der Option `--promisc` in `capture/src/main.rs`, des Felds `promiscuous` der Meldung `Ready` in `capture/src/lib.rs` und der
    Einstellung in `src/config/capture.rs`; der Live-Test auf dem Npcap-Loopback läuft weiter ohne Promiscuous Mode.
 2. Installer bauen und signieren (Abschnitt 6.1): `powershell -ExecutionPolicy Bypass -File dev\build-installer.ps1 -CertSha1 …` →
-   `target\installer\openpacketmon-0.5.1-setup.exe`; als Update über 0.5.0 installieren.
+   `target\installer\openpacketmon-<Version>-setup.exe` (Version aus `Cargo.toml`, zurzeit 0.5.2); als Update über 0.5.0 installieren.
 3. Von Hand: (a) am TAP über den Ethernet-Adapter (auch USB-Ethernet): Haken „Promiscuous Mode“ gesetzt, in der laufenden Aufzeichnung
    steht „Promiscuous Mode: an“, Vergleich gleichzeitig mit Wireshark am selben Adapter; (b) auf dem WLAN-Adapter: Was zeigt die Zeile
    („an“ oder „aus (vom Adapter abgelehnt)“), und läuft die Aufzeichnung? (c) Haken aus → „aus“. Ergebnisse hier und in `PLAN.md` 5.8
    eintragen.
 4. Release nur auf Ansage des Nutzers: erst unter Linux (`dev/release.sh`, CHANGELOG-Abschnitt `## [0.5.1]`), dann
-   `dev/release.sh --add-windows target/installer/openpacketmon-0.5.1-setup.exe --publish` in Git Bash. Ein schon vorher gebauter
+   `dev/release.sh --add-windows target/installer/openpacketmon-<Version>-setup.exe --publish` in Git Bash. Ein schon vorher gebauter
    Installer passt nur, solange seit dem Tag kein Programmcode geändert wurde.
 
 **v0.5.0 (2026-11-10):** Unter Linux released, der signierte Windows-Installer **am selben Tag hinzugefügt** (Schritt 3 unten). Vorher war der

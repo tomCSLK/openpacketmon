@@ -106,7 +106,7 @@ Maßgeblich ist `PLAN.md` (oben „Stand“, Abschnitt 5). Kurz (2026-11-12):
   Einstellung `capture.promiscuous` (Standard an), Schalter auf der Seite Aufzeichnung, Helfer-Option `--promisc on|off` mit Rückfall
   ohne den Modus, Zustand in `Ready` und in der laufenden Aufzeichnung. Am TAP unter Linux bestätigt; offen Windows
   (`docs/windows.md` oben unter „0.5.1“), Schritte 3 und 4.
-- **Startknopf oben** (`PLAN.md` 5.6, 2026-11-12): startet auf der Seite Aufzeichnung jetzt wie der untere (vorher nur Seitenwechsel).
+- **Startknopf oben** (`PLAN.md` 5.6, 2026-11-12, Test-Paket 0.5.2): startet auf der Seite Aufzeichnung jetzt wie der untere (vorher nur Seitenwechsel).
 - **v0.5.0** ist released (2026-11-10) mit neuer Oberfläche und VoIP, für Linux und mit **signiertem Windows-Installer** (am selben Tag
   hinzugefügt); Test durch den Nutzer steht aus. Unter Windows alle Tests grün; Smart App Control sperrt dort Proc-Macro-DLLs, Abhilfe
   in `docs/windows.md` oben. Update von 0.4.0 mit dem Installer beim Nutzer reibungslos; Test läuft.

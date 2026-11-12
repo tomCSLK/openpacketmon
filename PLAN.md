@@ -2,7 +2,7 @@
 
 **Stand: 2026-11-12.**
 
-- **Startknopf oben** (5.6, Rückmeldung 2026-11-12, umgesetzt und committet, noch in keinem Test-Paket): Auf der Seite Aufzeichnung startet jetzt auch der
+- **Startknopf oben** (5.6, Rückmeldung 2026-11-12, umgesetzt, Test-Paket **0.5.2**, 2026-11-12): Auf der Seite Aufzeichnung startet jetzt auch der
   Knopf „Aufzeichnung starten“ der Kopfleiste die Aufzeichnung (vorher führte er nur zur Seite, auf der man schon war).
 - **Befund am TAP (5.8, 2026-11-12):** Am Monitoring-Port eines Netzwerk-TAPs zeigte openpacketmon unter Linux und Windows nicht einmal
   die Hälfte dessen, was Wireshark zeigte. Ursache nach dem Aufbau: Der Helfer öffnete den Adapter fest ohne Promiscuous Mode.

@@ -920,6 +920,9 @@ Freigabe „zuerst 4.9 danach commiten und pushen“. Umgesetzt:
   `d05cbf5`, `design-muster`, Tag `upstream-base`).
 - Altes Repo umbenannt in `tomCSLK/openpacketmon-old` (privat), neues privates Repo `tomCSLK/openpacketmon` ohne
   Vorlagen, Actions erlaubt; Beschreibung übernommen.
+  Am 2026-11-16 auf GitHub **archiviert** (nur noch lesbar, privat): Die wöchentliche CI dort scheiterte an RUSTSEC-2026-0486
+  (rustix 1.1.5, im neuen Repo am 2026-11-12 behoben); archivierte Repos starten keine Läufe mehr. Rückgängig mit
+  `gh repo unarchive tomCSLK/openpacketmon-old`.
 - Ein Anfangs-Commit „openpacketmon 0.2.5 – fork of Sniffnet …“ mit dem Stand von `d05cbf5` plus Version 0.2.5 und
   dieser Doku; Tag `upstream-base` lokal gelöscht, `design-muster` bleibt lokal (nie pushen).
 - Doku: `CLAUDE.md`, `CHANGELOG.md` (kein Tag mehr, Bezug Commit `ab4bf739d464`), Übersicht.

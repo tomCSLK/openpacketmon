@@ -13,7 +13,7 @@ Logo seit der neuen Oberfläche: Zeichen C „Lupe über Paketen“ (`resources/
 |---|---|---|
 | `CLAUDE.md` | Regeln und Grundwissen für jede Sitzung | automatisch |
 | `CLAUDE.local.md` | Laptop, gemeldeter Befund beim Original, Pfade zu nicht öffentlichen Projekten (gitignored) | automatisch |
-| `PLAN.md` | oben der Stand; Entscheidungen (0), Lizenzprüfung (1), Bestandsaufnahme und Phasen 1–4 (2–4, Verlauf), Vorhaben 5.1–5.9, offene Punkte (5) | **maßgeblich**, vor Arbeit am Vorhaben lesen |
+| `PLAN.md` | oben der Stand; Entscheidungen (0), Lizenzprüfung (1), Bestandsaufnahme und Phasen 1–4 (2–4, Verlauf), Vorhaben 5.1–5.10, offene Punkte (5) | **maßgeblich**, vor Arbeit am Vorhaben lesen |
 | `docs/windows.md` | alles zu Windows: Einrichten, Code-Unterschiede, Tests, Installer, Code-Signatur, CI, offene Punkte | vor Arbeit unter oder für Windows |
 | `docs/entwurf/` | klickbarer Entwurf der neuen Oberfläche (HTML, erfundene Daten), `README.md` dort | vor Arbeit an der Oberfläche |
 | `README.md`, `CHANGELOG.md`, `SECURITY.md`, `CONTRIBUTING.md`, `NOTICE` | öffentlich, Englisch | bei Bedarf |
@@ -101,8 +101,10 @@ Fassung bis 2026-11-09 (mit dem Verlauf der Browser-Oberfläche) steht in der Gi
 
 ## Stand und offene Punkte
 
-Maßgeblich ist `PLAN.md` (oben „Stand“, Abschnitt 5). Kurz (2026-11-12):
+Maßgeblich ist `PLAN.md` (oben „Stand“, Abschnitt 5). Kurz (2026-11-25):
 
+- **Geplant: Graphen wie opennetmon 0.7.1** (`PLAN.md` 5.10, 2026-11-25). Linien durchgezogen, dazu „Gesamt“ (Ein- plus Ausgehend) als graue
+  Fläche (hell dunkles Grau, dunkel helles Grau) und eine Legende zum Anklicken. Ausblenden je Graph und nur bis zum Programmende. Umsetzung nach „go“.
 - **v0.5.2** ist released (2026-11-12, Linux) mit Promiscuous Mode und dem Startknopf oben; der **signierte Windows-Installer** ist am
   selben Tag hinzugefügt (Rust 1.99.1; `docs/windows.md` oben unter „0.5.1 und 0.5.2“). Danach Abhängigkeiten und `Cargo.toml`
   aufgeräumt (`PLAN.md` oben).

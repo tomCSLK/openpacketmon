@@ -1,7 +1,9 @@
 # PLAN.md – Fork von Sniffnet
 
-**Stand: 2026-11-12.**
+**Stand: 2026-11-25.**
 
+- **Geplant (5.10, 2026-11-25):** Graphen wie in opennetmon 0.7.1. Linien durchgezogen, dazu „Gesamt“ als graue Fläche
+  und eine Legende zum Anklicken. Fragen entschieden, Umsetzung nach „go“.
 - **v0.5.2** ist released (2026-11-12, auf Ansage des Nutzers, zunächst nur Linux) mit Promiscuous Mode (5.8) und dem Startknopf oben
   (5.6). Vorher war die CI unter Rust 1.100 rot: Clippy (pedantic `map_unwrap_or`) schlägt dort `map_or_default` vor, das es erst ab
   1.100 gibt; der Lint ist im Workspace abgeschaltet, weil Windows mit 1.99 baut (`rust-version` 1.99 hatte nicht gereicht). Die `.deb`
@@ -1960,6 +1962,72 @@ Fassung; auf `main` von rust-pcap nutzt `pcap` schon `windows-sys` 0.61, unverö
    die geänderte Link-Reihenfolge der Standardbibliothek schon gemeldet ist.
 
 ---
+
+#### 5.10 Graphen wie in opennetmon 0.7.1: Linien durchgezogen, „Gesamt“ als Fläche (Wunsch des Nutzers, 2026-11-25; Plan entschieden, Umsetzung nach „go“)
+
+**Wunsch des Nutzers (2026-11-25):** Die Änderung aus opennetmon (Vorhaben S, released in opennetmon v0.7.1) auch hier.
+Dort entschieden und hier zu übernehmen:
+- Die Linie „Ausgehend“ ist durchgezogen wie „Eingehend“.
+- Eine dritte Reihe **„Gesamt“** (Eingehend + Ausgehend) wie in PRTG, als schattierte Fläche hinter den beiden Linien.
+- Eingehend und Ausgehend ohne Schattierung, nur Gesamt.
+- Gesamt ist beim Öffnen sichtbar und über die Legende abschaltbar.
+- Farbe von Gesamt: im hellen Design ein dunkles Grau (kein Schwarz), im dunklen ein helles Grau.
+- Die übrigen Farben bleiben (Eingehend `s1` blau, Ausgehend `s2` orange).
+
+**Heute** (`src/gui/chart.rs`, nach dem Entwurf `drawChart`):
+- Eingehend ist eine Linie über einer blassen Fläche (`s1` mit 10 %), Ausgehend gestrichelt (`Shape::dashed_line`).
+- Die Legende `widgets::legend` ist nur ein Bild (Strich und gestrichelter Strich), nicht anklickbar.
+- Betroffen sind die beiden Verkehrsgraphen: **Übersicht** (`pages/overview.rs`, `traffic`, 220 hoch) und **Statistik**
+  (`pages/statistics.rs`, 200 hoch).
+- Der Hinweiskasten unter dem Zeiger (`label`) zeigt Zeit, Eingehend und Ausgehend. Die Achse reicht bis zum größten Wert der beiden
+  Reihen (`nice_max`).
+
+**Umsetzung (Vorschlag):**
+
+1. **Gesamt berechnen** in `chart.rs` aus `points` (`in + out` je Punkt). Die Seitendaten (`src/view/`) und `Chart` bleiben unverändert.
+   - Das gilt für jede Einheit der Anzeige (Bytes, Bits, Pakete), weil auch dort die Summe zählt.
+   - Kein Speicher, keine neue Abfrage.
+2. **Zeichnen** in dieser Reihenfolge:
+   - zuerst die Fläche von Gesamt (vorhandener Mesh-Code, jetzt unter der Gesamtlinie statt unter Eingehend), dazu die Gesamtlinie 1,2 px;
+   - darüber Eingehend und Ausgehend als durchgezogene Linien 1,6 px.
+   - `Shape::dashed_line` und die blasse Fläche unter Eingehend fallen weg.
+   - Der Zeiger zeigt drei Punkte.
+3. **Farben:** neu `s_total` und `s_total_fill` in `theme.rs`, für hell und dunkel, wie in opennetmon:
+   - hell `#444d59` (= `text_2`), Fläche etwa 14 % Deckkraft;
+   - dunkel `#b0b8c2`, Fläche etwa 16 %.
+4. **Legende zum Anklicken:** `widgets::legend` wird zu drei Knöpfen in der Reihenfolge wie in opennetmon: „Gesamt · Eingehend · Ausgehend“.
+   - Gesamt bekommt ein gefülltes Kästchen mit Strich oben, die anderen einen Strich.
+   - Ein Klick blendet die Reihe aus oder ein. Ausgeblendet: Text durchgestrichen und blass, wie `aria-pressed="false"` in opennetmon.
+   - Mit Tastatur bedienbar (Fokusrahmen `focus_ring`), mit `WidgetInfo` für Bildschirmleser.
+   - Neuer Text `chart-total` („Gesamt“/„Total“) in `locales/de` und `locales/en`; die Prüfung `every_message_is_used` deckt ihn ab.
+5. **Ausblenden merken:** Der Zustand liegt in der Oberfläche (je Graph, Übersicht und Statistik getrennt). Er gilt, solange das Programm läuft,
+   wie `sessionStorage` in opennetmon, und wird nicht gespeichert.
+6. **Achse und Hinweiskasten:**
+   - `nice_max` nimmt nur die sichtbaren Reihen. Ist Gesamt sichtbar, reicht die Achse bis zur Summe; ist es aus, schrumpft sie.
+   - Der Hinweiskasten zeigt die sichtbaren Reihen, Gesamt zuerst, und wird dafür höher (4 statt 3 Zeilen).
+   - Der Punkt unter dem Zeiger und die Zeile im Kasten nur für sichtbare Reihen.
+7. **Bleibt unverändert:**
+   - die Spark-Linien der Adapter auf der Seite Aufzeichnung (`capture.rs`, `spark`);
+   - die Zeile „jetzt ↓ … ↑ …“ über dem Graphen der Übersicht;
+   - Paketliste, Statistik-Tabellen, MCP-Werkzeuge.
+8. **Tests und Prüfung:**
+   - Einheitentests für die Summe und für `nice_max` mit und ohne Gesamt.
+   - GUI-Test (`src/gui/tests.rs`, Harness): Klick auf „Gesamt“ in der Legende blendet aus, die Achse schrumpft.
+   - Die Bilder der Übersicht und der Statistik neu erzeugen (`GUI_SHOTS_ONLY=overview`) und hell/dunkel ansehen.
+   - `cargo fmt`, `clippy`, Tests; danach einmal unter Windows bauen (Rust 1.99.1, `docs/windows.md`).
+9. **Doku:**
+   - Kopfkommentar von `chart.rs` und `widgets::legend`;
+   - `CHANGELOG.md` (Englisch);
+   - Stand oben, `CLAUDE.md` und die Zeile in `~/Claude/Projekte/CLAUDE.md`.
+   - Der Entwurf (`docs/entwurf/`) bleibt, wie er ist; die Abweichung wird hier vermerkt.
+
+**Entschieden (Nutzer, 2026-11-25):**
+- (a) Das Ausblenden wird zwischen Übersicht und Statistik nicht geteilt, es gilt je Graph.
+- (b) Es wird nicht über einen Neustart hinaus gespeichert, wie in opennetmon.
+
+Danach ein Test-Paket; die Version nennt der Nutzer.
+
+Aufwand: klein bis mittel (etwa zwei bis drei Stunden, die anklickbare Legende in egui ist der größte Teil). Keine neue Abhängigkeit.
 
 ## 5. Offene Punkte (Stand 2026-11-12)
 

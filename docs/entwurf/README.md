@@ -28,7 +28,7 @@ unter Statistik und leicht verschobene Grenzen der Kopfleiste, beides **abgenomm
 | `verbindungen.html` | Verbindungsfilter mit Prüfung, Vorschlägen und Hilfe, Sortierung, „Nur Favoriten“, Seiten (`?f=…`) |
 | `verbindung.html` | Fakten, Gegenstelle mit Stern, Sprünge zu Paketen, Statistik und Stream (`?id=st-http`, `st-tls`, `st-dns1` …) |
 | `pakete.html` | durchgehende Paketliste (virtuell, 48 000 Zeilen) mit Live-Folgen, Anzeigefilter, „Gehe zu Paket“ (Strg+G), Leiste für das gewählte Paket, ↑/↓/Enter/Pos1/Ende (`?f=`, `?c=` Verbindung, `?cf=` Verbindungsfilter, `?n=`) |
-| `paket.html` | Schichten und Bytes; ein Feld markiert seine Bytes und umgekehrt, Bezüge zu anderen Paketen, ←/→ blättern (`?n=1205` Client Hello, `?n=2409` zusammengesetzte HTTP-Antwort) |
+| `paket.html` | Schichten und Bytes; ein Feld markiert seine Bytes und umgekehrt, Bezüge zu anderen Paketen, ←/→ blättern (`?n=1205` Client Hello, `?n=2409` zusammengesetzte HTTP-Antwort); **seit 2026-11-25 (abgenommen, umgesetzt):** rechts unter den Bytes der „Aufbau“ (Paketdiagramm, siehe unten; `?n=1201` DNS, `?n=20000` RTP, `?n=303` SIP) |
 | `stream.html` | Stream folgen: Client und Server farbig, Richtung, Text oder Hex (`?c=st-http`) |
 | `statistik.html` | Unterreiter „Protokolle“: Kacheln, Verkehr der Auswahl, Protokollhierarchie mit Sprüngen, TCP-Analyse, Antwortzeiten (`?f=`, `?c=`, `?cf=`) |
 | `anrufe.html` | **neu:** Statistik, Unterreiter „Anrufe“: Kacheln, Liste der Anrufe (Zustand, Dauer, Von/An, Codec, Qualität, Anhören), Anmeldung, Hilfe; `?leer=1` zeigt die leere Liste |
@@ -128,6 +128,39 @@ Abgenommen (Nutzer, 2026-11-10):
    1280 px, nur Symbole unter 960 px. Gemessen von 760 bis 1920 px, laufend, pausiert und ohne Aufzeichnung: mindestens 15 px Luft.
 3. **„RTP auch ohne SIP erkennen“** standardmäßig an („SIP auch auf anderen Ports als 5060“ im Entwurf ebenfalls an).
 4. **Rufnummern über MCP** gekürzt auf die letzten zwei Ziffern (`sip:+xxxxxxxxxx67@…`), Namen und Domains bleiben; Ton nie über MCP.
+
+## Aufbau (Paketdiagramm) auf der Seite Paket (Wunsch des Nutzers, 2026-11-25; `PLAN.md` 5.11; abgenommen und umgesetzt 2026-11-25)
+
+Der Nutzer wünscht unter dem Hex-Dump rechts eine Ansicht der Kopfzeilen wie in den RFCs (Vorlage war ein Bildschirmfoto). Im Entwurf
+(`paket.html`, Code in `assets/pages.js` „Aufbau (Paketdiagramm)“, Stile in `assets/app.css` `.dg`):
+
+- **Karte „Aufbau“** unter „Bytes“, Hinweis „32 Bit je Zeile, Feldbreiten nach RFC“. Je Schicht eine Überschrift mit Größe, ein Lineal
+  (Bit 0, 8, 16, 24, 31, Striche je Bit) und die Felder in Zeilen zu 32 Bit; ein Feld über mehrere Zeilen bekommt einen gemeinsamen Umriss
+  (Ethernet: Ziel- und Quelladresse mit Stufe).
+- **Felder bitgenau**, nicht nur bytegenau: IPv4 Version/IHL, DSCP/ECN, Flags/Fragment Offset; TCP Header Length, Reserved und die acht
+  Flags je ein Bit (C E U A P R S F); IPv6 Traffic Class/Flow Label; DNS-Flags (QR, Opcode, AA, TC, RD, RA, Z, AD, CD, Rcode); RTP V, P, X,
+  CC, M, PT; RTCP; NTP LI/VN/Mode; QUIC (die durch Header Protection verschlüsselten Bits als „geschützt“).
+- **Lange Felder und Nutzdaten:** Felder über 16 Bytes (DHCP Server-Name und Boot-Datei, TCP-Optionen über 16 Bytes) und der Rest einer
+  Schicht (Nutzdaten, Fragen und Antworten bei DNS, Handshake bei TLS) stehen in **einer** Zeile mit Bruchkanten „//“ und der Größe, so bleibt
+  das Diagramm kurz. Textprotokolle (HTTP, SIP, SDP, SSDP) und Unbekanntes sind ein einziger Block „Text“ bzw. „Daten“. Der Rahmen
+  („Frame …“) und die zusammengesetzten TCP-Segmente bekommen keinen Aufbau.
+- **Namen | Werte** oben rechts: Feldnamen (schmale Felder mit Kurzform wie IHL, TTL, V, PT) oder die Werte (Adressen, Ports, `0x…`, Bits
+  als `010`). Ein Tooltip zeigt immer beides mit Bitlage („Bit 64–71 (8 Bit)“). Die Wahl merkt sich die Seite (im Programm: bis zum Ende).
+- **Markieren in drei Richtungen:** Klick auf ein Feld im Aufbau markiert seine Bytes im Hex-Dump und links das kleinste Feld, das sie
+  enthält (klappt die Schicht auf); Klick auf ein Feld links oder ein Byte markiert im Aufbau alle Felder in diesen Bytes; Klick auf die
+  Überschrift einer Schicht markiert die ganze Schicht. Mit Tastatur: Tab zu den Feldern, Enter.
+- Beim abgeschnittenen Paket (Snaplen) enden die Felder am letzten Byte, das letzte mit „(abgeschnitten)“.
+
+Herkunft: die Darstellung ist die übliche der RFCs (z. B. RFC 791); die Feldbreiten stammen aus den RFCs, nicht aus Wireshark (GPL),
+und der Code ist eigener.
+
+**Entschieden (Nutzer, 2026-11-25, „passt, setze alles um“):** alles wie im Entwurf, also „Aufbau“, keine Höhengrenze für den Hex-Dump,
+Standard „Namen“, alle Schichten. Die Fragen waren:
+1. Name der Karte: „Aufbau“ oder „Paketdiagramm“.
+2. Bei großen Paketen ist der Hex-Dump lang und der Aufbau steht weit unten (z. B. `?n=20000`, RTP mit 534 Bytes). So lassen, die Karte
+   „Bytes“ in der Höhe begrenzen (eigener Rollbalken, etwa 16 Zeilen), oder den Aufbau einklappbar machen?
+3. Standard „Namen“ (wie im Entwurf) oder „Werte“?
+4. Alle Schichten zeigen (wie im Entwurf) oder nur die links geöffneten?
 
 ## Umsetzung in egui (Vorschlag, erst nach „go“, in Stufen mit Test-Paket)
 

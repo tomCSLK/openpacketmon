@@ -1,6 +1,9 @@
 //! The details of a packet (`pagePacket` of the draft): the way back to the list, paging through
-//! the packets of the list, the connection, the layers with their fields and the bytes. A field
-//! marks its bytes in the hex dump, and a byte selects the smallest field that contains it.
+//! the packets of the list, the connection, the layers with their fields, the bytes and below
+//! them the structure of the headers in rows of 32 bits ([`diagram`]). A field marks its bytes in
+//! the hex dump, and a byte selects the smallest field that contains it.
+
+mod diagram;
 
 use std::ops::Range;
 use std::time::Duration;
@@ -68,6 +71,23 @@ pub struct State {
     open: Vec<bool>,
     /// Bring the chosen field into view (after a click on a byte)
     reveal: bool,
+    /// The field chosen in the structure (index of its layer there, index of the field)
+    picked: Option<(usize, usize)>,
+    /// The structure shows values instead of names (until the program ends)
+    values: bool,
+}
+
+#[cfg(test)]
+impl State {
+    /// A field of the structure is chosen
+    pub fn picked(&self) -> bool {
+        self.picked.is_some()
+    }
+
+    /// The structure shows values
+    pub fn values(&self) -> bool {
+        self.values
+    }
 }
 
 /// What the page asks for in a frame
@@ -79,16 +99,24 @@ struct Asked {
     copy: Option<String>,
     go: Option<Page>,
     step: Option<u64>,
+    /// A field of the structure was chosen (with `choose` for the field around it)
+    pick: Option<(usize, usize)>,
+    /// Names or values in the structure
+    values: Option<bool>,
 }
 
 impl Asked {
     /// Takes over what another part of the page asks for
     fn merge(&mut self, other: Asked) {
+        if other.choose.is_some() {
+            self.pick = other.pick;
+        }
         self.choose = other.choose.or(self.choose.take());
         self.toggle = other.toggle.or(self.toggle);
         self.copy = other.copy.or(self.copy.take());
         self.go = other.go.or(self.go.take());
         self.step = other.step.or(self.step);
+        self.values = other.values.or(self.values);
     }
 }
 
@@ -125,6 +153,7 @@ pub fn show(app: &mut App, ui: &mut Ui, number: u64) {
         state.chosen = None;
         state.open.clear();
         state.reveal = false;
+        state.picked = None;
     }
     state.detail.poll();
     let (engine, index) = (app.engine.clone(), app.index.clone());
@@ -220,16 +249,24 @@ pub fn show(app: &mut App, ui: &mut Ui, number: u64) {
                 let from = if n >= 4 { n - 2 } else { n.saturating_sub(1) };
                 (0..n).map(|i| i >= from).collect()
             };
+            let picked = state
+                .picked
+                .filter(|(l, k)| d.diagram.get(*l).is_some_and(|l| *k < l.fields.len()));
             let view = View {
                 t,
                 d,
                 chosen: state.chosen.as_ref(),
-                range: state
-                    .chosen
-                    .as_ref()
-                    .and_then(|c| chosen_range(&d.layers, c)),
+                range: match picked {
+                    Some((l, k)) => Some(d.diagram[l].fields[k].range.clone()),
+                    None => state
+                        .chosen
+                        .as_ref()
+                        .and_then(|c| chosen_range(&d.layers, c)),
+                },
                 open: &open,
                 reveal: state.reveal,
+                picked,
+                values: state.values,
             };
             body(ui, &view, &mut asked);
             // the text of a chosen field or layer goes to the clipboard
@@ -260,6 +297,10 @@ pub fn show(app: &mut App, ui: &mut Ui, number: u64) {
             *open = true;
         }
         state.chosen = Some(chosen);
+        state.picked = asked.pick;
+    }
+    if let Some(values) = asked.values {
+        state.values = values;
     }
     if let Some(text) = asked.copy {
         ctx.copy_text(text);
@@ -280,6 +321,9 @@ struct View<'a> {
     range: Option<Range<usize>>,
     open: &'a [bool],
     reveal: bool,
+    /// The field chosen in the structure
+    picked: Option<(usize, usize)>,
+    values: bool,
 }
 
 impl View<'_> {
@@ -372,6 +416,14 @@ fn body(ui: &mut Ui, view: &View, asked: &mut Asked) {
                 },
                 |ui| hex_dump(ui, view, &mut right),
             );
+            let mut tools = Asked::default();
+            widgets::flush_card(
+                ui,
+                &t.get("packet-diagram"),
+                |ui| diagram::tools(ui, view, &mut tools),
+                |ui| diagram::body(ui, view, &mut right),
+            );
+            right.merge(tools);
         },
     );
     if copy {

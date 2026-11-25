@@ -382,11 +382,21 @@ packet-truncated = The packet was not captured completely.
 packet-truncated-headers = Only the headers of this packet are stored (setting "Headers only").
 packet-layers = Layers
 packet-bytes = Bytes
-packet-layers-hint = Click a field to mark its bytes
+packet-layers-hint = Click a field to mark its bytes and its place in the structure
 packet-bytes-count = { $count ->
     [one] { $count } byte
    *[other] { $count } bytes
 }
+packet-diagram = Structure
+packet-diagram-hint = 32 bits per row, field widths as in the RFCs
+packet-diagram-names = Names
+packet-diagram-values = Values
+packet-diagram-bit = Bit { $from }
+packet-diagram-bits = Bits { $from }–{ $to } ({ $count } bits)
+packet-diagram-value = Value: { $value }
+packet-diagram-cut = truncated
+packet-diagram-protected = protected
+packet-diagram-none = No headers to draw.
 packet-copy = Copy
 packet-after = (after { $time })
 packet-hex-cut = Showing the first { $bytes } bytes; the PCAP file contains the whole packet.

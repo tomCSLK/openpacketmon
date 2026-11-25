@@ -2,6 +2,10 @@
 
 **Stand: 2026-11-25.**
 
+- **Umgesetzt (5.11, 2026-11-25):** Aufbau (Paketdiagramm) auf der Seite Paket rechts unter dem Hex-Dump, Kopfzeilen in Zeilen zu
+  32 Bit wie in den RFCs. Entwurf abgenommen, „go“ am 2026-11-25; Seitendaten `src/view/diagram.rs`, Zeichnung
+  `src/gui/pages/packet/diagram.rs`. **Test-Paket 0.5.3** gebaut (2026-11-25, `target/debian/openpacketmon_0.5.3-1_amd64.deb`),
+  offen Test durch den Nutzer und ein Bau unter Windows (`docs/windows.md` oben unter „Aufbau“).
 - **Geplant (5.10, 2026-11-25):** Graphen wie in opennetmon 0.7.1. Linien durchgezogen, dazu „Gesamt“ als graue Fläche
   und eine Legende zum Anklicken. Fragen entschieden, Umsetzung nach „go“.
 - **v0.5.2** ist released (2026-11-12, auf Ansage des Nutzers, zunächst nur Linux) mit Promiscuous Mode (5.8) und dem Startknopf oben
@@ -2028,6 +2032,74 @@ Dort entschieden und hier zu übernehmen:
 Danach ein Test-Paket; die Version nennt der Nutzer.
 
 Aufwand: klein bis mittel (etwa zwei bis drei Stunden, die anklickbare Legende in egui ist der größte Teil). Keine neue Abhängigkeit.
+
+#### 5.11 Aufbau (Paketdiagramm) auf der Seite Paket (Wunsch des Nutzers, 2026-11-25; Entwurf abgenommen und „go“ am 2026-11-25, umgesetzt)
+
+**Wunsch des Nutzers (2026-11-25):** In der Ansicht eines Pakets rechts unter dem Hex-Dump eine Darstellung der Kopfzeilen wie in den
+RFCs: je Schicht ein Bitlineal 0–31 und die Felder in Zeilen zu 32 Bit (Vorlage: Bildschirmfoto mit Ethernet, IPv4 und UDP). Zuerst ein
+Entwurf.
+
+**Entwurf** (2026-11-25): `docs/entwurf/paket.html`, beschrieben in `docs/entwurf/README.md` Abschnitt „Aufbau (Paketdiagramm)“ mit den
+offenen Fragen (Name der Karte, Höhe des Hex-Dumps bei großen Paketen, Standard Namen oder Werte, alle oder nur geöffnete Schichten).
+Geprüft mit Chrome (headless) hell und dunkel bei 1280 px an DNS, TLS Client Hello, HTTP und RTP; Klick im Aufbau markiert Byte, Feld
+links und Zelle.
+
+**Heute im Programm:** `src/gui/pages/packet.rs` zeigt Schichten und Hex-Dump; die Felder (`src/dissect/mod.rs`, `Field`) kennen nur
+Byte-Bereiche, Felder in einem Byte haben denselben Bereich (IPv4 „Version“ und „Header length“), die TCP-Flags sind Kinder ohne Bitlage.
+
+**Umsetzung (Vorschlag, nach Abnahme und „go“):**
+1. **Bitlage in den Feldern:** `Field` bekommt eine optionale Bitlage (erstes Bit und Anzahl, relativ zum Anfang des Byte-Bereichs); die
+   Zerleger setzen sie für Felder unter einem Byte (IPv4, IPv6, TCP, DNS-Flags, RTP, RTCP, NTP, QUIC). Dabei Felder trennen, die heute
+   zusammengefasst sind (DSCP/ECN, Flags/Fragment Offset sind schon getrennt bzw. als Kinder da).
+2. **Seitendaten** `src/view/diagram.rs` (ohne Oberfläche): aus den Feldern einer Schicht die Zeilen zu 32 Bit bauen (Abschnitte je Zeile,
+   Bruchzeilen für Felder über 16 Bytes und den Rest der Schicht, Textprotokolle als ein Block, abgeschnittene Pakete); Werte als Text.
+   Schichten, deren Felder keinen lückenlosen Kopf ergeben, werden ein Block. Einheitentests für Ethernet (3,5 Zeilen), IPv4 mit Optionen,
+   TCP mit und ohne Optionen, DNS-Flags, RTP, abgeschnittenes Paket.
+3. **Zeichnen** `src/gui/pages/packet/diagram.rs` mit dem egui-Painter: Lineal, Rahmenlinien aus der Belegung je Bit (Grenze, wo zwei
+   Nachbarzellen zu verschiedenen Feldern gehören), Beschriftung gekürzt mit „…“, Tooltip mit Name, Bitlage und Wert, Umschalter Namen/Werte.
+   Die Auswahl ist dieselbe wie beim Hex-Dump (Klick dort markiert Bytes und Feld, umgekehrt), Fokus und Enter für die Tastatur.
+4. **Texte** (Karte, Hinweis, Namen/Werte, „abgeschnitten“, „geschützt“, „Bytes“) in `locales/de` und `locales/en`; die Feldnamen bleiben
+   englisch wie in den Schichten.
+5. **Tests und Prüfung:** GUI-Test (Klick im Aufbau markiert die Bytes), Bilder der Seite Paket hell/dunkel neu, `cargo fmt`, `clippy`,
+   Tests; einmal unter Windows bauen (Rust 1.99.1).
+6. **Doku:** Kopfkommentare, `CHANGELOG.md`, Stand oben, `CLAUDE.md`, Zeile in `~/Claude/Projekte/CLAUDE.md`, Abweichungen vom Entwurf hier.
+
+Herkunft: Darstellung wie in den RFCs, Feldbreiten aus den RFCs; nichts aus Wireshark (GPL). Keine neue Abhängigkeit.
+Aufwand: mittel (etwa ein Tag; die Bitlage in den Zerlegern und das Zeichnen mit Auswahl sind die größten Teile).
+
+**Abnahme (Nutzer, 2026-11-25):** „passt, setze alles um. go.“ Die vier Fragen bleiben wie im Entwurf: Name „Aufbau“, der Hex-Dump
+ohne Höhengrenze, Standard „Namen“, alle Schichten.
+
+**Umgesetzt (2026-11-25):**
+- **Seitendaten** `src/view/diagram.rs` (ohne Oberfläche): je Schicht die Felder nach RFC mit Bitlage, Zeilen, Abschnitten, Werten,
+  Tooltip-Text und den Rahmenlinien (`DiagramLayer::lines`, Grenze dort, wo zwei Nachbarzellen zu verschiedenen Feldern gehören).
+  `PacketDetail::diagram` entsteht in `packet_detail` aus den Schichten und den Bytes (bei zusammengesetzten Nachrichten mit den
+  folgenden Segmenten). Bekannte Aufbauten: Ethernet, 802.3, 802.1Q, Linux cooked v1/v2, Loopback, ARP, IPv4, IPv6 mit Hop-by-Hop,
+  Routing, Destination Options und Fragment, TCP, UDP, ICMP, ICMPv6, IGMP, DNS, mDNS, LLMNR, TLS-Records, QUIC (kurzer und langer
+  Kopf, Version Negotiation, Retry), NTP, DHCP, DHCPv6, RTP (mit CSRC und Erweiterung), RTCP (SR und RR mit Report-Blöcken, SDES,
+  BYE); HTTP, SIP, SDP, SSDP als „Text“, Nachrichtenrumpf und Unbekanntes als „Data“. 11 Einheitentests.
+- **Zeichnung** `src/gui/pages/packet/diagram.rs`: Karte „Aufbau“ unter „Bytes“, Kopf mit Hinweis und Namen | Werte (gilt bis zum
+  Programmende, auch für weitere Pakete), je Schicht Überschrift (Klick markiert die Schicht), Lineal, Felder; zu breite Namen werden
+  zur Kurzform (IHL, TTL, PT …), sonst mit „…“ gekürzt; Felder über ganze Zeilen tragen den Text in ihrer Mitte; Tooltip mit Name,
+  Bedeutung, Bitlage und Wert; Kontextmenü (Zeile, Wert, Bytes als Hex, alles). Auswahl: Klick im Aufbau merkt sich das Feld
+  (`State::picked`), markiert genau dessen Bytes und links das kleinste Feld darum (Schicht wird aufgeklappt); Klick links oder auf
+  ein Byte hebt das auf und markiert im Aufbau alle Felder in diesen Bytes (sonst die, die Bytes mit ihnen teilen).
+- **Texte** `packet-diagram*` in `locales/de` und `locales/en`, `packet-layers-hint` ergänzt.
+- **Tests:** GUI-Test `the_structure_of_a_packet_marks_its_fields`, Test `a_field_of_the_drawing_chooses_the_smallest_field_around_it`;
+  Bilder `packet-tall-*` und `voip-rtp-tall-*`, `voip-rtcp-tall-*` in `gui::tests::shots`, hell und dunkel angesehen.
+  `cargo fmt`, `clippy -D warnings`, `cargo test --workspace` grün, Bau ohne Warnung.
+
+**Abweichung vom Vorschlag oben:** Die Bitlage steht nicht in `Field` der Zerleger, sondern in einer eigenen Tabelle nach RFC in
+`src/view/diagram.rs`, die die Bits aus den Bytes liest (wie der Entwurf). So bleiben die 44 Stellen der Zerleger, die Filterwerte und
+MCP unberührt; die Schichten liefern Titel und Byte-Bereich. Nachteil: ein neues Protokoll braucht dort eine eigene Zeile (sonst ein
+Block „Data“).
+
+**Test-Paket 0.5.3** (2026-11-25, auf Ansage des Nutzers): Version in `Cargo.toml` und `capture/Cargo.toml` auf 0.5.3, `dev/build-deb.sh`
+→ `target/debian/openpacketmon_0.5.3-1_amd64.deb` (Lizenzliste unverändert). Installieren mit
+`sudo apt install ./target/debian/openpacketmon_0.5.3-1_amd64.deb`.
+
+**Offen:** Test durch den Nutzer; einmal unter Windows bauen und von Hand prüfen (Rust 1.99.1; Schritte in `docs/windows.md` oben
+unter „Aufbau“); Release auf Ansage.
 
 ## 5. Offene Punkte (Stand 2026-11-12)
 

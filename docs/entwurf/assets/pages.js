@@ -550,6 +550,153 @@
     let rt = null; window.addEventListener('resize', function () { clearTimeout(rt); rt = setTimeout(render, 80); });
   }
 
+  /* ---------- Aufbau (Paketdiagramm) der Seite Paket ----------
+     Die Kopfzeilen jeder Schicht in Zeilen zu 32 Bit, wie in den RFCs gezeichnet. Feldbreiten nach den RFCs
+     (Ethernet IEEE 802.3, ARP 826, IPv4 791, IPv6 8200, TCP 9293, UDP 768, ICMP 792, DNS 1035, TLS 8446, QUIC 9000,
+     NTP 5905, DHCP 2131, RTP/RTCP 3550); eigener Code, nichts aus Wireshark (GPL). Felder über 16 Bytes und die
+     Nutzdaten werden zu einer Zeile mit Bruchkanten zusammengefasst. */
+  const DG_H = 26;   // Höhe einer Zeile in px
+  function dgSpec(l, b) {
+    const t = l.title, s = l.range[0], len = l.range[1] - l.range[0];
+    if (/^Frame /.test(t) || /^\[/.test(t)) return null;   // Rahmen und zusammengesetzte Segmente haben keinen eigenen Kopf
+    const F = function (n, bits, fmt, ab, tip) { return { n: n, bits: bits, fmt: fmt || 'dec', ab: ab, tip: tip }; };
+    const R = function (n, from) { return { n: n, bits: Math.max(0, len - from) * 8, fmt: 'len', rest: true }; };
+    const name = t.split(',')[0];
+    let f;
+    if (/^Ethernet/.test(t)) f = [F('Destination', 48, 'mac'), F('Source', 48, 'mac'), F('Type', 16, 'hex')];
+    else if (/^Address Resolution/.test(t)) f = [F('Hardware Type', 16), F('Protocol Type', 16, 'hex'), F('Hardware Size', 8, 'dec', 'HW Size'), F('Protocol Size', 8, 'dec', 'Prot. Size'), F('Opcode', 16), F('Sender MAC Address', 48, 'mac'), F('Sender IP Address', 32, 'ip4'), F('Target MAC Address', 48, 'mac'), F('Target IP Address', 32, 'ip4')];
+    else if (/^Internet Protocol Version 4/.test(t)) {
+      const ihl = b[s] & 15;
+      f = [F('Version', 4), F('Header Length', 4, 'ihl', 'IHL', 'in 32-Bit-Wörtern'), F('DSCP', 6, 'dec', 'DSCP', 'Differentiated Services Code Point'), F('ECN', 2, 'bin', 'ECN', 'Explicit Congestion Notification'), F('Total Length', 16),
+        F('Identification', 16, 'hex'), F('Flags', 3, 'bin', 'Flags', 'Reserved, Don’t Fragment, More Fragments'), F('Fragment Offset', 13), F('Time to Live', 8, 'dec', 'TTL'), F('Protocol', 8),
+        F('Header Checksum', 16, 'hex'), F('Source Address', 32, 'ip4'), F('Destination Address', 32, 'ip4')];
+      if (ihl > 5) f.push(F('Options', (ihl - 5) * 32, 'len'));
+    } else if (/^Internet Protocol Version 6/.test(t)) f = [F('Version', 4), F('Traffic Class', 8, 'hex'), F('Flow Label', 20, 'hex'), F('Payload Length', 16), F('Next Header', 8), F('Hop Limit', 8), F('Source Address', 128, 'ip6'), F('Destination Address', 128, 'ip6')];
+    else if (/^Transmission Control/.test(t)) {
+      const hl = b[s + 12] >> 4;
+      f = [F('Source Port', 16), F('Destination Port', 16), F('Sequence Number', 32), F('Acknowledgment Number', 32), F('Header Length', 4, 'ihl', 'Hdr Len', 'in 32-Bit-Wörtern'), F('Reserved', 4, 'bin', 'Res.'),
+        F('CWR', 1, 'bit', 'C', 'Congestion Window Reduced'), F('ECE', 1, 'bit', 'E', 'ECN-Echo'), F('URG', 1, 'bit', 'U', 'Urgent'), F('ACK', 1, 'bit', 'A', 'Acknowledgment'), F('PSH', 1, 'bit', 'P', 'Push'), F('RST', 1, 'bit', 'R', 'Reset'), F('SYN', 1, 'bit', 'S', 'Synchronize'), F('FIN', 1, 'bit', 'F', 'Finish'),
+        F('Window', 16), F('Checksum', 16, 'hex'), F('Urgent Pointer', 16)];
+      if (hl > 5) f.push(F('Options', (hl - 5) * 32, 'len'));
+    } else if (/^User Datagram/.test(t)) f = [F('Source Port', 16), F('Destination Port', 16), F('Length', 16), F('Checksum', 16, 'hex')];
+    else if (/^Internet Control Message/.test(t)) f = [F('Type', 8), F('Code', 8), F('Checksum', 16, 'hex'), F('Identifier', 16, 'hex'), F('Sequence Number', 16), R('Data', 8)];
+    else if (/Domain Name System/.test(t)) f = [F('Transaction ID', 16, 'hex'), F('QR', 1, 'bit', 'QR', 'Query/Response'), F('Opcode', 4), F('AA', 1, 'bit', 'AA', 'Authoritative Answer'), F('TC', 1, 'bit', 'TC', 'Truncated'), F('RD', 1, 'bit', 'RD', 'Recursion Desired'),
+      F('RA', 1, 'bit', 'RA', 'Recursion Available'), F('Z', 1, 'bit'), F('AD', 1, 'bit', 'AD', 'Authentic Data'), F('CD', 1, 'bit', 'CD', 'Checking Disabled'), F('Rcode', 4), F('Questions', 16), F('Answer RRs', 16), F('Authority RRs', 16), F('Additional RRs', 16), R('Queries and Answers', 12)];
+    else if (/^Transport Layer Security/.test(t)) f = [F('Content Type', 8), F('Version', 16, 'hex'), F('Length', 16), R(b[s] === 22 ? 'Handshake' : 'Encrypted Application Data', 5)];
+    else if (/^QUIC/.test(t)) f = [F('Header Form', 1, 'bit', 'H', 'Long (1) oder Short Header (0)'), F('Fixed Bit', 1, 'bit', 'F'), F('Spin Bit', 1, 'bit', 'S'), F('Protected Bits', 5, 'prot', 'geschützt', 'Reserved, Key Phase, Packet Number Length; mit Header Protection verschlüsselt'), F('Destination Connection ID', 64, 'hex'), R('Protected Payload', 9)];
+    else if (/^Network Time/.test(t)) f = [F('Leap Indicator', 2, 'dec', 'LI'), F('Version', 3, 'dec', 'VN'), F('Mode', 3), F('Stratum', 8), F('Poll', 8), F('Precision', 8), F('Root Delay', 32, 'hex'), F('Root Dispersion', 32, 'hex'), F('Reference ID', 32, 'hex'),
+      F('Reference Timestamp', 64, 'hex'), F('Origin Timestamp', 64, 'hex'), F('Receive Timestamp', 64, 'hex'), F('Transmit Timestamp', 64, 'hex'), R('Extensions', 48)];
+    else if (/^Dynamic Host Configuration/.test(t)) f = [F('Message Type', 8, 'dec', 'Op'), F('Hardware Type', 8, 'dec', 'HType'), F('Hardware Length', 8, 'dec', 'HLen'), F('Hops', 8), F('Transaction ID', 32, 'hex'), F('Seconds', 16), F('Flags', 16, 'hex'),
+      F('Client IP Address', 32, 'ip4'), F('Your IP Address', 32, 'ip4'), F('Server IP Address', 32, 'ip4'), F('Relay IP Address', 32, 'ip4'), F('Client Hardware Address', 128, 'chaddr'), F('Server Host Name', 512, 'len'), F('Boot File Name', 1024, 'len'), F('Magic Cookie', 32, 'hex'), R('Options', 240)];
+    else if (/^Real-Time Transport Protocol/.test(t)) f = [F('Version', 2, 'dec', 'V'), F('Padding', 1, 'bit', 'P'), F('Extension', 1, 'bit', 'X'), F('CSRC Count', 4, 'dec', 'CC'), F('Marker', 1, 'bit', 'M'), F('Payload Type', 7, 'dec', 'PT'), F('Sequence Number', 16), F('Timestamp', 32), F('SSRC', 32, 'hex'), R('Payload', 12)];
+    else if (/Control Protocol \(Sender Report\)/.test(t)) f = [F('Version', 2, 'dec', 'V'), F('Padding', 1, 'bit', 'P'), F('Reception Report Count', 5, 'dec', 'RC'), F('Packet Type', 8, 'dec', 'PT'), F('Length', 16), F('Sender SSRC', 32, 'hex'), F('NTP Timestamp', 64, 'hex'), F('RTP Timestamp', 32),
+      F('Sender’s Packet Count', 32), F('Sender’s Octet Count', 32), F('Report SSRC', 32, 'hex'), F('Fraction Lost', 8), F('Cumulative Lost', 24), F('Extended Highest Sequence Number', 32), F('Interarrival Jitter', 32), F('Last SR', 32, 'hex'), F('Delay since Last SR', 32)];
+    else if (/Control Protocol \(Source description\)/.test(t)) f = [F('Version', 2, 'dec', 'V'), F('Padding', 1, 'bit', 'P'), F('Source Count', 5, 'dec', 'SC'), F('Packet Type', 8, 'dec', 'PT'), F('Length', 16), F('SSRC', 32, 'hex'), R('SDES Items', 8)];
+    else if (/^(Hypertext|Session|Simple Service)/.test(t)) f = [R('Text', 0)];
+    else f = [R('Daten', 0)];
+    return { name: name, s: s, len: len, f: f };
+  }
+  // Legt die Felder in Zeilen zu 32 Bit: Felder (Bitlage relativ zur Schicht) und Abschnitte je Zeile
+  function dgLayout(sp) {
+    const fields = []; let bit = 0, row = 0, col = 0;
+    const seg = function (fd, c0, c1, brk) { fd.segs.push({ r: row, c0: c0, c1: c1, brk: !!brk }); };
+    sp.f.forEach(function (f) {
+      if (f.bits <= 0 || bit >= sp.len * 8) return;
+      let bits = f.bits, trunc = false;
+      if (bit + bits > sp.len * 8) { bits = sp.len * 8 - bit; trunc = true; }
+      const fd = { k: fields.length, n: f.n, ab: f.ab, tip: f.tip, fmt: f.fmt, b0: bit, bits: bits, trunc: trunc, segs: [], brk: !!f.rest || bits > 128 };
+      fields.push(fd);
+      if (fd.brk) {
+        if (col > 0) { seg(fd, col, 32); row += 1; col = 0; }
+        seg(fd, 0, 32, true); row += 1;
+      } else {
+        let rem = bits;
+        while (rem > 0) { const take = Math.min(32 - col, rem); seg(fd, col, col + take); col += take; rem -= take; if (col === 32) { row += 1; col = 0; } }
+      }
+      bit += bits;
+    });
+    return { fields: fields, rows: row + (col > 0 ? 1 : 0) };
+  }
+  function dgNum(b, sb, n) { let v = 0; for (let k = 0; k < n; k += 1) { const i = sb + k; v = v * 2 + ((b[i >> 3] >> (7 - (i & 7))) & 1); } return v; }
+  function ip6s(a) {
+    const g = []; for (let i = 0; i < 16; i += 2) g.push(((a[i] << 8) | a[i + 1]).toString(16));
+    let bs = -1, bl = 1; for (let i = 0; i < 8;) { if (g[i] === '0') { let j = i; while (j < 8 && g[j] === '0') j += 1; if (j - i > bl) { bs = i; bl = j - i; } i = j; } else i += 1; }
+    return bs < 0 ? g.join(':') : g.slice(0, bs).join(':') + '::' + g.slice(bs + bl).join(':');
+  }
+  function dgValue(fd, b, s) {
+    const sb = s * 8 + fd.b0, by = sb >> 3, nb = fd.bits >> 3;
+    const hx = function (x) { return x.toString(16).padStart(2, '0'); };
+    let v;
+    if (fd.fmt === 'len' || fd.brk) v = D.fnum(Math.ceil(fd.bits / 8)) + ' Bytes';
+    else if (fd.fmt === 'mac') v = b.slice(by, by + 6).map(hx).join(':');
+    else if (fd.fmt === 'chaddr') v = b.slice(by, by + 6).map(hx).join(':') + ' + ' + (nb - 6) + ' Bytes';
+    else if (fd.fmt === 'ip4') v = b.slice(by, by + 4).join('.');
+    else if (fd.fmt === 'ip6') v = ip6s(b.slice(by, by + 16));
+    else if (fd.fmt === 'prot') v = 'geschützt';
+    else if (fd.fmt === 'hex') v = fd.bits > 48 ? '0x' + b.slice(by, by + nb).map(hx).join('') : '0x' + dgNum(b, sb, fd.bits).toString(16).padStart(Math.ceil(fd.bits / 4), '0');
+    else if (fd.fmt === 'bin') v = dgNum(b, sb, fd.bits).toString(2).padStart(fd.bits, '0');
+    else if (fd.fmt === 'ihl') { const x = dgNum(b, sb, fd.bits); v = x + ' (' + x * 4 + ' B)'; }
+    else v = String(dgNum(b, sb, fd.bits));
+    return v + (fd.trunc ? ' (abgeschnitten)' : '');
+  }
+  // Bytes des Felds im Paket [von, bis)
+  function dgRange(fd, s) { return [s + (fd.b0 >> 3), s + Math.ceil((fd.b0 + fd.bits) / 8)]; }
+  // Eine Schicht: Überschrift, Lineal, Rahmenlinien als SVG, darüber die anklickbaren Abschnitte
+  function dgBlock(li, sp, lay, b, values) {
+    const rows = lay.rows, own = [];
+    for (let r = 0; r < rows; r += 1) own.push(new Array(32).fill(-1));
+    lay.fields.forEach(function (fd) { fd.segs.forEach(function (sg) { for (let c = sg.c0; c < sg.c1; c += 1) own[sg.r][c] = fd.k; }); });
+    const at = function (r, c) { return r < 0 || r >= rows || c < 0 || c > 31 ? -1 : own[r][c]; };
+    let lines = '';
+    for (let r = 0; r <= rows; r += 1) {           // waagrecht: Grenze zwischen Zeile r-1 und r
+      let c0 = -1;
+      for (let c = 0; c <= 32; c += 1) {
+        const draw = c < 32 && at(r - 1, c) !== at(r, c);
+        if (draw && c0 < 0) c0 = c;
+        if (!draw && c0 >= 0) { lines += '<line x1="' + c0 + '" y1="' + r + '" x2="' + c + '" y2="' + r + '"/>'; c0 = -1; }
+      }
+    }
+    for (let c = 0; c <= 32; c += 1) {             // senkrecht: Grenze zwischen Spalte c-1 und c
+      let r0 = -1;
+      for (let r = 0; r <= rows; r += 1) {
+        const draw = r < rows && at(r, c - 1) !== at(r, c);
+        if (draw && r0 < 0) r0 = r;
+        if (!draw && r0 >= 0) { lines += '<line x1="' + c + '" y1="' + r0 + '" x2="' + c + '" y2="' + r + '"/>'; r0 = -1; }
+      }
+    }
+    let ticks = '', nums = '';
+    for (let c = 0; c <= 32; c += 1) ticks += '<line x1="' + c + '" y1="' + (c % 8 === 0 ? 0 : 0.55) + '" x2="' + c + '" y2="1"/>';
+    [0, 8, 16, 24, 31].forEach(function (c) { nums += '<span style="left:' + (c / 32 * 100) + '%">' + c + '</span>'; });
+    let cells = '', marks = '';
+    lay.fields.forEach(function (fd) {
+      let best = 0; fd.segs.forEach(function (sg, i) { if (sg.c1 - sg.c0 > fd.segs[best].c1 - fd.segs[best].c0 || sg.brk && !fd.segs[best].brk) best = i; });
+      const val = dgValue(fd, b, sp.s);
+      const bitTxt = fd.bits === 1 ? 'Bit ' + fd.b0 : 'Bit ' + fd.b0 + '–' + (fd.b0 + fd.bits - 1) + ' (' + D.fnum(fd.bits) + ' Bit)';
+      const tip = fd.n + (fd.tip ? ' – ' + fd.tip : '') + '\n' + bitTxt + '\nWert: ' + val;
+      const narrow = fd.ab && fd.bits < 8;
+      const label = fd.brk ? (values ? val : fd.n + ' (' + val + ')') : values ? val : narrow ? fd.ab : fd.n;
+      fd.segs.forEach(function (sg, i) {
+        const main = i === best;
+        cells += '<div class="dgc' + (values && !fd.brk ? ' v' : '') + (fd.bits === 1 ? ' b1' : '') + '" data-f="' + li + ':' + fd.k + '" data-r="' + dgRange(fd, sp.s).join(',') + '"' +
+          ' style="left:' + (sg.c0 / 32 * 100) + '%;width:' + ((sg.c1 - sg.c0) / 32 * 100) + '%;top:' + sg.r * DG_H + 'px"' +
+          (main ? ' tabindex="0" role="button" aria-label="' + esc(fd.n + ': ' + val) + '"' : ' aria-hidden="true"') + ' title="' + esc(tip) + '">' + (main ? esc(label) : '') + '</div>';
+        if (sg.brk) marks += '<span class="brk" style="left:0;top:' + (sg.r + 0.5) * DG_H + 'px">//</span><span class="brk" style="left:100%;top:' + (sg.r + 0.5) * DG_H + 'px">//</span>';
+      });
+    });
+    const lr = sp.s + '_' + (sp.s + sp.len);
+    return '<div class="dgl" data-l="' + li + '"><h3 data-r="' + sp.s + ',' + (sp.s + sp.len) + '" data-lr="' + lr + '">' + esc(sp.name) + '<span class="hint">' + D.fnum(sp.len) + ' Bytes</span></h3>' +
+      '<div class="rul">' + nums + '<svg viewBox="0 0 32 1" preserveAspectRatio="none" aria-hidden="true">' + ticks + '</svg></div>' +
+      '<div class="grid" style="height:' + rows * DG_H + 'px">' + cells + '<svg viewBox="0 0 32 ' + rows + '" preserveAspectRatio="none" aria-hidden="true">' + lines + '</svg>' + marks + '</div></div>';
+  }
+  function diagram(d, values) {
+    let html = '';
+    d.layers.forEach(function (l, li) {
+      const sp = dgSpec(l, d.bytes); if (!sp || sp.len <= 0) return;
+      html += dgBlock(li, sp, dgLayout(sp), d.bytes, values);
+    });
+    return html || '<p class="small muted">Keine Kopfzeilen zum Zeichnen.</p>';
+  }
+
   /* ---------- Paket ---------- */
   function pagePacket() {
     if (none()) { $('#main').innerHTML = pagehead('Paket', '', '', { back: 'pakete.html' }) + noCapture(); return; }
@@ -581,23 +728,53 @@
       return s;
     }
     const stream = c.proto === 'TCP' || c.proto === 'UDP';
+    let dgValues = false; try { dgValues = localStorage.getItem('opm-dg') === 'v'; } catch (err) { /* nur Komfort */ }
     $('#main').innerHTML = pagehead('Paket ' + n + ' <span class="tag">' + esc(p.proto) + '</span>', '<span class="mono">' + esc(p.info) + '</span>',
       '<div class="seg" role="group" aria-label="Blättern">' + (prev ? '<a href="' + url('paket.html', Object.assign({ n: prev }, keep)) + '">' + I('chev-left', 'sm') + 'Vorheriges</a>' : '<button type="button" disabled>' + I('chev-left', 'sm') + 'Vorheriges</button>') +
       (next ? '<a href="' + url('paket.html', Object.assign({ n: next }, keep)) + '">Nächstes' + I('chev-right', 'sm') + '</a>' : '<button type="button" disabled>Nächstes' + I('chev-right', 'sm') + '</button>') + '</div>',
       { back: url('pakete.html', Object.assign({ n: n }, keep)), crumb: '<a href="' + url('pakete.html', Object.assign({ n: n }, keep)) + '">Pakete</a> <span>›</span> <span>Paket ' + n + '</span>' }) +
       '<div class="notice info">' + I('connections') + '<div>Verbindung: <a class="mono" href="verbindung.html?id=' + c.id + '">' + esc(connLabel(c)) + '</a> · <a href="pakete.html?c=' + c.id + '">Pakete</a> · <a href="statistik.html?c=' + c.id + '">Statistik</a>' + (stream ? ' · <a href="stream.html?c=' + c.id + '">Stream</a>' : '') + ' · <a href="verbindung.html?id=' + c.id + '">Details</a>' +
         (d.call ? '<br>' + I('phone', 'sm') + ' Gehört zum Anruf <a href="anruf.html?id=' + d.call.id + '">' + esc(callLabel(d.call)) + '</a>' : '') + '</div></div>' +
-      '<div class="split2"><section class="card"><header><h2>Schichten</h2><span class="hint">Klick auf ein Feld markiert seine Bytes</span></header><ul class="layers" id="layers">' + layers + '</ul></section>' +
-      '<section class="card"><header><h2>Bytes</h2><span class="hint">' + d.bytes.length + ' Bytes</span><button class="btn sm ghost" type="button" data-draft-toast="Entwurf: kopiert die Bytes als Hex">' + I('copy', 'sm') + 'Kopieren</button></header><pre class="hex" id="hex">' + hex() + '</pre></section></div>';
-    function mark(r, el) {
-      $$('#hex b.on').forEach(function (b) { b.classList.remove('on'); });
-      $$('#layers .f.on').forEach(function (f) { f.classList.remove('on'); });
-      $$('#layers li.on').forEach(function (l) { l.classList.remove('on'); });
+      '<div class="split2"><section class="card"><header><h2>Schichten</h2><span class="hint">Klick auf ein Feld markiert seine Bytes und seinen Platz im Aufbau</span></header><ul class="layers" id="layers">' + layers + '</ul></section>' +
+      '<div><section class="card"><header><h2>Bytes</h2><span class="hint">' + d.bytes.length + ' Bytes</span><button class="btn sm ghost" type="button" data-draft-toast="Entwurf: kopiert die Bytes als Hex">' + I('copy', 'sm') + 'Kopieren</button></header><pre class="hex" id="hex">' + hex() + '</pre></section>' +
+      '<section class="card"><header><h2>Aufbau</h2><span class="hint">32 Bit je Zeile, Feldbreiten nach RFC</span>' +
+        '<div class="seg sm" id="dgMode" role="group" aria-label="Beschriftung"><button type="button" data-v="n" aria-pressed="' + !dgValues + '">Namen</button><button type="button" data-v="v" aria-pressed="' + dgValues + '">Werte</button></div></header>' +
+        '<div class="dg" id="dg">' + diagram(d, dgValues) + '</div></section></div></div>';
+    // Markiert Bytes (r = "von,bis"), das Feld oder die Schicht links (el) und im Aufbau entweder genau ein Feld (dg = "Schicht:Feld",
+    // bei einem Klick dort) oder alle Felder, die in den Bytes liegen
+    let marked = null;
+    function mark(r, el, dg) {
+      marked = r ? [r, el, dg] : null;
+      $$('#hex b.on, #layers .f.on, #layers li.on, #dg .dgc.on, #dg h3.on').forEach(function (x) { x.classList.remove('on'); });
       if (!r) return;
       const a = r.split(',').map(Number);
       $$('#hex b').forEach(function (b) { const i = +b.dataset.i; if (i >= a[0] && i < a[1]) b.classList.add('on'); });
       if (el) { if (el.classList.contains('f')) el.classList.add('on'); else el.closest('li').classList.add('on'); }
+      if (dg) { $$('#dg .dgc[data-f="' + dg + '"]').forEach(function (x) { x.classList.add('on'); }); return; }
+      const cells = $$('#dg .dgc'); const inside = function (x) { const f = x.dataset.r.split(',').map(Number); return f[0] >= a[0] && f[1] <= a[1]; };
+      let hit = cells.filter(inside);
+      if (!hit.length) hit = cells.filter(function (x) { const f = x.dataset.r.split(',').map(Number); return f[0] < a[1] && f[1] > a[0]; });
+      hit.forEach(function (x) { x.classList.add('on'); });
+      $$('#dg h3').forEach(function (h) { if (h.dataset.r === r) h.classList.add('on'); });
     }
+    // Klick im Aufbau: das kleinste Feld links, das die Bytes enthält, sonst die Schicht
+    function fromDiagram(x) {
+      const f = x.dataset.r.split(',').map(Number); let best = null, bw = 1e9;
+      $$('#layers .f[data-r]').forEach(function (e) { const a = e.dataset.r.split(',').map(Number); if (a[0] <= f[0] && a[1] >= f[1] && a[1] - a[0] < bw) { best = e; bw = a[1] - a[0]; } });
+      if (!best) $$('#layers summary[data-r]').forEach(function (e) { const a = e.dataset.r.split(',').map(Number); if (a[0] <= f[0] && a[1] >= f[1] && a[1] - a[0] < bw) { best = e; bw = a[1] - a[0]; } });
+      if (best && best.classList.contains('f')) best.closest('details').open = true;
+      mark(x.dataset.r, best, x.dataset.f);
+      if (best) best.scrollIntoView({ block: 'nearest' });
+    }
+    $('#dg').addEventListener('click', function (e) {
+      const x = e.target.closest('.dgc'); if (x) { fromDiagram(x); return; }
+      const h = e.target.closest('h3[data-r]'); if (h) { const sm = $$('#layers summary[data-r]').filter(function (s) { return s.dataset.r === h.dataset.r; })[0]; mark(h.dataset.r, sm || null); }
+    });
+    $('#dg').addEventListener('keydown', function (e) { const x = e.target.closest('.dgc'); if (x && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); fromDiagram(x); } });
+    bindSeg('dgMode', function (v) {
+      dgValues = v === 'v'; try { localStorage.setItem('opm-dg', v); } catch (err) { /* nur Komfort */ }
+      $('#dg').innerHTML = diagram(d, dgValues); if (marked) mark(marked[0], marked[1], marked[2]);
+    });
     $('#layers').addEventListener('click', function (e) {
       const f = e.target.closest('.f[data-r]'); if (f) { mark(f.dataset.r, f); return; }
       const s = e.target.closest('summary'); if (s) mark(s.dataset.r, s);

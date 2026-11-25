@@ -13,7 +13,7 @@ Logo seit der neuen Oberfläche: Zeichen C „Lupe über Paketen“ (`resources/
 |---|---|---|
 | `CLAUDE.md` | Regeln und Grundwissen für jede Sitzung | automatisch |
 | `CLAUDE.local.md` | Laptop, gemeldeter Befund beim Original, Pfade zu nicht öffentlichen Projekten (gitignored) | automatisch |
-| `PLAN.md` | oben der Stand; Entscheidungen (0), Lizenzprüfung (1), Bestandsaufnahme und Phasen 1–4 (2–4, Verlauf), Vorhaben 5.1–5.10, offene Punkte (5) | **maßgeblich**, vor Arbeit am Vorhaben lesen |
+| `PLAN.md` | oben der Stand; Entscheidungen (0), Lizenzprüfung (1), Bestandsaufnahme und Phasen 1–4 (2–4, Verlauf), Vorhaben 5.1–5.11, offene Punkte (5) | **maßgeblich**, vor Arbeit am Vorhaben lesen |
 | `docs/windows.md` | alles zu Windows: Einrichten, Code-Unterschiede, Tests, Installer, Code-Signatur, CI, offene Punkte | vor Arbeit unter oder für Windows |
 | `docs/entwurf/` | klickbarer Entwurf der neuen Oberfläche (HTML, erfundene Daten), `README.md` dort | vor Arbeit an der Oberfläche |
 | `README.md`, `CHANGELOG.md`, `SECURITY.md`, `CONTRIBUTING.md`, `NOTICE` | öffentlich, Englisch | bei Bedarf |
@@ -29,7 +29,7 @@ Fassung bis 2026-11-09 (mit dem Verlauf der Browser-Oberfläche) steht in der Gi
 - `src/engine/` – Zustand der Aufzeichnung, Paketspeicher `packets.rs` (nur im RAM, wählbar bis 2 GiB und 2 Millionen Pakete), TCP-Analyse
   `analysis.rs`. `Engine::stop` wartet, bis der Mitschnitt seine Dateien geschlossen hat.
 - `src/dissect/` – eigene Zerleger (DNS/mDNS/LLMNR, DHCP, TLS mit SNI, HTTP/1, SSDP, NTP, QUIC-Kopf); `src/filter/` – eigene Filtergrammatik.
-- `src/view/` – **Seitendaten ohne Oberfläche** (was jede Seite zeigt, Treffer-Index `filter_index.rs`, Stream, Statistik, Vorschläge,
+- `src/view/` – **Seitendaten ohne Oberfläche** (was jede Seite zeigt, Treffer-Index `filter_index.rs`, Aufbau `diagram.rs`, Stream, Statistik, Vorschläge,
   Übersetzung `i18n.rs` mit Prüfung `every_message_is_used`). Neue Seitendaten gehören hierher.
 - `src/gui/` – egui/eframe: `mod.rs` (Fenster 1280 × 820, mindestens 760 × 480), `theme.rs` (Farben), `pages/`, `widgets.rs`, `tests.rs` (Bedienung
   und Bilder). Wireshark-Muster: Fenster schließen beendet das Programm, mit Rückfrage bei laufender Aufzeichnung. Unter Windows zeichnet es mit
@@ -103,6 +103,9 @@ Fassung bis 2026-11-09 (mit dem Verlauf der Browser-Oberfläche) steht in der Gi
 
 Maßgeblich ist `PLAN.md` (oben „Stand“, Abschnitt 5). Kurz (2026-11-25):
 
+- **Aufbau (Paketdiagramm)** (`PLAN.md` 5.11, 2026-11-25): auf der Seite Paket rechts unter dem Hex-Dump die Kopfzeilen jeder
+  Schicht in Zeilen zu 32 Bit wie in den RFCs, Felder bitgenau, Namen oder Werte, Markieren in drei Richtungen. Entwurf abgenommen,
+  umgesetzt (`src/view/diagram.rs`, `src/gui/pages/packet/diagram.rs`), Test-Paket 0.5.3; offen Test durch den Nutzer und Windows-Bau.
 - **Geplant: Graphen wie opennetmon 0.7.1** (`PLAN.md` 5.10, 2026-11-25). Linien durchgezogen, dazu „Gesamt“ (Ein- plus Ausgehend) als graue
   Fläche (hell dunkles Grau, dunkel helles Grau) und eine Legende zum Anklicken. Ausblenden je Graph und nur bis zum Programmende. Umsetzung nach „go“.
 - **v0.5.2** ist released (2026-11-12, Linux) mit Promiscuous Mode und dem Startknopf oben; der **signierte Windows-Installer** ist am

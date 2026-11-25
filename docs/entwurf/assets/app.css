@@ -458,6 +458,27 @@ a.tile:hover { border-color: var(--border-strong); text-decoration: none; box-sh
 .hex b.on { background: var(--hl); }
 .hex .a { color: var(--text-2); }
 .hex .dotc { color: var(--text-3); }
+/* Aufbau (Paketdiagramm) unter den Bytes: Zeilen zu 32 Bit, Rahmen als SVG, darüber die Felder zum Anklicken */
+.dg { padding: var(--sp-3) var(--sp-4) var(--sp-4); }
+.dg .dgl + .dgl { margin-top: var(--sp-4); }
+.dg h3 { display: flex; align-items: baseline; gap: var(--sp-2); margin: 0 0 2px; padding: 2px 4px; font-size: var(--fs-sm); font-weight: 500; text-transform: none; letter-spacing: 0; color: var(--text); border-radius: var(--radius-sm); cursor: pointer; width: fit-content; }
+.dg h3:hover { background: var(--hover); }
+.dg h3.on { background: var(--selected); box-shadow: inset 3px 0 0 var(--accent); }
+.dg h3 .hint { font-size: var(--fs-xs); font-weight: 400; color: var(--text-3); }
+.dg .rul { position: relative; height: 18px; margin: 0 1px; }
+.dg .rul span { position: absolute; top: 0; padding-left: 2px; font-family: var(--font-mono); font-size: 10px; line-height: 1; color: var(--text-3); }
+.dg .grid { position: relative; margin: 0 1px; }
+.dg svg { position: absolute; left: 0; top: 0; width: 100%; height: 100%; overflow: visible; pointer-events: none; }
+.dg .rul svg { top: 11px; height: 7px; }
+.dg line { stroke: var(--text-3); stroke-width: 1; vector-effect: non-scaling-stroke; shape-rendering: crispEdges; }
+.dg .rul line { stroke: var(--border-strong); }
+.dg .dgc { position: absolute; height: 26px; padding: 0 4px; font-size: var(--fs-xs); line-height: 26px; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--text); cursor: pointer; }
+.dg .dgc.v { font-family: var(--font-mono); font-size: 11.5px; }
+.dg .dgc.b1 { padding: 0; font-size: 11px; text-overflow: clip; }
+.dg .dgc:hover { background: var(--hover); }
+.dg .dgc.on { background: var(--hl); }
+.dg .dgc:focus-visible { outline: 2px solid var(--focus); outline-offset: -2px; }
+.dg .brk { position: absolute; transform: translate(-50%, -50%); padding: 2px 0; font-family: var(--font-mono); font-size: 11px; line-height: 1; letter-spacing: -2px; color: var(--text-3); background: var(--surface); pointer-events: none; }
 
 /* ---------- Stream folgen ---------- */
 .stream { margin: 0; padding: var(--sp-3) var(--sp-4); font-family: var(--font-mono); font-size: var(--fs-sm); line-height: 1.55; white-space: pre-wrap; overflow-wrap: anywhere; }

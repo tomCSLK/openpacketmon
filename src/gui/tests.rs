@@ -308,6 +308,13 @@ fn call_shots(folder: &Path) {
             harness.state_mut().go(Page::Packet(n));
             shot(&mut harness, folder, &format!("voip-{name}-{suffix}"));
         }
+        // the structure of RTP and RTCP below the bytes
+        harness.set_size(egui::vec2(1280.0, 1500.0));
+        for (name, n) in [("rtp", 7), ("rtcp", 79)] {
+            harness.state_mut().go(Page::Packet(n));
+            shot(&mut harness, folder, &format!("voip-{name}-tall-{suffix}"));
+        }
+        harness.set_size(egui::vec2(1280.0, 820.0));
         harness.state_mut().go(Page::Statistics {
             filter: String::new(),
             connections: String::new(),
@@ -588,6 +595,10 @@ fn shots() {
 
         harness.state_mut().go(Page::Packet(3));
         shot(&mut harness, &folder, &format!("packet-{suffix}"));
+        // the structure below the bytes
+        harness.set_size(egui::vec2(1280.0, 1400.0));
+        shot(&mut harness, &folder, &format!("packet-tall-{suffix}"));
+        harness.set_size(egui::vec2(1280.0, 820.0));
 
         harness.state_mut().go(Page::Stream(3));
         shot(&mut harness, &folder, &format!("stream-{suffix}"));
@@ -945,6 +956,57 @@ fn the_details_of_a_packet_can_be_copied() {
         !hex.is_empty() && hex.split(' ').all(|byte| byte.len() == 2),
         "{hex}"
     );
+}
+
+#[test]
+#[serial]
+fn the_structure_of_a_packet_marks_its_fields() {
+    let fixture = engine_with(200);
+    let mut harness = window_of_size(&fixture, Theme::Light, Lang::En, 1_600.0);
+    harness.state_mut().go(Page::Packet(3));
+    settle(&mut harness);
+
+    // a field of the drawing chooses the field around its bytes in the layers
+    harness.get_by_label("Destination Port: 443").click();
+    harness.run_steps(2);
+    assert!(harness.state().pages.packet.picked());
+    harness.event(egui::Event::Copy);
+    harness.step();
+    assert_eq!(copied(&harness).as_deref(), Some("Destination port: 443"));
+
+    // a field of the layers takes the choice back from the drawing
+    harness.get_by_label("Destination port: 443").click();
+    harness.run_steps(2);
+    assert!(!harness.state().pages.packet.picked());
+
+    // a layer by its name
+    harness
+        .get_by_label("Transmission Control Protocol")
+        .click();
+    harness.run_steps(2);
+    harness.event(egui::Event::Copy);
+    harness.step();
+    let layer = copied(&harness).unwrap();
+    assert!(
+        layer.starts_with("Transmission Control Protocol, Src Port"),
+        "{layer}"
+    );
+
+    // values instead of names, also for the next packet
+    harness.get_by_label("Values").click();
+    harness.run_steps(2);
+    assert!(harness.state().pages.packet.values());
+    harness
+        .get_by_label("Destination Port: 443")
+        .click_secondary();
+    harness.run_steps(2);
+    harness.get_by_label("Copy value").click();
+    harness.step();
+    assert_eq!(copied(&harness).as_deref(), Some("443"));
+    harness.state_mut().go(Page::Packet(4));
+    settle(&mut harness);
+    assert!(harness.state().pages.packet.values());
+    assert!(!harness.state().pages.packet.picked());
 }
 
 #[test]

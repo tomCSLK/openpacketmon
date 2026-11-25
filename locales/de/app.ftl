@@ -382,11 +382,21 @@ packet-truncated = Das Paket wurde nicht vollständig mitgeschnitten.
 packet-truncated-headers = Von diesem Paket sind nur die Kopfdaten gespeichert (Einstellung „Nur Kopfdaten“).
 packet-layers = Schichten
 packet-bytes = Bytes
-packet-layers-hint = Klick auf ein Feld markiert seine Bytes
+packet-layers-hint = Klick auf ein Feld markiert seine Bytes und seinen Platz im Aufbau
 packet-bytes-count = { $count ->
     [one] { $count } Byte
    *[other] { $count } Bytes
 }
+packet-diagram = Aufbau
+packet-diagram-hint = 32 Bit je Zeile, Feldbreiten nach RFC
+packet-diagram-names = Namen
+packet-diagram-values = Werte
+packet-diagram-bit = Bit { $from }
+packet-diagram-bits = Bit { $from }–{ $to } ({ $count } Bit)
+packet-diagram-value = Wert: { $value }
+packet-diagram-cut = abgeschnitten
+packet-diagram-protected = geschützt
+packet-diagram-none = Keine Kopfzeilen zum Zeichnen.
 packet-copy = Kopieren
 packet-after = (nach { $time })
 packet-hex-cut = Angezeigt sind die ersten { $bytes } Bytes; das ganze Paket enthält die PCAP-Datei.

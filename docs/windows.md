@@ -1,6 +1,6 @@
 # Windows-Version von openpacketmon
 
-Angelegt 2026-10-30, ergänzt bis 2026-11-12. Diese Datei beschreibt, was nötig ist, um das Projekt auf einem Windows-Rechner fortzusetzen und dort eine
+Angelegt 2026-10-30, ergänzt bis 2026-11-25. Diese Datei beschreibt, was nötig ist, um das Projekt auf einem Windows-Rechner fortzusetzen und dort eine
 Windows-Version zu bauen und zu testen.
 
 **Stand (2026-11-09):** Windows läuft auf `main` (der Zweig `windows` ist seit 2026-11-02 übernommen). Debug- und Release-Fassung bauen,
@@ -23,6 +23,24 @@ Rust 1.99 hat die Standardbibliothek die Funktionen vorher selbst aufgelöst, se
 Bauen mit `rustup toolchain install 1.99.1 --profile minimal`, dann `$env:RUSTUP_TOOLCHAIN = '1.99.1'` vor `cargo` und
 `dev\build-installer.ps1`. **Plan für die Korrektur in `PLAN.md` 5.9** (Verweis auf die drei Funktionen aus `windows-sys` 0.61 im
 eigenen Crate; an einer Probe mit Rust 1.100 geprüft; `synchronization.lib` allein vorzuziehen hilft nicht). Umsetzung nach „go“.
+
+**Aufbau (Paketdiagramm, `PLAN.md` 5.11, umgesetzt 2026-11-25 unter Linux, unter Windows noch nicht gebaut):** Auf der Seite Paket
+steht unter dem Hex-Dump die Karte „Aufbau“ mit den Kopfzeilen jeder Schicht in Zeilen zu 32 Bit. Neu sind nur Rust-Code und Texte
+(`src/view/diagram.rs`, `src/gui/pages/packet/diagram.rs`, Änderungen in `src/gui/pages/packet.rs`, `src/view/packets.rs`,
+`src/gui/tests.rs`, `locales/*/app.ftl`); kein Windows-spezifischer Code, keine neue Abhängigkeit, `Cargo.lock` und
+`THIRD-PARTY-LICENSES.txt` unverändert; Version 0.5.3 (Test-Paket unter Linux 2026-11-25). Verwendet werden nur Funktionen der Standardbibliothek, die es in 1.99
+schon gibt (`Option::is_none_or`, `div_ceil`, `if let`-Ketten). Reihenfolge unter Windows:
+1. `git pull` (Stand mit dem Commit des Aufbaus auf `main`), `$env:RUSTUP_TOOLCHAIN = '1.99.1'`, dann `cargo build --release --workspace`
+   (soll ohne Warnung bauen) und `cargo test --workspace -j 4`. Neue Tests: 11 in `view::diagram::tests`,
+   `gui::pages::packet::diagram::tests::a_field_of_the_drawing_chooses_the_smallest_field_around_it` und der GUI-Test
+   `gui::tests::the_structure_of_a_packet_marks_its_fields`. Unter Linux: 435 im Hauptprogramm grün (3 ignoriert).
+   Prüfen, dass der Helfer richtig importiert: `dumpbin /dependents target\release\openpacketmon-capture.exe` ohne `vertdll.dll`.
+2. Von Hand (Release-Fassung aus `target\release` oder nach einem Installer-Bau, Abschnitt 6): eine Aufzeichnung oder PCAP-Datei
+   öffnen, ein Paket anklicken, rechts unter „Bytes“ die Karte „Aufbau“ ansehen (Linien scharf, Beschriftungen nicht abgeschnitten,
+   hell und dunkel; DirectX 12 zeichnet unter Windows, sonst OpenGL), „Namen | Werte“ umschalten, ein Feld im Aufbau anklicken (markiert
+   seine Bytes und links das Feld), ein Feld links anklicken (markiert die Felder im Aufbau), Tab und Enter auf den Feldern, Tooltip,
+   Rechtsklick „Wert kopieren“. Auf Bildschirmen mit Skalierung 125 % und 150 % prüfen, ob die Rahmenlinien gleichmäßig dick sind.
+3. Ergebnis hier und in `PLAN.md` 5.11 („Offen“) eintragen. Ein Installer nur auf Ansage des Nutzers (Version nennt er).
 
 **0.5.1 und 0.5.2 (Test-Pakete 2026-11-12; v0.5.2 unter Linux released am 2026-11-12, signierter Windows-Installer am selben Tag hinzugefügt):** Promiscuous Mode (`PLAN.md` 5.8, ab 0.5.1); in 0.5.2 dazu der Knopf
 „Aufzeichnung starten“ der Kopfleiste, der auf der Seite Aufzeichnung jetzt startet (`PLAN.md` 5.6). Am Monitoring-Port eines Netzwerk-TAPs zeigte
@@ -483,6 +501,6 @@ Update über eine ältere Version, Start ohne Npcap (Abschnitt 5 Punkt 8).
 **Beginn (Nutzer, 2026-11-02):** Windows wird **vor** dem ersten Release gemacht, weil andere Tester eine Windows-Fassung
 brauchen; MCP ist fertig. Der Haltepunkt aus `PLAN.md` 4.10 ist seit 2026-11-02 aufgehoben.
 
-**Noch offen (Stand 2026-11-12):** Rust 1.100 und `vertdll.dll` im Code beheben (oben), 0.5.2 am TAP prüfen, sobald einer verfügbar ist (oben unter „0.5.1 und 0.5.2“), Test von 0.5.0 unter Windows zu Ende führen (oben unter „v0.5.0“, Schritt 2; das Update von 0.4.0
+**Noch offen (Stand 2026-11-25):** den Aufbau (Paketdiagramm) bauen und prüfen (oben unter „Aufbau“), Rust 1.100 und `vertdll.dll` im Code beheben (oben), 0.5.2 am TAP prüfen, sobald einer verfügbar ist (oben unter „0.5.1 und 0.5.2“), Test von 0.5.0 unter Windows zu Ende führen (oben unter „v0.5.0“, Schritt 2; das Update von 0.4.0
 mit dem Installer lief beim Nutzer reibungslos), CI-Job für Windows (Abschnitt 7), Test auf einem sauberen System (Deinstallation, Update über eine
 ältere Version, Start ohne Npcap), MCP-Einrichtung in `docs/windows-tester.md`, MCP-Integrationstests von den echten Einstellungen trennen.

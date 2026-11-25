@@ -14,6 +14,7 @@ use crate::view::i18n::Lang;
 pub mod calls;
 pub mod capture;
 pub mod connections;
+pub mod diagram;
 pub mod entries;
 pub mod filter_index;
 pub mod format;

@@ -878,6 +878,8 @@ pub struct PacketDetail {
     pub truncated: bool,
     pub headers_only: bool,
     pub layers: Vec<Layer>,
+    /// The headers of the layers in rows of 32 bits
+    pub diagram: Vec<crate::view::diagram::DiagramLayer>,
     pub hex: Vec<HexLine>,
     /// Note that the hex dump ends before the packet
     pub hex_cut: Option<String>,
@@ -960,6 +962,10 @@ pub fn packet_detail(t: Lang, engine: &Engine, n: u64) -> Option<PacketDetail> {
             .unwrap_or(layers.len() - 1);
     }
     let neighbor = |n: u64| store.get(n).map(|_| n);
+    // the bytes of the packet and of the following segments of an assembled message
+    let joined = (!more.is_empty()).then(|| [&packet.data[..], &more].concat());
+    let diagram =
+        crate::view::diagram::diagram(t, &layers, joined.as_deref().unwrap_or(&packet.data));
     Some(PacketDetail {
         number: packet.number,
         protocol: d.protocol,
@@ -967,12 +973,10 @@ pub fn packet_detail(t: Lang, engine: &Engine, n: u64) -> Option<PacketDetail> {
         truncated: d.truncated,
         headers_only: store.headers_only(),
         layers,
-        hex: if more.is_empty() {
-            hex_dump(&packet.data[..captured.min(HEX_LIMIT)])
-        } else {
-            let mut joined = packet.data.to_vec();
-            joined.extend_from_slice(&more);
-            hex_dump(&joined)
+        diagram,
+        hex: match &joined {
+            None => hex_dump(&packet.data[..captured.min(HEX_LIMIT)]),
+            Some(joined) => hex_dump(joined),
         },
         assembled: (!used.is_empty()).then(|| {
             let numbers: Vec<String> = used.iter().map(u64::to_string).collect();

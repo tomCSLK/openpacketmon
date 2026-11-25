@@ -8,6 +8,17 @@ The history of Sniffnet itself is in its own changelog: <https://github.com/Gyul
 
 ## [Unreleased]
 
+### Interface
+
+- The packet page shows the structure of the headers below the bytes: each layer as the RFCs draw it, in rows of 32 bits
+  with a ruler, every field at its bits (the IPv4 header length and DSCP/ECN, the single TCP flags, the DNS flags, RTP
+  and RTCP …); long fields and the payload take one row with broken edges. It shows the names of the fields or their
+  values, and a tooltip both with the bits. A field there marks its bytes in the hex dump and the field around them in
+  the layers, and a field or byte chosen there marks the fields in its bytes
+- Known layouts: Ethernet, 802.1Q, Linux cooked capture, loopback, ARP, IPv4, IPv6 and its extension headers, TCP, UDP,
+  ICMP, ICMPv6, IGMP, DNS, mDNS, LLMNR, TLS records, QUIC, NTP, DHCP, DHCPv6, RTP and RTCP; text protocols and other
+  data are one block
+
 ### Dependencies
 
 - toml is only used by the tests now; the build checks the service names with rustrict in release builds too, not only

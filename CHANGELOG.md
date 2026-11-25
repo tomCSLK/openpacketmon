@@ -24,6 +24,8 @@ The history of Sniffnet itself is in its own changelog: <https://github.com/Gyul
 
 ### Dependencies
 
+- etherparse 0.21.1 (RUSTSEC-2026-0596: out-of-bounds read on malformed IPv6 extension headers in lax parsing, which the
+  packet parser uses) and url 2.5.9 (RUSTSEC-2026-0592)
 - toml is only used by the tests now; the build checks the service names with rustrict in release builds too, not only
   in debug builds
 

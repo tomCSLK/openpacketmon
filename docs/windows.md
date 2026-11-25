@@ -57,7 +57,8 @@ Reihenfolge unter Windows (wie bei 0.5.2):
 steht unter dem Hex-Dump die Karte „Aufbau“ mit den Kopfzeilen jeder Schicht in Zeilen zu 32 Bit. Neu sind nur Rust-Code und Texte
 (`src/view/diagram.rs`, `src/gui/pages/packet/diagram.rs`, Änderungen in `src/gui/pages/packet.rs`, `src/view/packets.rs`,
 `src/gui/tests.rs`, `locales/*/app.ftl`); kein Windows-spezifischer Code, keine neue Abhängigkeit, `Cargo.lock` und
-`THIRD-PARTY-LICENSES.txt` unverändert; Version 0.5.4 (Release unter Linux 2026-11-25, mit den Graphen aus 5.10 unten). Verwendet werden nur Funktionen der Standardbibliothek, die es in 1.99
+Version 0.5.4 (Release unter Linux 2026-11-25, mit den Graphen aus 5.10 unten). Vor dem Release kamen etherparse 0.21.1 und
+url 2.5.9 dazu (neue RustSec-Meldungen, beide bauen mit Rust 1.99.1); `THIRD-PARTY-LICENSES.txt` ist dafür neu erzeugt. Verwendet werden nur Funktionen der Standardbibliothek, die es in 1.99
 schon gibt (`Option::is_none_or`, `div_ceil`, `if let`-Ketten). Reihenfolge unter Windows:
 1. (Ablauf für 0.5.4 oben unter „v0.5.4“.) `git pull`, `$env:RUSTUP_TOOLCHAIN = '1.99.1'`, dann `cargo build --release --workspace`
    (soll ohne Warnung bauen) und `cargo test --workspace -j 4`. Neue Tests: 11 in `view::diagram::tests`,

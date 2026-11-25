@@ -14,7 +14,10 @@ unsound = "all"
 # arrive through other crates; they are checked again when those crates are updated.
 # Checked 2026-11-02: accesskit_unix 0.24.1 and accesskit_atspi_common 0.21.1 are the newest releases and still use
 # zbus 5; the advisories say the crates were merged into zbus 6, not that they have a flaw.
+# Checked 2026-11-25: chrono is unmaintained (no flaw named, no newer release); it only comes with rmcp 3.9.0 (schemars
+# feature "chrono04"), the MCP server, which does not use its time types.
 ignore = [
+    { id = "RUSTSEC-2026-0543", reason = "chrono (unmaintained) only through rmcp and schemars, the MCP server" },
     { id = "RUSTSEC-2026-0370", reason = "zvariant (merged into zbus 6) only through accesskit_unix, the screen reader support of egui" },
     { id = "RUSTSEC-2026-0371", reason = "zbus_names (merged into zbus 6) only through accesskit_unix, the screen reader support of egui" },
     { id = "RUSTSEC-2026-0372", reason = "zvariant_derive (merged into zbus 6) only through accesskit_unix, the screen reader support of egui" },

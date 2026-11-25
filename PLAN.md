@@ -7,7 +7,9 @@
   oben unter „v0.5.4“ (Bau mit Rust 1.99.1, `dev/release.sh --add-windows`, Release-Text anpassen). Vor dem Release scheiterte
   `cargo deny` an drei neuen RustSec-Meldungen: etherparse 0.21.1 (RUSTSEC-2026-0596, Lesen außerhalb der Grenzen bei kaputten
   IPv6-Erweiterungsköpfen im „lax“-Zerlegen, das der Paket-Parser nutzt) und url 2.5.9 übernommen; chrono (RUSTSEC-2026-0543,
-  nicht mehr gepflegt, nur über rmcp) in `deny.toml` mit Begründung ignoriert.
+  nicht mehr gepflegt, nur über rmcp) in `deny.toml` mit Begründung ignoriert. CI grün, dann `dev/release.sh --publish`:
+  Release `v0.5.4` mit `openpacketmon_0.5.4-1_amd64.deb` (SHA-256 `89e5559c…ca1caadf0`), `THIRD-PARTY-LICENSES.txt` und
+  `SHA256SUMS`; Release-Text mit Abschnitt „Security“ (etherparse) und dem Hinweis, dass der Windows-Installer folgt.
 - **Umgesetzt (5.11, 2026-11-25):** Aufbau (Paketdiagramm) auf der Seite Paket rechts unter dem Hex-Dump, Kopfzeilen in Zeilen zu
   32 Bit wie in den RFCs. Entwurf abgenommen, „go“ am 2026-11-25; Seitendaten `src/view/diagram.rs`, Zeichnung
   `src/gui/pages/packet/diagram.rs`. **Test-Paket 0.5.3** gebaut (2026-11-25, `target/debian/openpacketmon_0.5.3-1_amd64.deb`),

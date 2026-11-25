@@ -27,7 +27,8 @@ Bauen mit `rustup toolchain install 1.99.1 --profile minimal`, dann `$env:RUSTUP
 `dev\build-installer.ps1`. **Plan für die Korrektur in `PLAN.md` 5.9** (Verweis auf die drei Funktionen aus `windows-sys` 0.61 im
 eigenen Crate; an einer Probe mit Rust 1.100 geprüft; `synchronization.lib` allein vorzuziehen hilft nicht). Umsetzung nach „go“.
 
-**v0.5.4 (released 2026-11-25 unter Linux, nur `.deb`; der signierte Windows-Installer fehlt noch, Termin des Nutzers: 2026-11-26).**
+**v0.5.4 (released 2026-11-25 unter Linux, nur `.deb`, Tag auf Commit `30c1929`; der signierte Windows-Installer fehlt noch, Termin
+des Nutzers: 2026-11-26).**
 Inhalt: der Aufbau unter dem Hex-Dump (`PLAN.md` 5.11) und die Graphen mit „Gesamt“ (5.10), Einzelheiten in den beiden Absätzen
 unten. 0.5.3 war nur ein Test-Paket unter Linux, ohne Release. Bis der Installer da ist, verweist der Release-Text für Windows auf v0.5.2.
 Reihenfolge unter Windows (wie bei 0.5.2):

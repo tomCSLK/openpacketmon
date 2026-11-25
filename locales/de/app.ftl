@@ -907,5 +907,6 @@ gui-theme-dark = Dunkel
 gui-packets-memory = Höchstens Arbeitsspeicher
 gui-connection-gone = Diese Verbindung ist nicht mehr in der Aufzeichnung.
 rate-now = jetzt
+chart-total = Gesamt
 chart-in = Eingehend
 chart-out = Ausgehend

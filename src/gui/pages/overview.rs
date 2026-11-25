@@ -7,7 +7,7 @@ use eframe::egui::{self, Align, Layout, RichText, Sense, Ui, UiBuilder};
 
 use crate::config::favorite::Favorite;
 use crate::engine::Engine;
-use crate::gui::chart::{Chart, chart};
+use crate::gui::chart::{Chart, Shown, chart};
 use crate::gui::load::Loader;
 use crate::gui::pages::{entries, head_rich};
 use crate::gui::theme::{self, medium_font, palette};
@@ -37,6 +37,16 @@ struct Data {
 #[derive(Default)]
 pub struct State {
     data: Loader<(usize, DataUnit), Data>,
+    /// The series the chart shows
+    chart: Shown,
+}
+
+#[cfg(test)]
+impl State {
+    /// The series the chart shows
+    pub fn chart(&self) -> [bool; 3] {
+        self.chart.0
+    }
 }
 
 impl State {
@@ -242,9 +252,11 @@ fn rate_line(ui: &mut Ui, t: Lang, unit: DataUnit, now: [f64; 2]) {
     ui.add(egui::Label::new(job).selectable(false));
 }
 
-fn traffic(ui: &mut Ui, t: Lang, unit: DataUnit, d: &Data) {
+fn traffic(ui: &mut Ui, t: Lang, unit: DataUnit, d: &Data, shown: &mut Shown) {
     let points = points(&d.samples, unit);
     let now = rate_now(&points);
+    // the legend changes the series from the next frame on
+    let (shown_now, mut legend) = (*shown, *shown);
     widgets::flush_card(
         ui,
         &t.get("chart-title"),
@@ -253,7 +265,8 @@ fn traffic(ui: &mut Ui, t: Lang, unit: DataUnit, d: &Data) {
                 rate_line(ui, t, unit, now);
             }
             ui.add_space(theme::SP4 - theme::SP3);
-            widgets::legend(ui, &t.get("chart-in"), &t.get("chart-out"));
+            let names = [t.get("chart-total"), t.get("chart-in"), t.get("chart-out")];
+            widgets::legend(ui, [&names[0], &names[1], &names[2]], &mut legend.0);
         },
         |ui| {
             if points.is_empty() {
@@ -263,14 +276,15 @@ fn traffic(ui: &mut Ui, t: Lang, unit: DataUnit, d: &Data) {
             let seconds: Vec<i64> = d.samples.iter().map(|s| d.start + s[0] as i64).collect();
             let last = seconds.len() - 1;
             let live = d.live;
-            let names = [t.get("chart-in"), t.get("chart-out")];
+            let names = [t.get("chart-total"), t.get("chart-in"), t.get("chart-out")];
             chart(
                 ui,
                 &Chart {
                     height: 220.0,
                     points: &points,
                     ticks: 5,
-                    names: [&names[0], &names[1]],
+                    names: [&names[0], &names[1], &names[2]],
+                    shown: shown_now,
                 },
                 |i| {
                     if live && i == last {
@@ -284,6 +298,7 @@ fn traffic(ui: &mut Ui, t: Lang, unit: DataUnit, d: &Data) {
             );
         },
     );
+    *shown = legend;
 }
 
 /// What was clicked in a top list
@@ -587,7 +602,7 @@ pub fn show(app: &mut App, ui: &mut Ui) {
     } else if let Some(d) = app.pages.overview.data.value() {
         go = go.or(tiles(ui, t, &d.view));
         jump = attention(ui, t, &d.view);
-        traffic(ui, t, unit, d);
+        traffic(ui, t, unit, d, &mut app.pages.overview.chart);
         let (page, clicked) = tops(ui, t, &d.view);
         go = go.or(page);
         action = clicked;

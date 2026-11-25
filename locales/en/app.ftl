@@ -907,5 +907,6 @@ gui-theme-dark = Dark
 gui-packets-memory = Most memory
 gui-connection-gone = This connection is no longer part of the capture.
 rate-now = now
+chart-total = Total
 chart-in = Incoming
 chart-out = Outgoing

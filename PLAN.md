@@ -6,8 +6,9 @@
   32 Bit wie in den RFCs. Entwurf abgenommen, „go“ am 2026-11-25; Seitendaten `src/view/diagram.rs`, Zeichnung
   `src/gui/pages/packet/diagram.rs`. **Test-Paket 0.5.3** gebaut (2026-11-25, `target/debian/openpacketmon_0.5.3-1_amd64.deb`),
   offen Test durch den Nutzer und ein Bau unter Windows (`docs/windows.md` oben unter „Aufbau“).
-- **Geplant (5.10, 2026-11-25):** Graphen wie in opennetmon 0.7.1. Linien durchgezogen, dazu „Gesamt“ als graue Fläche
-  und eine Legende zum Anklicken. Fragen entschieden, Umsetzung nach „go“.
+- **Umgesetzt (5.10, 2026-11-25):** Graphen wie in opennetmon 0.7.1. Linien durchgezogen, dazu „Gesamt“ als graue Fläche
+  und eine Legende zum Anklicken (`src/gui/chart.rs`, `widgets::legend`). **Test-Paket 0.5.4** (2026-11-25) mit 5.10 und 5.11:
+  `sudo apt install ./target/debian/openpacketmon_0.5.4-1_amd64.deb`.
 - **v0.5.2** ist released (2026-11-12, auf Ansage des Nutzers, zunächst nur Linux) mit Promiscuous Mode (5.8) und dem Startknopf oben
   (5.6). Vorher war die CI unter Rust 1.100 rot: Clippy (pedantic `map_unwrap_or`) schlägt dort `map_or_default` vor, das es erst ab
   1.100 gibt; der Lint ist im Workspace abgeschaltet, weil Windows mit 1.99 baut (`rust-version` 1.99 hatte nicht gereicht). Die `.deb`
@@ -1967,7 +1968,7 @@ Fassung; auf `main` von rust-pcap nutzt `pcap` schon `windows-sys` 0.61, unverö
 
 ---
 
-#### 5.10 Graphen wie in opennetmon 0.7.1: Linien durchgezogen, „Gesamt“ als Fläche (Wunsch des Nutzers, 2026-11-25; Plan entschieden, Umsetzung nach „go“)
+#### 5.10 Graphen wie in opennetmon 0.7.1: Linien durchgezogen, „Gesamt“ als Fläche (Wunsch des Nutzers, 2026-11-25; „go“ am 2026-11-25, umgesetzt)
 
 **Wunsch des Nutzers (2026-11-25):** Die Änderung aus opennetmon (Vorhaben S, released in opennetmon v0.7.1) auch hier.
 Dort entschieden und hier zu übernehmen:
@@ -2032,6 +2033,28 @@ Dort entschieden und hier zu übernehmen:
 Danach ein Test-Paket; die Version nennt der Nutzer.
 
 Aufwand: klein bis mittel (etwa zwei bis drei Stunden, die anklickbare Legende in egui ist der größte Teil). Keine neue Abhängigkeit.
+
+**„go“ (2026-11-25):** Das „passt, setze alles um. go.“ zum Aufbau (5.11) galt auch hierfür; zuerst nur 5.11 umgesetzt und 0.5.3
+gebaut, auf Hinweis des Nutzers danach 5.10.
+
+**Umgesetzt (2026-11-25), wie oben vorgeschlagen:**
+- `src/gui/chart.rs`: `Shown` (drei Schalter, anfangs alle an), `series` (Gesamt, Ein-, Ausgehend je Punkt), `axis_top` (nur die
+  sichtbaren Reihen); Fläche unter Gesamt mit `s_total_fill`, Gesamtlinie 1,2 px, Ein- und Ausgehend durchgezogen 1,6 px; Punkte
+  und Zeilen im Hinweiskasten nur für sichtbare Reihen, Gesamt zuerst. `Shape::dashed_line` und die Fläche unter Eingehend entfallen.
+- `src/gui/theme.rs`: `s_total` und `s_total_fill`, hell `#444d59` mit 14 %, dunkel `#b0b8c2` mit 16 %.
+- `widgets::legend`: drei Knöpfe „Gesamt · Eingehend · Ausgehend“ (Kästchen mit Strich bzw. Strich), ausgeblendet durchgestrichen und
+  blass, Fokusrahmen, `WidgetInfo::selected`. Text `chart-total`.
+- Zustand je Graph in `overview::State::chart` und `statistics::State::chart`, nur bis zum Programmende. Die Legende wirkt ab dem
+  nächsten Bild (sie steht im Kopf der Karte vor dem Graphen; sie fordert dafür ein neues Bild an).
+- Tests: `the_total_is_the_sum_and_the_axis_follows_the_series_shown` (Summe, Achse mit und ohne Gesamt), GUI-Test
+  `the_legend_hides_a_series_of_its_own_chart` (Ausblenden je Graph getrennt). Bilder Übersicht und Statistik hell/dunkel angesehen.
+  `cargo fmt`, `clippy -D warnings`, `cargo test --workspace` (437 im Hauptprogramm) grün.
+- Abweichung vom Entwurf (`docs/entwurf/`): der Entwurf zeigt weiter die alte Darstellung (Eingehend mit Fläche, Ausgehend gestrichelt).
+
+**Test-Paket 0.5.4** (2026-11-25, auf Ansage des Nutzers), enthält 5.10 und 5.11: `target/debian/openpacketmon_0.5.4-1_amd64.deb`
+(Lizenzliste unverändert).
+
+**Offen:** Test durch den Nutzer, Bau unter Windows (`docs/windows.md` oben unter „Aufbau“).
 
 #### 5.11 Aufbau (Paketdiagramm) auf der Seite Paket (Wunsch des Nutzers, 2026-11-25; Entwurf abgenommen und „go“ am 2026-11-25, umgesetzt)
 

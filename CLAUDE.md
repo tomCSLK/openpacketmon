@@ -105,9 +105,9 @@ Maßgeblich ist `PLAN.md` (oben „Stand“, Abschnitt 5). Kurz (2026-11-25):
 
 - **Aufbau (Paketdiagramm)** (`PLAN.md` 5.11, 2026-11-25): auf der Seite Paket rechts unter dem Hex-Dump die Kopfzeilen jeder
   Schicht in Zeilen zu 32 Bit wie in den RFCs, Felder bitgenau, Namen oder Werte, Markieren in drei Richtungen. Entwurf abgenommen,
-  umgesetzt (`src/view/diagram.rs`, `src/gui/pages/packet/diagram.rs`), Test-Paket 0.5.3; offen Test durch den Nutzer und Windows-Bau.
-- **Geplant: Graphen wie opennetmon 0.7.1** (`PLAN.md` 5.10, 2026-11-25). Linien durchgezogen, dazu „Gesamt“ (Ein- plus Ausgehend) als graue
-  Fläche (hell dunkles Grau, dunkel helles Grau) und eine Legende zum Anklicken. Ausblenden je Graph und nur bis zum Programmende. Umsetzung nach „go“.
+  umgesetzt (`src/view/diagram.rs`, `src/gui/pages/packet/diagram.rs`), Test-Pakete 0.5.3 und 0.5.4; offen Test durch den Nutzer und Windows-Bau.
+- **Graphen wie opennetmon 0.7.1** (`PLAN.md` 5.10, 2026-11-25): Linien durchgezogen, „Gesamt“ als graue Fläche, Legende zum
+  Anklicken (je Graph, bis zum Programmende). Umgesetzt, im Test-Paket 0.5.4 (mit dem Aufbau).
 - **v0.5.2** ist released (2026-11-12, Linux) mit Promiscuous Mode und dem Startknopf oben; der **signierte Windows-Installer** ist am
   selben Tag hinzugefügt (Rust 1.99.1; `docs/windows.md` oben unter „0.5.1 und 0.5.2“). Danach Abhängigkeiten und `Cargo.toml`
   aufgeräumt (`PLAN.md` oben).

@@ -1,7 +1,9 @@
-//! The traffic charts of the overview and the statistics, drawn as in the draft
-//! (`docs/entwurf/assets/pages.js`, `drawChart`): incoming as a line over a pale area, outgoing as
-//! a dashed line, five grid lines, and under the pointer a line across, the two points and their
-//! values in a dark label.
+//! The traffic charts of the overview and the statistics, drawn after the draft
+//! (`docs/entwurf/assets/pages.js`, `drawChart`) and as in opennetmon 0.7.1 (`PLAN.md` 5.10): the
+//! total of both directions as a grey line over a grey area, incoming and outgoing as solid lines
+//! over it, five grid lines, and under the pointer a line across, the points and their values in a
+//! dark label. The legend ([`crate::gui::widgets::legend`]) hides and shows each series; the axis
+//! reaches the highest value of the series shown.
 
 use eframe::egui::epaint::{Mesh, PathStroke, Vertex, WHITE_UV};
 use eframe::egui::{
@@ -17,6 +19,37 @@ const PAD_RIGHT: f32 = 12.0;
 const PAD_TOP: f32 = 10.0;
 const PAD_BOTTOM: f32 = 26.0;
 
+/// The series of a chart: the total, incoming and outgoing
+pub const TOTAL: usize = 0;
+
+/// Which series a chart shows ([`TOTAL`], incoming, outgoing): all at first; the choice lasts as
+/// long as the program runs, for each chart of its own
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Shown(pub [bool; 3]);
+
+impl Default for Shown {
+    fn default() -> Self {
+        Self([true; 3])
+    }
+}
+
+/// The total, incoming and outgoing value of a point
+fn series(point: [f64; 2]) -> [f64; 3] {
+    [point[0] + point[1], point[0], point[1]]
+}
+
+/// The top of the axis: the highest value of the series shown, a little above
+fn axis_top(points: &[[f64; 2]], shown: Shown) -> f64 {
+    let max = points
+        .iter()
+        .flat_map(|point| {
+            let values = series(*point);
+            (0..3).filter(move |k| shown.0[*k]).map(move |k| values[k])
+        })
+        .fold(0.0_f64, f64::max);
+    nice_max(max * 1.08)
+}
+
 /// A chart of incoming and outgoing values
 pub struct Chart<'a> {
     /// Height in the units of the draft (220 in the overview, 200 in the statistics)
@@ -25,8 +58,9 @@ pub struct Chart<'a> {
     pub points: &'a [[f64; 2]],
     /// Labels of the time axis: one more than this, the first at the start, the last at the end
     pub ticks: usize,
-    /// "Incoming", "Outgoing"
-    pub names: [&'a str; 2],
+    /// "Total", "Incoming", "Outgoing"
+    pub names: [&'a str; 3],
+    pub shown: Shown,
 }
 
 /// The top of the vertical axis: 1, 2, 2.5, 5 or 10 times a power of ten (`niceMax`)
@@ -97,12 +131,7 @@ fn draw(
         return;
     }
     let n = c.points.len();
-    let max = c
-        .points
-        .iter()
-        .flat_map(|p| [p[0], p[1]])
-        .fold(0.0_f64, f64::max);
-    let top = nice_max(max * 1.08);
+    let top = axis_top(c.points, c.shown);
     let at = |x: f32, y: f32| pos2(rect.left() + x * scale, rect.top() + y * scale);
     let x = |i: usize| {
         PAD_LEFT
@@ -153,38 +182,45 @@ fn draw(
         return;
     }
 
-    let line: Vec<Pos2> = (0..n).map(|i| at(x(i), y(c.points[i][0]))).collect();
-    let dashed: Vec<Pos2> = (0..n).map(|i| at(x(i), y(c.points[i][1]))).collect();
-    // the area below the incoming line, as one mesh (an area is not convex)
-    let base = at(0.0, y(0.0)).y;
-    let fill = p.s1.gamma_multiply(0.10);
-    let mut mesh = Mesh::default();
-    for pt in &line {
-        mesh.vertices.push(Vertex {
-            pos: *pt,
-            uv: WHITE_UV,
-            color: fill,
-        });
-        mesh.vertices.push(Vertex {
-            pos: pos2(pt.x, base),
-            uv: WHITE_UV,
-            color: fill,
-        });
+    let colors = [p.s_total, p.s1, p.s2];
+    let lines: Vec<Vec<Pos2>> = (0..3)
+        .map(|k| {
+            (0..n)
+                .map(|i| at(x(i), y(series(c.points[i])[k])))
+                .collect()
+        })
+        .collect();
+    if c.shown.0[TOTAL] {
+        // the area below the total, as one mesh (an area is not convex)
+        let base = at(0.0, y(0.0)).y;
+        let fill = p.s_total_fill;
+        let mut mesh = Mesh::default();
+        for pt in &lines[TOTAL] {
+            mesh.vertices.push(Vertex {
+                pos: *pt,
+                uv: WHITE_UV,
+                color: fill,
+            });
+            mesh.vertices.push(Vertex {
+                pos: pos2(pt.x, base),
+                uv: WHITE_UV,
+                color: fill,
+            });
+        }
+        for i in 0..n.saturating_sub(1) as u32 {
+            let (a, b) = (2 * i, 2 * i + 2);
+            mesh.add_triangle(a, a + 1, b);
+            mesh.add_triangle(b, a + 1, b + 1);
+        }
+        painter.add(Shape::mesh(mesh));
     }
-    for i in 0..n.saturating_sub(1) as u32 {
-        let (a, b) = (2 * i, 2 * i + 2);
-        mesh.add_triangle(a, a + 1, b);
-        mesh.add_triangle(b, a + 1, b + 1);
+    for k in (0..3).filter(|k| c.shown.0[*k]) {
+        let width = if k == TOTAL { 1.2 } else { 1.6 } * scale;
+        painter.add(Shape::line(
+            lines[k].clone(),
+            PathStroke::new(width, colors[k]),
+        ));
     }
-    painter.add(Shape::mesh(mesh));
-    let width_1 = 1.6 * scale;
-    painter.add(Shape::line(line.clone(), PathStroke::new(width_1, p.s1)));
-    painter.extend(Shape::dashed_line(
-        &dashed,
-        Stroke::new(width_1, p.s2),
-        5.0 * scale,
-        3.0 * scale,
-    ));
 
     let Some(pointer) = response.hover_pos() else {
         return;
@@ -198,11 +234,11 @@ fn draw(
         ],
         Stroke::new(1.0, p.border_strong),
     );
-    for (point, color) in [(line[i], p.s1), (dashed[i], p.s2)] {
+    for k in (0..3).filter(|k| c.shown.0[*k]) {
         painter.circle(
-            point,
+            lines[k][i],
             4.0 * scale,
-            color,
+            colors[k],
             Stroke::new(2.0 * scale, p.surface),
         );
     }
@@ -233,23 +269,23 @@ fn label(
     let plain = FontId::proportional(size);
     let bold = theme::mono_medium_font(size);
     let title = painter.layout_no_wrap(tip(i), plain.clone(), p.surface);
-    let rows: Vec<_> = [
-        (c.names[0], c.points[i][0], p.s1),
-        (c.names[1], c.points[i][1], p.s2),
-    ]
-    .into_iter()
-    .map(|(name, v, color)| {
-        let dot = painter.layout_no_wrap("●".to_owned(), plain.clone(), color);
-        let name = painter.layout_no_wrap(format!(" {name} "), plain.clone(), p.surface);
-        let v = painter.layout_no_wrap(value(v), bold.clone(), p.surface);
-        (dot, name, v)
-    })
-    .collect();
+    let values = series(c.points[i]);
+    let colors = [p.s_total, p.s1, p.s2];
+    let rows: Vec<_> = (0..3)
+        .filter(|k| c.shown.0[*k])
+        .map(|k| (c.names[k], values[k], colors[k]))
+        .map(|(name, v, color)| {
+            let dot = painter.layout_no_wrap("●".to_owned(), plain.clone(), color);
+            let name = painter.layout_no_wrap(format!(" {name} "), plain.clone(), p.surface);
+            let v = painter.layout_no_wrap(value(v), bold.clone(), p.surface);
+            (dot, name, v)
+        })
+        .collect();
     let inner_w = rows
         .iter()
         .map(|(d, n, v)| d.size().x + n.size().x + v.size().x)
         .fold(title.size().x, f32::max);
-    let size_box = vec2(inner_w + 16.0, 3.0 * line_h + 12.0);
+    let size_box = vec2(inner_w + 16.0, (1 + rows.len()) as f32 * line_h + 12.0);
     // the draft places the label from the left edge of the box around the chart (16 px left of it)
     let left = (rect.left() - 16.0 + x * scale + 14.0).min(rect.right() - size_box.x - 4.0);
     let top = rect.top() - 12.0 + 18.0;
@@ -292,6 +328,21 @@ mod tests {
         assert!((nice_max(1_900.0) - 2_000.0).abs() < 1e-6);
         assert!((nice_max(2_300.0) - 2_500.0).abs() < 1e-6);
         assert!((nice_max(41.0) - 50.0).abs() < 1e-9);
+    }
+
+    #[test]
+    fn the_total_is_the_sum_and_the_axis_follows_the_series_shown() {
+        assert_eq!(series([300.0, 50.0]), [350.0, 300.0, 50.0]);
+        let points = [[300.0, 50.0], [700.0, 900.0]];
+        // the total reaches 1 600: up to 2 000
+        assert!((axis_top(&points, Shown::default()) - 2_000.0).abs() < 1e-9);
+        // without it, outgoing reaches 900: up to 1 000
+        assert!((axis_top(&points, Shown([false, true, true])) - 1_000.0).abs() < 1e-9);
+        // incoming alone reaches 700
+        assert!((axis_top(&points, Shown([false, true, false])) - 1_000.0).abs() < 1e-9);
+        assert!((axis_top(&points, Shown([false, false, true])) - 1_000.0).abs() < 1e-9);
+        // nothing shown: an axis up to 1
+        assert!((axis_top(&points, Shown([false; 3])) - 1.0).abs() < 1e-9);
     }
 
     #[test]

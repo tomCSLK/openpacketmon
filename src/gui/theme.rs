@@ -114,6 +114,9 @@ pub struct Palette {
     /// Charts: incoming blue, outgoing orange
     pub s1: Color32,
     pub s2: Color32,
+    /// Charts: the total of both, a grey line over a grey area
+    pub s_total: Color32,
+    pub s_total_fill: Color32,
     /// Follow stream: client and server
     pub cli: Color32,
     pub cli_bg: Color32,
@@ -162,6 +165,8 @@ pub const LIGHT: Palette = Palette {
     off_line: rgb(0xb5c2cf),
     s1: rgb(0x1c5ea8),
     s2: rgb(0xb45309),
+    s_total: rgb(0x444d59),
+    s_total_fill: rgba(0x444d59, 14),
     cli: rgb(0x174f8f),
     cli_bg: rgb(0xe8f0fa),
     srv: rgb(0x8a3c00),
@@ -214,6 +219,8 @@ pub const DARK: Palette = Palette {
     off_line: rgb(0x44505d),
     s1: rgb(0x7aaeea),
     s2: rgb(0xf0a24f),
+    s_total: rgb(0xb0b8c2),
+    s_total_fill: rgba(0xb0b8c2, 16),
     cli: rgb(0x9cc3f0),
     cli_bg: rgb(0x19283a),
     srv: rgb(0xf5b77a),

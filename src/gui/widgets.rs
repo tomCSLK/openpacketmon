@@ -1699,26 +1699,71 @@ pub fn switch(ui: &mut Ui, on: &mut bool, text: &str, big: bool) -> Response {
     response
 }
 
-/// The legend of a chart (`.legend`): a line in the first color, a dashed one in the second
-pub fn legend(ui: &mut Ui, first: &str, second: &str) {
+/// The legend of a chart (`.legend` as in opennetmon 0.7.1): "Total · Incoming · Outgoing" as
+/// buttons that hide or show their series in this chart; the total with a filled box under a line,
+/// the others with a line. A hidden series has its name struck through and pale.
+pub fn legend(ui: &mut Ui, names: [&str; 3], shown: &mut [bool; 3]) {
     let p = palette(ui.ctx());
-    ui.spacing_mut().item_spacing.x = 6.0;
-    for (text, color, dashed) in [(second, p.s2, true), (first, p.s1, false)] {
-        ui.label(small(text).color(p.text_2));
-        let (rect, _) = ui.allocate_exact_size(egui::vec2(16.0, 14.0), Sense::hover());
-        let y = rect.center().y;
-        if dashed {
-            ui.painter().extend(egui::Shape::dashed_line(
-                &[egui::pos2(rect.left(), y), egui::pos2(rect.right(), y)],
-                Stroke::new(2.0, color),
-                4.0,
-                2.0,
-            ));
+    let colors = [p.s_total, p.s1, p.s2];
+    ui.spacing_mut().item_spacing.x = theme::SP1;
+    // the head of a card lays out from the right: the last first
+    for k in (0..3).rev() {
+        let on = shown[k];
+        let text_color = if on { p.text_2 } else { p.text_3 };
+        let galley = ui.painter().layout_no_wrap(
+            names[k].to_owned(),
+            egui::FontId::proportional(theme::FS_SM),
+            text_color,
+        );
+        let mark_w = 16.0;
+        let size = egui::vec2(
+            mark_w + 6.0 + galley.size().x + 2.0 * theme::SP1,
+            CONTROL_SM_H,
+        );
+        let (rect, response) = ui.allocate_exact_size(size, Sense::click());
+        response.widget_info(|| WidgetInfo::selected(egui::Role::Button, true, on, names[k]));
+        let response = response.on_hover_cursor(egui::CursorIcon::PointingHand);
+        if response.hovered() {
+            ui.painter()
+                .rect_filled(rect, CornerRadius::same(theme::RADIUS_SM), p.hover);
+        }
+        focus_ring(ui, &response, theme::RADIUS_SM);
+        let color = if on {
+            colors[k]
+        } else {
+            colors[k].gamma_multiply(0.35)
+        };
+        let mark = Rect::from_center_size(
+            egui::pos2(rect.left() + theme::SP1 + mark_w / 2.0, rect.center().y),
+            egui::vec2(mark_w, 10.0),
+        );
+        if k == 0 {
+            let fill = if on {
+                p.s_total_fill
+            } else {
+                p.s_total_fill.gamma_multiply(0.35)
+            };
+            ui.painter().rect_filled(mark, 0.0, fill);
+            ui.painter()
+                .hline(mark.x_range(), mark.top(), Stroke::new(2.0, color));
         } else {
             ui.painter()
-                .hline(rect.x_range(), y, Stroke::new(2.0, color));
+                .hline(mark.x_range(), mark.center().y, Stroke::new(2.0, color));
         }
-        ui.add_space(theme::SP4 - 6.0);
+        let text_at = egui::pos2(mark.right() + 6.0, rect.center().y - galley.size().y / 2.0);
+        let text_w = galley.size().x;
+        ui.painter().galley(text_at.round(), galley, text_color);
+        if !on {
+            ui.painter().hline(
+                text_at.x..=text_at.x + text_w,
+                rect.center().y.round() + 0.5,
+                Stroke::new(1.0, p.text_3),
+            );
+        }
+        if response.clicked() {
+            shown[k] = !on;
+            ui.ctx().request_repaint();
+        }
     }
 }
 

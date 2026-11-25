@@ -960,6 +960,41 @@ fn the_details_of_a_packet_can_be_copied() {
 
 #[test]
 #[serial]
+fn the_legend_hides_a_series_of_its_own_chart() {
+    let fixture = engine_with(200);
+    let mut harness = window_of_size(&fixture, Theme::Light, Lang::En, 1_200.0);
+    harness.state_mut().go(Page::Overview);
+    settle(&mut harness);
+    assert_eq!(harness.state().pages.overview.chart(), [true; 3]);
+    harness.get_by_label("Total").click();
+    harness.run_steps(2);
+    assert_eq!(harness.state().pages.overview.chart(), [false, true, true]);
+
+    // the chart of the statistics has its own choice
+    harness.state_mut().go(Page::Statistics {
+        filter: String::new(),
+        connections: String::new(),
+    });
+    settle(&mut harness);
+    assert_eq!(harness.state().pages.statistics.chart(), [true; 3]);
+    harness.get_by_label("Total").click();
+    harness.run_steps(2);
+    assert_eq!(
+        harness.state().pages.statistics.chart(),
+        [false, true, true]
+    );
+    harness.get_by_label("Total").click();
+    harness.run_steps(2);
+    assert_eq!(harness.state().pages.statistics.chart(), [true; 3]);
+
+    // and the overview kept its own
+    harness.state_mut().go(Page::Overview);
+    settle(&mut harness);
+    assert_eq!(harness.state().pages.overview.chart(), [false, true, true]);
+}
+
+#[test]
+#[serial]
 fn the_structure_of_a_packet_marks_its_fields() {
     let fixture = engine_with(200);
     let mut harness = window_of_size(&fixture, Theme::Light, Lang::En, 1_600.0);

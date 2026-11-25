@@ -7,7 +7,7 @@ use std::time::Duration;
 use eframe::egui::{self, Color32, CornerRadius, FontId, Response, Sense, Stroke, Ui};
 use egui::emath::GuiRounding as _;
 
-use crate::gui::chart::{Chart as ChartSpec, chart};
+use crate::gui::chart::{Chart as ChartSpec, Shown, chart};
 use crate::gui::filter_field::FilterField;
 use crate::gui::load::Loader;
 use crate::gui::pages::head;
@@ -35,6 +35,16 @@ pub struct State {
     shown: Option<String>,
     display: FilterField,
     data: Loader<Key, Statistics>,
+    /// The series the chart shows
+    chart: Shown,
+}
+
+#[cfg(test)]
+impl State {
+    /// The series the chart shows
+    pub fn chart(&self) -> [bool; 3] {
+        self.chart.0
+    }
 }
 
 /// What was clicked on the page
@@ -133,7 +143,7 @@ pub fn show(app: &mut App, ui: &mut Ui, display: &str, connections: &str) {
     match state.data.value_of(&key) {
         Some(s) => match &s.error {
             Some(error) => widgets::error(ui, &error.message),
-            None => page(ui, t, s, &mut actions),
+            None => page(ui, t, s, &mut state.chart, &mut actions),
         },
         None => widgets::loading(ui, state.data.running_for(), &t.get("gui-loading")),
     }
@@ -175,7 +185,7 @@ pub fn show(app: &mut App, ui: &mut Ui, display: &str, connections: &str) {
     }
 }
 
-fn page(ui: &mut Ui, t: Lang, s: &Statistics, actions: &mut Actions) {
+fn page(ui: &mut Ui, t: Lang, s: &Statistics, shown: &mut Shown, actions: &mut Actions) {
     let tiles: Vec<Tile> = s
         .tiles
         .iter()
@@ -188,23 +198,29 @@ fn page(ui: &mut Ui, t: Lang, s: &Statistics, actions: &mut Actions) {
         })
         .collect();
     widgets::tiles(ui, &tiles, true);
+    // the legend changes the series from the next frame on
+    let (shown_now, mut legend) = (*shown, *shown);
     widgets::flush_card(
         ui,
         &t.get("stats-chart"),
-        |ui| widgets::legend(ui, &t.get("chart-in"), &t.get("chart-out")),
+        |ui| {
+            let names = [t.get("chart-total"), t.get("chart-in"), t.get("chart-out")];
+            widgets::legend(ui, [&names[0], &names[1], &names[2]], &mut legend.0);
+        },
         |ui| {
             if s.chart.points.is_empty() {
                 widgets::empty(ui, &t.get("stats-empty"));
                 return;
             }
-            let names = [t.get("chart-in"), t.get("chart-out")];
+            let names = [t.get("chart-total"), t.get("chart-in"), t.get("chart-out")];
             chart(
                 ui,
                 &ChartSpec {
                     height: 200.0,
                     points: &s.chart.points,
                     ticks: 6,
-                    names: [&names[0], &names[1]],
+                    names: [&names[0], &names[1], &names[2]],
+                    shown: shown_now,
                 },
                 |i| s.chart.labels.get(i).cloned().unwrap_or_default(),
                 |i| s.chart.tips.get(i).cloned().unwrap_or_default(),
@@ -212,6 +228,7 @@ fn page(ui: &mut Ui, t: Lang, s: &Statistics, actions: &mut Actions) {
             );
         },
     );
+    *shown = legend;
     widgets::flush_card(
         ui,
         &t.get("stats-hierarchy"),

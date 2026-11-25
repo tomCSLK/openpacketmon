@@ -28,7 +28,7 @@ eigenen Crate; an einer Probe mit Rust 1.100 geprüft; `synchronization.lib` all
 steht unter dem Hex-Dump die Karte „Aufbau“ mit den Kopfzeilen jeder Schicht in Zeilen zu 32 Bit. Neu sind nur Rust-Code und Texte
 (`src/view/diagram.rs`, `src/gui/pages/packet/diagram.rs`, Änderungen in `src/gui/pages/packet.rs`, `src/view/packets.rs`,
 `src/gui/tests.rs`, `locales/*/app.ftl`); kein Windows-spezifischer Code, keine neue Abhängigkeit, `Cargo.lock` und
-`THIRD-PARTY-LICENSES.txt` unverändert; Version 0.5.3 (Test-Paket unter Linux 2026-11-25). Verwendet werden nur Funktionen der Standardbibliothek, die es in 1.99
+`THIRD-PARTY-LICENSES.txt` unverändert; Version 0.5.4 (Test-Paket unter Linux 2026-11-25, mit den Graphen aus 5.10 unten). Verwendet werden nur Funktionen der Standardbibliothek, die es in 1.99
 schon gibt (`Option::is_none_or`, `div_ceil`, `if let`-Ketten). Reihenfolge unter Windows:
 1. `git pull` (Stand mit dem Commit des Aufbaus auf `main`), `$env:RUSTUP_TOOLCHAIN = '1.99.1'`, dann `cargo build --release --workspace`
    (soll ohne Warnung bauen) und `cargo test --workspace -j 4`. Neue Tests: 11 in `view::diagram::tests`,
@@ -41,6 +41,12 @@ schon gibt (`Option::is_none_or`, `div_ceil`, `if let`-Ketten). Reihenfolge unte
    seine Bytes und links das Feld), ein Feld links anklicken (markiert die Felder im Aufbau), Tab und Enter auf den Feldern, Tooltip,
    Rechtsklick „Wert kopieren“. Auf Bildschirmen mit Skalierung 125 % und 150 % prüfen, ob die Rahmenlinien gleichmäßig dick sind.
 3. Ergebnis hier und in `PLAN.md` 5.11 („Offen“) eintragen. Ein Installer nur auf Ansage des Nutzers (Version nennt er).
+
+Danach dazugekommen (`PLAN.md` 5.10, 2026-11-25): die Graphen von Übersicht und Statistik mit „Gesamt“ als Fläche, durchgezogenen
+Linien und anklickbarer Legende; ebenfalls nur Rust-Code (`src/gui/chart.rs`, `widgets::legend`, `theme.rs`) und ein Text. Von Hand
+unter Windows: Graphen hell und dunkel ansehen, „Gesamt“, „Eingehend“, „Ausgehend“ in der Legende an- und abschalten (die Achse folgt),
+Tab und Leertaste auf der Legende. Neue Tests: `gui::chart::tests::the_total_is_the_sum_and_the_axis_follows_the_series_shown`,
+`gui::tests::the_legend_hides_a_series_of_its_own_chart`.
 
 **0.5.1 und 0.5.2 (Test-Pakete 2026-11-12; v0.5.2 unter Linux released am 2026-11-12, signierter Windows-Installer am selben Tag hinzugefügt):** Promiscuous Mode (`PLAN.md` 5.8, ab 0.5.1); in 0.5.2 dazu der Knopf
 „Aufzeichnung starten“ der Kopfleiste, der auf der Seite Aufzeichnung jetzt startet (`PLAN.md` 5.6). Am Monitoring-Port eines Netzwerk-TAPs zeigte

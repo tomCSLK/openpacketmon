@@ -6,7 +6,7 @@ openpacketmon starts from Sniffnet `main` at commit `ab4bf739d464` (2026-10-20, 
 the history of this repository starts with one initial commit of the cleaned-up fork.
 The history of Sniffnet itself is in its own changelog: <https://github.com/GyulyVGC/sniffnet/blob/main/CHANGELOG.md>.
 
-## [Unreleased]
+## [0.5.4] - 2026-11-25
 
 ### Interface
 
@@ -15,12 +15,12 @@ The history of Sniffnet itself is in its own changelog: <https://github.com/Gyul
   and RTCP …); long fields and the payload take one row with broken edges. It shows the names of the fields or their
   values, and a tooltip both with the bits. A field there marks its bytes in the hex dump and the field around them in
   the layers, and a field or byte chosen there marks the fields in its bytes
-- The traffic charts of the overview and the statistics as in opennetmon 0.7.1: incoming and outgoing as solid lines
-  (outgoing was dashed), and a third series "Total" (incoming plus outgoing) as a grey area behind them; the legend
-  hides and shows each series of its chart until the program ends, and the axis follows the series shown
 - Known layouts: Ethernet, 802.1Q, Linux cooked capture, loopback, ARP, IPv4, IPv6 and its extension headers, TCP, UDP,
   ICMP, ICMPv6, IGMP, DNS, mDNS, LLMNR, TLS records, QUIC, NTP, DHCP, DHCPv6, RTP and RTCP; text protocols and other
   data are one block
+- The traffic charts of the overview and the statistics as in opennetmon 0.7.1: incoming and outgoing as solid lines
+  (outgoing was dashed), and a third series "Total" (incoming plus outgoing) as a grey area behind them; the legend
+  hides and shows each series of its chart until the program ends, and the axis follows the series shown
 
 ### Dependencies
 

@@ -2,6 +2,9 @@
 
 **Stand: 2026-11-25.**
 
+- **v0.5.4 released (2026-11-25, auf Ansage des Nutzers, zunächst nur Linux):** Aufbau unter dem Hex-Dump (5.11) und Graphen mit
+  „Gesamt“ (5.10). 0.5.3 war nur ein Test-Paket. Der signierte Windows-Installer folgt am 2026-11-26; Ablauf in `docs/windows.md`
+  oben unter „v0.5.4“ (Bau mit Rust 1.99.1, `dev/release.sh --add-windows`, Release-Text anpassen).
 - **Umgesetzt (5.11, 2026-11-25):** Aufbau (Paketdiagramm) auf der Seite Paket rechts unter dem Hex-Dump, Kopfzeilen in Zeilen zu
   32 Bit wie in den RFCs. Entwurf abgenommen, „go“ am 2026-11-25; Seitendaten `src/view/diagram.rs`, Zeichnung
   `src/gui/pages/packet/diagram.rs`. **Test-Paket 0.5.3** gebaut (2026-11-25, `target/debian/openpacketmon_0.5.3-1_amd64.deb`),

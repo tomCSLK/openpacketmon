@@ -24,6 +24,7 @@ their top that they were modified ("Modified for openpacketmon"):
   build.rs
   capture/src/main.rs  (from src/networking/types/capture_context.rs)
   lib/sniffnet-packet-parser/Cargo.toml
+  lib/sniffnet-packet-parser/src/lib.rs
   resources/packaging/linux/openpacketmon.desktop  (from resources/packaging/linux/sniffnet.desktop)
   resources/packaging/linux/scripts/postinst
   resources/services/categories.txt

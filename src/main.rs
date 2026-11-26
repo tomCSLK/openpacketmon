@@ -28,6 +28,10 @@ mod filter;
 #[cfg(test)]
 mod fuzz;
 mod gui;
+// the right import of three functions of the standard library under Windows (see there)
+#[cfg(all(windows, target_env = "msvc"))]
+#[path = "../capture/src/link_order.rs"]
+mod link_order;
 mod mcp;
 mod mmdb;
 mod networking;

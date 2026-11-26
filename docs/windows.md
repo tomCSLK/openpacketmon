@@ -3,8 +3,9 @@
 Angelegt 2026-10-30, ergänzt bis 2026-11-26. Diese Datei beschreibt, was nötig ist, um das Projekt auf einem Windows-Rechner fortzusetzen und dort eine
 Windows-Version zu bauen und zu testen.
 
-**Stand (2026-11-26):** Der signierte Installer 0.5.4 ist im Release `v0.5.4` (unten unter „v0.5.4“). Als Nächstes für Windows:
-Rust 1.100 und `vertdll.dll` im Code beheben (unten, `PLAN.md` 5.9, nach „go“); die übrigen Punkte am Ende von Abschnitt 8.
+**Stand (2026-11-26):** Der signierte Installer 0.5.4 ist im Release `v0.5.4` (unten unter „v0.5.4“). Der Fehler mit Rust 1.100
+und `vertdll.dll` ist im Code behoben (unten, `PLAN.md` 5.9); Windows baut wieder mit dem aktuellen stable. Offen sind die Punkte am
+Ende von Abschnitt 8.
 
 **Stand (2026-11-09):** Windows läuft auf `main` (der Zweig `windows` ist seit 2026-11-02 übernommen). Debug- und Release-Fassung bauen,
 die Tests sind grün; die Release-Fassung öffnet kein Konsolenfenster und trägt Icon und Versionsangaben. Adapter erscheinen mit ihrer
@@ -14,7 +15,7 @@ Beschreibung, ohne Npcap startet das Programm mit einem Hinweis, die C-Laufzeit 
 am Ende von Abschnitt 8. Die Punkte in Abschnitt 4 stammen aus einer Durchsicht des Codes auf dem Linux-Rechner, ergänzt um das, was unter
 Windows aufgefallen ist.
 
-**Rust 1.100 baut einen kaputten Helfer (2026-11-12): Windows-Fassungen bis zur Korrektur mit Rust 1.99.1 bauen.** Mit Rust 1.100
+**Rust 1.100 baute einen kaputten Helfer (Befund 2026-11-12, im Code behoben 2026-11-26).** Mit Rust 1.100
 importiert `openpacketmon-capture.exe` die Funktionen `WaitOnAddress`, `WakeByAddressAll` und `WakeByAddressSingle` aus
 `vertdll.dll` (Laufzeit für VBS-Enklaven) statt aus `api-ms-win-core-synch-l1-2-0.dll` und stürzt beim ersten Sperren ab
 (`STATUS_ACCESS_VIOLATION` in `vertdll.dll`, Ereignis 1000 im Anwendungsprotokoll). Ebenso die Unit-Tests von `openpacketmon-capture`
@@ -23,9 +24,18 @@ dessen mitgelieferte `windows.lib` (`windows_x86_64_msvc` 0.36.1) die drei Funkt
 Issue #2027, behoben ab `windows-sys` 0.42). Sie steht in der Link-Reihenfolge vor `synchronization.lib` aus dem Windows SDK; bis
 Rust 1.99 hat die Standardbibliothek die Funktionen vorher selbst aufgelöst, seit 1.100 nicht mehr. Der Helfer aus 0.5.0 (Rust
 1.99.1) importiert richtig. Prüfen: `dumpbin /dependents target\release\openpacketmon-capture.exe` darf `vertdll.dll` nicht nennen.
-Bauen mit `rustup toolchain install 1.99.1 --profile minimal`, dann `$env:RUSTUP_TOOLCHAIN = '1.99.1'` vor `cargo` und
-`dev\build-installer.ps1`. **Plan für die Korrektur in `PLAN.md` 5.9** (Verweis auf die drei Funktionen aus `windows-sys` 0.61 im
-eigenen Crate; an einer Probe mit Rust 1.100 geprüft; `synchronization.lib` allein vorzuziehen hilft nicht). Umsetzung nach „go“.
+Bis 0.5.4 sind die Windows-Fassungen deshalb mit Rust 1.99.1 gebaut (`$env:RUSTUP_TOOLCHAIN = '1.99.1'`).
+**Korrektur (`PLAN.md` 5.9, 2026-11-26):** `capture/src/link_order.rs` verweist mit drei `#[used]`-Statics auf die drei Funktionen
+aus `windows-sys` 0.61 (ohne `unsafe`); das eigene Objekt verlangt sie vor jeder Bibliothek, so gewinnt der richtige Import. Der
+Helfer, openpacketmon (`src/main.rs`, per `#[path]`) und die Tests von `sniffnet-packet-parser` binden die Datei unter Windows mit
+MSVC ein. `dev\build-installer.ps1` prüft beide Programme mit `dumpbin` und bricht vor dem Signieren ab, wenn eines aus `vertdll.dll`
+importiert. Geprüft mit Rust 1.100: Release-Bau ohne Warnung; beide Programme, beide Debug-Programme und alle Testprogramme
+importieren aus `api-ms-win-core-synch-l1-2-0.dll`; alle Tests grün (438 im Hauptprogramm, 6 MCP, 4 + 4 im Helfer, 2 im Live-Test,
+2 im Parser). Mit 1.99.1 `cargo clippy -- -D warnings` und `cargo fmt --check` grün; der Release-Bau zur Gegenprobe scheiterte
+an Smart App Control, das das Build-Skript von openpacketmon dauerhaft sperrte, nicht am Code. Unter
+1.100 sperrt Smart App Control hier `rustdoc`, `cargo-clippy`, `cargo-fmt` und `cargo-deny` (unten, „Rust 1.100“); Doctests gibt es
+in den betroffenen Crates keine, `clippy` und `fmt` laufen mit 1.99.1 (dort mit `rustup component add --toolchain 1.99.1 clippy
+rustfmt` nachinstalliert), `cargo deny` prüft die CI. Kommt `pcap` mit einem neueren `windows-sys`, die Datei wieder entfernen.
 
 **v0.5.4 (released 2026-11-25 unter Linux, Tag auf Commit `30c1929`; signierter Windows-Installer am 2026-11-26 hinzugefügt).**
 Inhalt: der Aufbau unter dem Hex-Dump (`PLAN.md` 5.11) und die Graphen mit „Gesamt“ (5.10), Einzelheiten in den beiden Absätzen
@@ -217,6 +227,9 @@ Lauf genügte). `cargo clean -p <crate>` für die Bibliothek, die „nicht gefun
 Proc-Makros unter `target\<profil>\build\<crate>\<hash>\out\` ab (`build_script_build.exe`, `<makro>-<hash>.dll`); nach einem
 Compilerwechsel ist alles neu und wird reihenweise gesperrt. Abhilfe wie oben, nur öfter: mit `cargo build --keep-going` alle
 Sperren eines Laufs sammeln, die Dateien aus den 3033-Einträgen löschen, erneut bauen (Release-Bau: acht Läufe, Tests: zwei).
+Am 2026-11-26 sperrte Smart App Control `rustdoc.exe`, `cargo-clippy`, `cargo-fmt` (und `cargo-deny`) von 1.100 wieder, dauerhaft
+über mehrere Versuche; dieselben Werkzeuge von 1.99.1 liefen. Die Einträge 3033 erscheinen ein paar Sekunden nach dem Fehlschlag;
+wer sie gleich danach liest, findet sie noch nicht.
 
 **Feste Vorgaben:** Npcap wird **nie mitgeliefert**, der Nutzer installiert es selbst (proprietäre Lizenz). Wireshark-Code
 bleibt tabu. Die Arbeitsregeln in `CLAUDE.md` gelten unverändert. Die Arbeit beginnt **vor dem ersten Release** (vorgezogen
@@ -549,6 +562,6 @@ Update über eine ältere Version, Start ohne Npcap (Abschnitt 5 Punkt 8).
 **Beginn (Nutzer, 2026-11-02):** Windows wird **vor** dem ersten Release gemacht, weil andere Tester eine Windows-Fassung
 brauchen; MCP ist fertig. Der Haltepunkt aus `PLAN.md` 4.10 ist seit 2026-11-02 aufgehoben.
 
-**Noch offen (Stand 2026-11-26):** Rust 1.100 und `vertdll.dll` im Code beheben (oben), 0.5.2 am TAP prüfen, sobald einer verfügbar ist (oben unter „0.5.1 und 0.5.2“), Test von 0.5.0 unter Windows zu Ende führen (oben unter „v0.5.0“, Schritt 2; das Update von 0.4.0
+**Noch offen (Stand 2026-11-26):** 0.5.2 am TAP prüfen, sobald einer verfügbar ist (oben unter „0.5.1 und 0.5.2“), Test von 0.5.0 unter Windows zu Ende führen (oben unter „v0.5.0“, Schritt 2; das Update von 0.4.0
 mit dem Installer lief beim Nutzer reibungslos), CI-Job für Windows (Abschnitt 7), Test auf einem sauberen System (Deinstallation, Update über eine
 ältere Version, Start ohne Npcap), MCP-Einrichtung in `docs/windows-tester.md`, MCP-Integrationstests von den echten Einstellungen trennen.

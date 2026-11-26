@@ -1,7 +1,8 @@
 # Builds the installer for Windows: target\installer\openpacketmon-<version>-setup.exe
 #
 # Builds openpacketmon and openpacketmon-capture in release mode with the version from Cargo.toml, checks the list
-# of third-party licenses and calls the compiler of Inno Setup 6 (resources\packaging\windows\openpacketmon.iss).
+# of third-party licenses and that neither program imports from vertdll.dll (it would crash), and calls the compiler of
+# Inno Setup 6 (resources\packaging\windows\openpacketmon.iss).
 # Raise the version in Cargo.toml and capture\Cargo.toml first (then `cargo update --workspace --offline`), the same
 # way as for the .deb (dev/build-deb.sh); the user names it.
 #
@@ -68,6 +69,28 @@ function Find-SignTool {
         Select-Object -First 1
 }
 
+# dumpbin of the MSVC tools of Visual Studio, needed for the Rust tool chain anyway
+function Find-DumpBin {
+    $onPath = Get-Command dumpbin.exe -ErrorAction SilentlyContinue
+    if ($onPath) { return $onPath.Source }
+    @($env:ProgramFiles, ${env:ProgramFiles(x86)}) |
+        ForEach-Object { Join-Path $_ 'Microsoft Visual Studio\*\*\VC\Tools\MSVC\*\bin\Hostx64\x64\dumpbin.exe' } |
+        ForEach-Object { Get-ChildItem -Path $_ -ErrorAction SilentlyContinue } |
+        Sort-Object FullName -Descending |
+        Select-Object -First 1 -ExpandProperty FullName
+}
+
+# A program that imports from vertdll.dll (the runtime of VBS enclaves) crashes at its first contended lock; this
+# happened to the helper with Rust 1.100 before capture\src\link_order.rs (docs/windows.md, top)
+function Test-Imports([string]$file) {
+    $imports = & $dumpbin /nologo /dependents $file
+    if ($LASTEXITCODE -ne 0) { throw "dumpbin failed: $file" }
+    if ($imports -match 'vertdll\.dll') { throw "$file imports from vertdll.dll and would crash (docs/windows.md, top)" }
+}
+
+$dumpbin = Find-DumpBin
+if (-not $dumpbin) { throw 'dumpbin is missing: install the MSVC build tools of Visual Studio (docs/windows.md 3)' }
+
 $sign = [bool]$CertSha1
 if ($sign) {
     $CertSha1 = ($CertSha1 -replace '[^0-9A-Fa-f]', '').ToUpper()
@@ -99,6 +122,7 @@ python -I dev\third-party-licenses.py --check
 if ($LASTEXITCODE -ne 0) { throw 'THIRD-PARTY-LICENSES.txt is out of date: python -I dev\third-party-licenses.py' }
 
 $programs = @('target\release\openpacketmon.exe', 'target\release\openpacketmon-capture.exe')
+foreach ($program in $programs) { Test-Imports $program }
 $isccArgs = @('/Qp', "/DAppVersion=$version")
 if ($sign) {
     Invoke-Sign $programs

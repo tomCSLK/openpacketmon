@@ -3501,6 +3501,7 @@ dependencies = [
  "tokio",
  "toml 1.1.8+spec-1.1.0",
  "webbrowser",
+ "windows-sys 0.61.2",
  "winresource",
 ]
 
@@ -3510,6 +3511,7 @@ version = "0.5.4"
 dependencies = [
  "pcap",
  "rustix 1.1.6",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -5011,6 +5013,7 @@ version = "0.2.1"
 dependencies = [
  "etherparse",
  "pcap",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]

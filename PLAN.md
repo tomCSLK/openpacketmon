@@ -2,6 +2,13 @@
 
 **Stand: 2026-11-26.**
 
+- **Umgesetzt (5.9, „go“ am 2026-11-26):** Der Helfer läuft unter Windows auch mit Rust 1.100. `capture/src/link_order.rs` verweist
+  mit drei `#[used]`-Statics auf `WaitOnAddress`, `WakeByAddressSingle` und `WakeByAddressAll` aus `windows-sys` 0.61 (Workspace-
+  Abhängigkeit, nur Windows); eingebunden im Helfer, in `src/main.rs` und in den Tests des Parsers (dessen `src/lib.rs` hat jetzt den
+  Hinweis „Modified for openpacketmon“ und steht in `NOTICE`). `dev\build-installer.ps1` bricht ab, wenn ein Programm aus
+  `vertdll.dll` importiert. Unter Windows mit 1.100 geprüft (Release-Bau, `dumpbin` aller Programme und Testprogramme, alle Tests
+  grün), mit 1.99.1 `clippy -D warnings` und `fmt` grün; `dev/check-notices.sh` grün. Einzelheiten in 5.9.
+  Keine neue Version (nennt der Nutzer).
 - **Windows-Installer 0.5.4 zum Release hinzugefügt (2026-11-26, auf Ansage des Nutzers):** vom Tag `v0.5.4` mit Rust 1.99.1 gebaut,
   ohne Warnung; alle Tests grün (438 im Hauptprogramm, einer mehr als unter Linux wegen eines Tests nur für Windows); der Helfer
   importiert nicht aus `vertdll.dll`. Aufbau und Graphen vom Nutzer unter Windows von Hand geprüft, ohne Befund. Installer signiert
@@ -34,8 +41,8 @@
   das Feld `Homepage` der `.deb` bleibt gleich). Cargo baut seitdem ohne Warnung.
 - **Rust 1.100 unter Windows (2026-11-12):** Damit gebaut, stürzt der Helfer `openpacketmon-capture.exe` ab: Er importiert `WaitOnAddress`
   und `WakeByAddress*` aus `vertdll.dll` (VBS-Enklaven), weil die alte `windows.lib` von `windows-sys` 0.36.1 (über `pcap` 2.5.0) beim
-  Linken vor `synchronization.lib` steht (windows-rs Issue #2027). Windows-Fassungen bis zur Korrektur mit Rust 1.99.1 bauen; Einzelheiten
-  und Prüfung mit `dumpbin` in `docs/windows.md` oben. **Plan für die Korrektur in 5.9** (geprüft an einer Probe; Umsetzung nach „go“).
+  Linken vor `synchronization.lib` steht (windows-rs Issue #2027). Bis 0.5.4 Windows-Fassungen mit Rust 1.99.1 gebaut; Einzelheiten
+  und Prüfung mit `dumpbin` in `docs/windows.md` oben. **Korrektur in 5.9 umgesetzt** (2026-11-26, oben).
 - **Startknopf oben** (5.6, Rückmeldung 2026-11-12, umgesetzt, Test-Paket **0.5.2**, 2026-11-12): Auf der Seite Aufzeichnung startet jetzt auch der
   Knopf „Aufzeichnung starten“ der Kopfleiste die Aufzeichnung (vorher führte er nur zur Seite, auf der man schon war).
 - **Befund am TAP (5.8, 2026-11-12):** Am Monitoring-Port eines Netzwerk-TAPs zeigte openpacketmon unter Linux und Windows nicht einmal
@@ -1927,7 +1934,7 @@ Wireshark dient nur als Vergleichswerkzeug; kein Code daraus.
 - Offen: der Vergleich unter Windows (Bau dort, Anleitung in `docs/windows.md` oben unter „0.5.1 und 0.5.2“), Schritt 3 (Live-Test für den Modus fest in `capture/tests/live.rs`, Bildtest der
   laufenden Aufzeichnung, Verhalten von Npcap bei WLAN-Adaptern), Schritt 4 (Durchsatz, Ringspeicher, Zählweise, `savefile`).
 
-#### 5.9 Der Helfer unter Rust 1.100 auf Windows (Befund 2026-11-12; Plan, Umsetzung erst nach „go“)
+#### 5.9 Der Helfer unter Rust 1.100 auf Windows (Befund 2026-11-12; „go“ am 2026-11-26, umgesetzt)
 
 **Befund** (Einzelheiten in `docs/windows.md` oben): Mit Rust 1.100 gebaut, importiert `openpacketmon-capture.exe` die Funktionen
 `WaitOnAddress`, `WakeByAddressSingle` und `WakeByAddressAll` aus `vertdll.dll` (Laufzeit für VBS-Enklaven) statt aus
@@ -1978,6 +1985,25 @@ Fassung; auf `main` von rust-pcap nutzt `pcap` schon `windows-sys` 0.61, unverö
    intern: die veröffentlichten Installer sind mit 1.99.1 gebaut und nicht betroffen). Die Version nennt der Nutzer.
 7. Optional, nur auf Ansage (öffentlich): bei rust-pcap nach einer Fassung mit neuerem `windows-sys` fragen; bei rust-lang prüfen, ob
    die geänderte Link-Reihenfolge der Standardbibliothek schon gemeldet ist.
+
+**Umgesetzt (2026-11-26, Schritte 1–6):**
+- `capture/src/link_order.rs` (Name aus dem Plan übernommen) mit den drei Statics und dem Kommentar zur Ursache. Abweichung vom Plan:
+  eine Datei für alle drei Crates; `src/main.rs` und `lib/sniffnet-packet-parser/src/lib.rs` binden sie per `#[path]` ein, damit
+  es nur eine Stelle zum Entfernen gibt. `windows-sys = { version = "0.61.2", features = ["Win32_System_Threading"] }` steht unter
+  `[workspace.dependencies]`; Helfer und openpacketmon nehmen es unter `cfg(windows)`, der Parser als Windows-Dev-Abhängigkeit.
+  `Cargo.lock` bekommt nur die drei Verweise auf die vorhandene 0.61.2; `THIRD-PARTY-LICENSES.txt` bleibt gleich (`--check` grün).
+- Parser: `src/lib.rs` mit „Modified for openpacketmon“ oben, Eintrag in `NOTICE`, `dev/check-notices.sh` grün.
+- `dev/build-installer.ps1`: `Find-DumpBin` (im Pfad oder unter den MSVC-Werkzeugen von Visual Studio) und `Test-Imports` für beide
+  Programme nach der Lizenzprüfung, vor dem Signieren.
+- Geprüft unter Windows mit Rust 1.100: Release-Bau ohne Warnung; `openpacketmon.exe`, `openpacketmon-capture.exe`, ihre
+  Debug-Fassungen und alle sechs Testprogramme importieren aus `api-ms-win-core-synch-l1-2-0.dll`, keines aus `vertdll.dll`;
+  `cargo test --workspace -j 4` grün (438 im Hauptprogramm, 6 MCP, 4 + 4 im Helfer, 2 im Live-Test, 2 im Parser). `rustdoc`,
+  `cargo-clippy`, `cargo-fmt` und `cargo-deny` von 1.100 sperrt Smart App Control auf diesem Rechner (`docs/windows.md`); deshalb
+  `clippy -D warnings` und `fmt --check` mit 1.99.1 (grün), Doctests gibt es in Helfer und Parser keine, `cargo deny` in der CI.
+  Die Gegenprobe (Release-Bau mit 1.99.1) scheiterte an Smart App Control, das das Build-Skript von openpacketmon dauerhaft
+  sperrte (auch nach Löschen und neuem Bau, gleicher Inhalt); `clippy` mit 1.99.1 übersetzt denselben Code ohne Befund.
+- Unter Linux ändert sich nichts (alles hinter `cfg(windows)`); die CI prüft Tests, `clippy`, `fmt` und `cargo deny`.
+- CHANGELOG unter „Unreleased“ (Build); die Version nennt der Nutzer. Schritt 7 nur auf Ansage.
 
 ---
 
@@ -2156,7 +2182,7 @@ Block „Data“).
 7. Fehlende Pakete am Monitoring-Port eines TAPs (5.8, Befund 2026-11-12): Promiscuous Mode als Einstellung (Standard an) umgesetzt
    (Schritt 2, Test-Paket 0.5.1); am TAP unter Linux bestätigt (2026-11-12); offen Windows (`docs/windows.md` oben unter „0.5.1 und 0.5.2“,
    0.5.2 dort installiert, TAP zurzeit nicht verfügbar), dann Schritte 3 und 4.
-8. Helfer unter Rust 1.100 auf Windows (5.9, Befund 2026-11-12): stürzt ab (`vertdll.dll`); bis zur Korrektur Windows mit Rust 1.99.1
-   bauen. Plan in 5.9, an einer Probe geprüft; Umsetzung nach „go“.
+8. Helfer unter Rust 1.100 auf Windows (5.9): im Code behoben (2026-11-26), unter Windows geprüft; Windows baut wieder mit dem
+   aktuellen stable. Offen: eine Version mit der Korrektur (nennt der Nutzer), Schritt 7 (nur auf Ansage).
 
 Die Namenssuche (früher Abschnitt 6, 2026-10-28) ist erledigt: **openpacketmon**, Marke vom Nutzer geprüft.

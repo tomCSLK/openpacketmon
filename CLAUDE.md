@@ -81,8 +81,8 @@ Fassung bis 2026-11-09 (mit dem Verlauf der Browser-Oberfläche) steht in der Gi
 ## Prüfen, bauen, veröffentlichen
 
 - Build unter Linux braucht `libpcap-dev`, `libasound2-dev` (Ton) und `libfontconfig1-dev`. Rust Edition 2024, Workspace mit `capture/` und
-  `lib/sniffnet-packet-parser`. Die CI nimmt immer das neueste stable (seit 2026-11-12 Rust 1.100, lokal ebenso), die Windows-Fassung 1.99.1
-  (`$env:RUSTUP_TOOLCHAIN = '1.99.1'`, mit 1.100 stürzt der Helfer ab);
+  `lib/sniffnet-packet-parser`. Die CI nimmt immer das neueste stable (seit 2026-11-12 Rust 1.100, lokal ebenso), Windows seit 5.9 auch
+  (`clippy` und `fmt` dort mit 1.99.1, weil Smart App Control die von 1.100 sperrt);
   deshalb keine Funktionen der Standardbibliothek ab 1.100 und Clippy-Lint `map_unwrap_or` aus. Cargo baut ohne Warnung, so soll es bleiben.
 - Prüfen: `cargo test --workspace`, `cargo clippy -- -D warnings` (ohne `--all-targets`, wie das Original; der Testcode hat viele
   Pedantic-Meldungen), `cargo fmt --all -- --check`, `cargo deny --workspace check` (cargo-deny 0.20.2; ohne `--workspace` fehlt der Helfer;
@@ -113,8 +113,9 @@ Maßgeblich ist `PLAN.md` (oben „Stand“, Abschnitt 5). Kurz (2026-11-26):
 - **v0.5.2** ist released (2026-11-12, Linux) mit Promiscuous Mode und dem Startknopf oben; der **signierte Windows-Installer** ist am
   selben Tag hinzugefügt (Rust 1.99.1; `docs/windows.md` oben unter „0.5.1 und 0.5.2“). Danach Abhängigkeiten und `Cargo.toml`
   aufgeräumt (`PLAN.md` oben).
-- **Windows nur mit Rust 1.99.1 bauen:** Mit 1.100 importiert der Helfer `WaitOnAddress` aus `vertdll.dll` und stürzt ab (alte
-  `windows-sys` 0.36.1 über `pcap` 2.5.0, windows-rs #2027); `docs/windows.md` oben. Plan für die Korrektur in `PLAN.md` 5.9 (nach „go“).
+- **Rust 1.100 unter Windows behoben** (`PLAN.md` 5.9, 2026-11-26): Der Helfer importierte `WaitOnAddress` aus `vertdll.dll` und stürzte
+  ab (`windows-sys` 0.36.1 über `pcap` 2.5.0); `capture/src/link_order.rs` erzwingt den richtigen Import, `dev\build-installer.ps1`
+  prüft ihn mit `dumpbin`. Entfernen, wenn `pcap` ein neueres `windows-sys` bringt. Noch keine Version damit.
 - **Befund am TAP** (`PLAN.md` 5.8, 2026-11-12): Am Monitoring-Port eines Netzwerk-TAPs fehlte unter Linux und Windows mehr als die
   Hälfte der Pakete gegenüber Wireshark, weil der Helfer fest ohne Promiscuous Mode öffnete. **Umgesetzt** (Schritt 2, Test-Paket 0.5.1):
   Einstellung `capture.promiscuous` (Standard an), Schalter auf der Seite Aufzeichnung, Helfer-Option `--promisc on|off` mit Rückfall

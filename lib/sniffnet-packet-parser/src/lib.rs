@@ -1,3 +1,6 @@
+// Modified for openpacketmon (2026), see NOTICE. Based on `lib/sniffnet-packet-parser/src/lib.rs` of Sniffnet
+// (https://github.com/GyulyVGC/sniffnet), Copyright (c) 2022 Giuliano Bellini, MIT OR Apache-2.0.
+
 #![doc = include_str!("../README.md")]
 
 #[cfg(feature = "full")]
@@ -8,6 +11,10 @@ mod headers;
 mod icmp_type;
 #[cfg(feature = "full")]
 mod igmp_type;
+// the right import of three functions of the standard library in the test programs under Windows
+#[cfg(all(test, windows, target_env = "msvc"))]
+#[path = "../../../capture/src/link_order.rs"]
+mod link_order;
 #[cfg(feature = "full")]
 mod link_type;
 #[cfg(feature = "full")]

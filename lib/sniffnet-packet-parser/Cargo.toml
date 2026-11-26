@@ -24,5 +24,9 @@ full = ["dep:etherparse", "dep:pcap"]
 etherparse = { workspace = true, optional = true }
 pcap = { workspace = true, optional = true }
 
+# the tests include capture/src/link_order.rs under Windows (see src/lib.rs)
+[target.'cfg(windows)'.dev-dependencies]
+windows-sys.workspace = true
+
 [lints]
 workspace = true

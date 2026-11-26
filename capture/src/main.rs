@@ -17,6 +17,10 @@ use openpacketmon_capture::{
 };
 use pcap::{Active, Capture, Device, Error};
 
+// the right import of three functions of the standard library under Windows (see there)
+#[cfg(all(windows, target_env = "msvc"))]
+mod link_order;
+
 /// Largest kernel buffer accepted on the command line
 const MAX_BUFFER_BYTES: i32 = 64 * 1024 * 1024;
 /// Longest BPF filter accepted on the command line

@@ -6,6 +6,17 @@ openpacketmon starts from Sniffnet `main` at commit `ab4bf739d464` (2026-10-20, 
 the history of this repository starts with one initial commit of the cleaned-up fork.
 The history of Sniffnet itself is in its own changelog: <https://github.com/GyulyVGC/sniffnet/blob/main/CHANGELOG.md>.
 
+## [Unreleased]
+
+### Build
+
+- Windows builds with Rust 1.100 again. With it, the capture helper imported `WaitOnAddress` and `WakeByAddress*` from
+  `vertdll.dll` instead of `api-ms-win-core-synch-l1-2-0.dll` and crashed at its first contended lock: pcap 2.5.0 brings
+  windows-sys 0.36, whose import library knows these functions only through `vertdll.dll` (windows-rs #2027), and since
+  Rust 1.100 the linker reaches it first. `capture/src/link_order.rs` references the three functions from windows-sys 0.61,
+  and `dev/build-installer.ps1` refuses programs that import from `vertdll.dll`. The published Windows installers up to 0.5.4
+  were built with Rust 1.99.1 and are not affected
+
 ## [0.5.4] - 2026-11-25
 
 ### Interface

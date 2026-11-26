@@ -7,6 +7,20 @@ Windows-Version zu bauen und zu testen.
 und `vertdll.dll` ist im Code behoben (unten, `PLAN.md` 5.9); Windows baut wieder mit dem aktuellen stable. Offen sind die Punkte am
 Ende von Abschnitt 8.
 
+**0.5.5 (Test-Paket unter Windows, 2026-11-26, auf Ansage des Nutzers; kein Release, kein Tag):** die Korrektur aus `PLAN.md` 5.9,
+sonst gleich 0.5.4. Version in `Cargo.toml` und `capture/Cargo.toml` auf 0.5.5, `cargo update --workspace --offline`, Lizenzliste
+unverändert (`--check` grün). Mit **Rust 1.100** (stable) gebaut: Release-Bau ohne Warnung (im ersten Anlauf, Smart App Control
+sperrte nichts), dann `dev\build-installer.ps1 -CertSha1 …`; die neue Prüfung mit `dumpbin` lief ohne Abbruch, beide Programme
+importieren aus `api-ms-win-core-synch-l1-2-0.dll`. Installer `target\installer\openpacketmon-0.5.5-setup.exe`, 10 715 352 Bytes,
+SHA-256 `558364f076bbfb82be1f266c409ab6d55871ad6ff30692ba0c38ff6d05035dc5`; Installer und beide Programme signiert (Certum,
+SHA-256, RFC-3161-Zeitstempel), `signtool verify /pa /all` dreimal „Successfully verified“. Tests mit 1.100 wie unter
+„Rust 1.100 baute einen kaputten Helfer“ unten (gleicher Code). **Offen (Nutzer):** als Update über 0.5.4 installieren, eine
+Aufzeichnung starten und ein paar Minuten laufen lassen (der Helfer stürzte mit 1.100 ohne Korrektur beim ersten umkämpften Lock ab);
+danach entscheidet der Nutzer über ein Release. Unter Linux bringt 0.5.5 nichts Neues (alles hinter `cfg(windows)`); ein `.deb` 0.5.5
+nur, falls zum Release gewünscht. Für ein Release wie bei 0.5.4: unter Linux `dev/release.sh` (Tag `v0.5.5`), dann hier den Installer
+vom Stand des Tags bauen und mit `dev/release.sh --add-windows` hinzufügen (der Installer muss zum Tag passen; der oben ist von
+`main` vor dem Tag, Programmcode gleich, solange sich bis zum Tag nichts ändert).
+
 **Stand (2026-11-09):** Windows läuft auf `main` (der Zweig `windows` ist seit 2026-11-02 übernommen). Debug- und Release-Fassung bauen,
 die Tests sind grün; die Release-Fassung öffnet kein Konsolenfenster und trägt Icon und Versionsangaben. Adapter erscheinen mit ihrer
 Beschreibung, ohne Npcap startet das Programm mit einem Hinweis, die C-Laufzeit ist statisch gelinkt. Den **Installer** (Inno Setup,

@@ -115,7 +115,8 @@ Maßgeblich ist `PLAN.md` (oben „Stand“, Abschnitt 5). Kurz (2026-11-26):
   aufgeräumt (`PLAN.md` oben).
 - **Rust 1.100 unter Windows behoben** (`PLAN.md` 5.9, 2026-11-26): Der Helfer importierte `WaitOnAddress` aus `vertdll.dll` und stürzte
   ab (`windows-sys` 0.36.1 über `pcap` 2.5.0); `capture/src/link_order.rs` erzwingt den richtigen Import, `dev\build-installer.ps1`
-  prüft ihn mit `dumpbin`. Entfernen, wenn `pcap` ein neueres `windows-sys` bringt. Noch keine Version damit.
+  prüft ihn mit `dumpbin`. Entfernen, wenn `pcap` ein neueres `windows-sys` bringt. **Test-Paket 0.5.5** unter Windows damit (mit
+  Rust 1.100, signiert, 2026-11-26); offen Test durch den Nutzer, Release auf Ansage (`docs/windows.md` oben unter „0.5.5“).
 - **Befund am TAP** (`PLAN.md` 5.8, 2026-11-12): Am Monitoring-Port eines Netzwerk-TAPs fehlte unter Linux und Windows mehr als die
   Hälfte der Pakete gegenüber Wireshark, weil der Helfer fest ohne Promiscuous Mode öffnete. **Umgesetzt** (Schritt 2, Test-Paket 0.5.1):
   Einstellung `capture.promiscuous` (Standard an), Schalter auf der Seite Aufzeichnung, Helfer-Option `--promisc on|off` mit Rückfall

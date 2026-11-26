@@ -5,7 +5,8 @@
 - **Test-Paket 0.5.5 unter Windows (2026-11-26, auf Ansage des Nutzers):** 0.5.4 plus die Korrektur aus 5.9, mit Rust 1.100 gebaut,
   Installer signiert (`openpacketmon-0.5.5-setup.exe`, SHA-256 `558364f0…05035dc5`); die neue Prüfung mit `dumpbin` im
   Installer-Skript lief ohne Abbruch. Kein Release, kein Tag. **Vom Nutzer geprüft:** Update über 0.5.4, Aufzeichnung läuft ohne
-  Probleme. Offen: Release auf Ansage. Unter Linux nichts Neues; Einzelheiten in `docs/windows.md` oben unter „0.5.5“.
+  Probleme. **Kein eigenes Release für 0.5.5** (Nutzer): für Nutzer ändert sich nichts; die Korrektur kommt mit der nächsten Version,
+  die Neues bringt (CHANGELOG bis dahin unter „Unreleased“). Unter Linux nichts Neues; Einzelheiten in `docs/windows.md` oben unter „0.5.5“.
 - **Umgesetzt (5.9, „go“ am 2026-11-26):** Der Helfer läuft unter Windows auch mit Rust 1.100. `capture/src/link_order.rs` verweist
   mit drei `#[used]`-Statics auf `WaitOnAddress`, `WakeByAddressSingle` und `WakeByAddressAll` aus `windows-sys` 0.61 (Workspace-
   Abhängigkeit, nur Windows); eingebunden im Helfer, in `src/main.rs` und in den Tests des Parsers (dessen `src/lib.rs` hat jetzt den
@@ -2012,7 +2013,8 @@ Fassung; auf `main` von rust-pcap nutzt `pcap` schon `windows-sys` 0.61, unverö
 
 **Test-Paket 0.5.5** (2026-11-26, Windows, auf Ansage des Nutzers): mit Rust 1.100 gebaut und signiert, `dumpbin`-Prüfung des
 Installer-Skripts ohne Abbruch; Einzelheiten in `docs/windows.md` oben unter „0.5.5“. Vom Nutzer als Update über 0.5.4 installiert,
-Aufzeichnung läuft ohne Probleme (2026-11-26). **Offen:** Release auf Ansage (dann CHANGELOG „Unreleased“ → „0.5.5“).
+Aufzeichnung läuft ohne Probleme (2026-11-26). **Entschieden:** kein eigenes Release für 0.5.5 (Nutzer, 2026-11-26): für Nutzer ändert sich nichts, die Korrektur kommt mit der nächsten Version, die Neues bringt; der CHANGELOG-Eintrag bleibt bis dahin unter
+„Unreleased“.
 
 ---
 
@@ -2192,7 +2194,7 @@ Block „Data“).
    (Schritt 2, Test-Paket 0.5.1); am TAP unter Linux bestätigt (2026-11-12); offen Windows (`docs/windows.md` oben unter „0.5.1 und 0.5.2“,
    0.5.2 dort installiert, TAP zurzeit nicht verfügbar), dann Schritte 3 und 4.
 8. Helfer unter Rust 1.100 auf Windows (5.9): im Code behoben (2026-11-26), unter Windows geprüft; Windows baut wieder mit dem
-   aktuellen stable. Test-Paket 0.5.5 unter Windows (2026-11-26, signiert), vom Nutzer geprüft (Aufzeichnung läuft); offen
-   Release auf Ansage, Schritt 7 (nur auf Ansage).
+   aktuellen stable. Test-Paket 0.5.5 unter Windows (2026-11-26, signiert), vom Nutzer geprüft (Aufzeichnung läuft); kein eigenes Release für 0.5.5 (Nutzer, 2026-11-26): für Nutzer ändert sich nichts, die Korrektur kommt mit der nächsten Version, die Neues bringt.
+   Offen nur Schritt 7 (nur auf Ansage).
 
 Die Namenssuche (früher Abschnitt 6, 2026-10-28) ist erledigt: **openpacketmon**, Marke vom Nutzer geprüft.

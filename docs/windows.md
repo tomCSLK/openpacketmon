@@ -14,9 +14,9 @@ sperrte nichts), dann `dev\build-installer.ps1 -CertSha1 …`; die neue Prüfung
 importieren aus `api-ms-win-core-synch-l1-2-0.dll`. Installer `target\installer\openpacketmon-0.5.5-setup.exe`, 10 715 352 Bytes,
 SHA-256 `558364f076bbfb82be1f266c409ab6d55871ad6ff30692ba0c38ff6d05035dc5`; Installer und beide Programme signiert (Certum,
 SHA-256, RFC-3161-Zeitstempel), `signtool verify /pa /all` dreimal „Successfully verified“. Tests mit 1.100 wie unter
-„Rust 1.100 baute einen kaputten Helfer“ unten (gleicher Code). **Offen (Nutzer):** als Update über 0.5.4 installieren, eine
-Aufzeichnung starten und ein paar Minuten laufen lassen (der Helfer stürzte mit 1.100 ohne Korrektur beim ersten umkämpften Lock ab);
-danach entscheidet der Nutzer über ein Release. Unter Linux bringt 0.5.5 nichts Neues (alles hinter `cfg(windows)`); ein `.deb` 0.5.5
+„Rust 1.100 baute einen kaputten Helfer“ unten (gleicher Code). **Vom Nutzer geprüft (2026-11-26):** als Update über 0.5.4
+installiert, Aufzeichnung läuft ohne Probleme (ohne Korrektur stürzte der Helfer mit 1.100 beim ersten umkämpften Lock ab). Ein
+Release entscheidet der Nutzer. Unter Linux bringt 0.5.5 nichts Neues (alles hinter `cfg(windows)`); ein `.deb` 0.5.5
 nur, falls zum Release gewünscht. Für ein Release wie bei 0.5.4: unter Linux `dev/release.sh` (Tag `v0.5.5`), dann hier den Installer
 vom Stand des Tags bauen und mit `dev/release.sh --add-windows` hinzufügen (der Installer muss zum Tag passen; der oben ist von
 `main` vor dem Tag, Programmcode gleich, solange sich bis zum Tag nichts ändert).

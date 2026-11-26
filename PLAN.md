@@ -1,11 +1,16 @@
 # PLAN.md – Fork von Sniffnet
 
-**Stand: 2026-11-25.**
+**Stand: 2026-11-26.**
 
+- **Windows-Installer 0.5.4 zum Release hinzugefügt (2026-11-26, auf Ansage des Nutzers):** vom Tag `v0.5.4` mit Rust 1.99.1 gebaut,
+  ohne Warnung; alle Tests grün (438 im Hauptprogramm, einer mehr als unter Linux wegen eines Tests nur für Windows); der Helfer
+  importiert nicht aus `vertdll.dll`. Aufbau und Graphen vom Nutzer unter Windows von Hand geprüft, ohne Befund. Installer signiert
+  (`openpacketmon-0.5.4-setup.exe`, SHA-256 `e6121b18…eec53a8e2`), beim Nutzer als Update über 0.5.2 installiert und gestartet,
+  ohne Probleme; mit `dev/release.sh --add-windows --publish` hochgeladen, Windows-Absatz im Release-Text wie bei v0.5.2.
+  Einzelheiten in `docs/windows.md` oben unter „v0.5.4“.
 - **v0.5.4 released (2026-11-25, auf Ansage des Nutzers, zunächst nur Linux):** Aufbau unter dem Hex-Dump (5.11) und Graphen mit
-  „Gesamt“ (5.10). 0.5.3 war nur ein Test-Paket. Der signierte Windows-Installer folgt am 2026-11-26; Ablauf in `docs/windows.md`
-  oben unter „v0.5.4“ (Bau mit Rust 1.99.1, `dev/release.sh --add-windows`, Release-Text anpassen). Vor dem Release scheiterte
-  `cargo deny` an drei neuen RustSec-Meldungen: etherparse 0.21.1 (RUSTSEC-2026-0596, Lesen außerhalb der Grenzen bei kaputten
+  „Gesamt“ (5.10). 0.5.3 war nur ein Test-Paket. Der signierte Windows-Installer ist am 2026-11-26 dazugekommen (oben). Vor dem
+  Release scheiterte `cargo deny` an drei neuen RustSec-Meldungen: etherparse 0.21.1 (RUSTSEC-2026-0596, Lesen außerhalb der Grenzen bei kaputten
   IPv6-Erweiterungsköpfen im „lax“-Zerlegen, das der Paket-Parser nutzt) und url 2.5.9 übernommen; chrono (RUSTSEC-2026-0543,
   nicht mehr gepflegt, nur über rmcp) in `deny.toml` mit Begründung ignoriert. CI grün, dann `dev/release.sh --publish`:
   Release `v0.5.4` mit `openpacketmon_0.5.4-1_amd64.deb` (SHA-256 `89e5559c…ca1caadf0`), `THIRD-PARTY-LICENSES.txt` und
@@ -13,7 +18,7 @@
 - **Umgesetzt (5.11, 2026-11-25):** Aufbau (Paketdiagramm) auf der Seite Paket rechts unter dem Hex-Dump, Kopfzeilen in Zeilen zu
   32 Bit wie in den RFCs. Entwurf abgenommen, „go“ am 2026-11-25; Seitendaten `src/view/diagram.rs`, Zeichnung
   `src/gui/pages/packet/diagram.rs`. **Test-Paket 0.5.3** gebaut (2026-11-25, `target/debian/openpacketmon_0.5.3-1_amd64.deb`),
-  offen Test durch den Nutzer und ein Bau unter Windows (`docs/windows.md` oben unter „Aufbau“).
+  unter Windows gebaut und geprüft (2026-11-26, oben).
 - **Umgesetzt (5.10, 2026-11-25):** Graphen wie in opennetmon 0.7.1. Linien durchgezogen, dazu „Gesamt“ als graue Fläche
   und eine Legende zum Anklicken (`src/gui/chart.rs`, `widgets::legend`). **Test-Paket 0.5.4** (2026-11-25) mit 5.10 und 5.11:
   `sudo apt install ./target/debian/openpacketmon_0.5.4-1_amd64.deb`.
@@ -2062,7 +2067,8 @@ gebaut, auf Hinweis des Nutzers danach 5.10.
 **Test-Paket 0.5.4** (2026-11-25, auf Ansage des Nutzers), enthält 5.10 und 5.11: `target/debian/openpacketmon_0.5.4-1_amd64.deb`
 (Lizenzliste unverändert).
 
-**Offen:** Test durch den Nutzer, Bau unter Windows (`docs/windows.md` oben unter „Aufbau“).
+**Unter Windows** (2026-11-26): in v0.5.4 gebaut (Rust 1.99.1), Tests grün, Graphen vom Nutzer von Hand geprüft, ohne Befund;
+signierter Installer im Release (`docs/windows.md` oben unter „v0.5.4“). **Offen:** Test durch den Nutzer im Alltag.
 
 #### 5.11 Aufbau (Paketdiagramm) auf der Seite Paket (Wunsch des Nutzers, 2026-11-25; Entwurf abgenommen und „go“ am 2026-11-25, umgesetzt)
 
@@ -2129,10 +2135,11 @@ Block „Data“).
 → `target/debian/openpacketmon_0.5.3-1_amd64.deb` (Lizenzliste unverändert). Installieren mit
 `sudo apt install ./target/debian/openpacketmon_0.5.3-1_amd64.deb`.
 
-**Offen:** Test durch den Nutzer; einmal unter Windows bauen und von Hand prüfen (Rust 1.99.1; Schritte in `docs/windows.md` oben
-unter „Aufbau“); Release auf Ansage.
+**Released** in v0.5.4 (2026-11-25 Linux, 2026-11-26 Windows). **Unter Windows** (2026-11-26): gebaut mit Rust 1.99.1, Tests grün
+(10 in `view::diagram::tests` und die übrigen neuen), vom Nutzer von Hand geprüft, ohne Befund (`docs/windows.md` oben unter „v0.5.4“).
+**Offen:** Test durch den Nutzer im Alltag.
 
-## 5. Offene Punkte (Stand 2026-11-12)
+## 5. Offene Punkte (Stand 2026-11-26)
 
 1. Neue Oberfläche (5.6): in v0.5.0 released (2026-11-10); Test durch den Nutzer.
 2. VoIP (5.7, „go“ am 2026-11-10): Stufen 1–5 (Zerleger, Filter, Anrufe, Anhören, MCP) in v0.5.0 released; Test mit einem echten Anruf
@@ -2144,7 +2151,8 @@ unter „Aufbau“); Release auf Ansage.
 5. Pull Request mit der Korrektur aus 4.8 beim Original angenommen (2026-11-12, Zweig `v1.6.0`); unsere Grenzen bleiben wie sie sind,
    keine Angleichung an die Fassung des Originals (Nutzer, 2026-11-12); Zweig im Fork gelöscht. Offen nur die Herkunftsangabe im
    Advisory nach dem Release von Sniffnet 1.6.0 (4.10; Einzelheiten nur in `CLAUDE.local.md`).
-6. Weitere Ideen in 5.2, noch nicht beschlossen.
+6. Weitere Ideen in 5.2, noch nicht beschlossen. Graphen (5.10) und Aufbau (5.11) sind in v0.5.4 für Linux und Windows released
+   (2026-11-25/26); Test durch den Nutzer im Alltag.
 7. Fehlende Pakete am Monitoring-Port eines TAPs (5.8, Befund 2026-11-12): Promiscuous Mode als Einstellung (Standard an) umgesetzt
    (Schritt 2, Test-Paket 0.5.1); am TAP unter Linux bestätigt (2026-11-12); offen Windows (`docs/windows.md` oben unter „0.5.1 und 0.5.2“,
    0.5.2 dort installiert, TAP zurzeit nicht verfügbar), dann Schritte 3 und 4.

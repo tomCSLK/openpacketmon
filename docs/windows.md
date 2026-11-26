@@ -1,10 +1,10 @@
 # Windows-Version von openpacketmon
 
-Angelegt 2026-10-30, ergänzt bis 2026-11-25. Diese Datei beschreibt, was nötig ist, um das Projekt auf einem Windows-Rechner fortzusetzen und dort eine
+Angelegt 2026-10-30, ergänzt bis 2026-11-26. Diese Datei beschreibt, was nötig ist, um das Projekt auf einem Windows-Rechner fortzusetzen und dort eine
 Windows-Version zu bauen und zu testen.
 
-**Als Nächstes (2026-11-26):** v0.5.4 unter Windows bauen und den Installer zum Release hinzufügen, Schritte direkt unter dem Absatz zu
-Rust 1.100 („v0.5.4“).
+**Stand (2026-11-26):** Der signierte Installer 0.5.4 ist im Release `v0.5.4` (unten unter „v0.5.4“). Als Nächstes für Windows:
+Rust 1.100 und `vertdll.dll` im Code beheben (unten, `PLAN.md` 5.9, nach „go“); die übrigen Punkte am Ende von Abschnitt 8.
 
 **Stand (2026-11-09):** Windows läuft auf `main` (der Zweig `windows` ist seit 2026-11-02 übernommen). Debug- und Release-Fassung bauen,
 die Tests sind grün; die Release-Fassung öffnet kein Konsolenfenster und trägt Icon und Versionsangaben. Adapter erscheinen mit ihrer
@@ -27,11 +27,10 @@ Bauen mit `rustup toolchain install 1.99.1 --profile minimal`, dann `$env:RUSTUP
 `dev\build-installer.ps1`. **Plan für die Korrektur in `PLAN.md` 5.9** (Verweis auf die drei Funktionen aus `windows-sys` 0.61 im
 eigenen Crate; an einer Probe mit Rust 1.100 geprüft; `synchronization.lib` allein vorzuziehen hilft nicht). Umsetzung nach „go“.
 
-**v0.5.4 (released 2026-11-25 unter Linux, nur `.deb`, Tag auf Commit `30c1929`; der signierte Windows-Installer fehlt noch, Termin
-des Nutzers: 2026-11-26).**
+**v0.5.4 (released 2026-11-25 unter Linux, Tag auf Commit `30c1929`; signierter Windows-Installer am 2026-11-26 hinzugefügt).**
 Inhalt: der Aufbau unter dem Hex-Dump (`PLAN.md` 5.11) und die Graphen mit „Gesamt“ (5.10), Einzelheiten in den beiden Absätzen
-unten. 0.5.3 war nur ein Test-Paket unter Linux, ohne Release. Bis der Installer da ist, verweist der Release-Text für Windows auf v0.5.2.
-Reihenfolge unter Windows (wie bei 0.5.2):
+unten. 0.5.3 war nur ein Test-Paket unter Linux, ohne Release.
+Reihenfolge unter Windows (wie bei 0.5.2), **alle Schritte erledigt am 2026-11-26** (Ergebnisse jeweils am Ende des Schritts):
 1. **Holen:** `git pull`, dann `git checkout v0.5.4` (der Installer muss zum Tag passen; am Ende `git checkout main`).
 2. **Rust 1.99.1:** in jeder neuen PowerShell `$env:RUSTUP_TOOLCHAIN = '1.99.1'` (mit 1.100 stürzt der Helfer ab, oben); prüfen mit
    `rustc --version`. Ist 1.99.1 nicht mehr da: `rustup toolchain install 1.99.1 --profile minimal`.
@@ -39,22 +38,34 @@ Reihenfolge unter Windows (wie bei 0.5.2):
    einmal der Speicher aus). Unter Linux alle grün, 437 im Hauptprogramm (3 ignoriert). Sperrt Smart App Control Bau-Skripte:
    Abschnitt „Proc-Macro-DLLs“ weiter unten. Danach
    `dumpbin /dependents target\release\openpacketmon-capture.exe`: darf `vertdll.dll` nicht nennen.
+   **Erledigt (rustc 1.99.1):** Release-Bau in 4 min 47 s ohne Warnung. Tests grün: 438 im Hauptprogramm (3 ignoriert; einer mehr als
+   unter Linux, weil ein Test in `src/gui/tests.rs` nur unter Windows läuft), 6 MCP, 4 + 4 im Helfer, 2 im Live-Test (3 ignoriert),
+   2 im Parser. Smart App Control sperrte beim Testen `pastey-….dll`, `pnet_macros-….dll` und `mcp-….exe`; nach Löschen und neuem
+   Lauf grün (dritter Versuch). `openpacketmon-capture.exe` und `openpacketmon.exe` importieren die Sperrfunktionen aus
+   `api-ms-win-core-synch-l1-2-0.dll`, keins nennt `vertdll.dll`.
 4. **Von Hand prüfen** (Release-Fassung aus `target\release`): die Punkte unter „Aufbau“ (Schritt 2) und unter „Danach dazugekommen“
-   (Graphen) unten.
+   (Graphen) unten. **Erledigt:** vom Nutzer geprüft, alles in Ordnung.
 5. **Installer bauen und signieren** (Abschnitt 6.1): SimplySign Desktop anmelden, dann
    `powershell -ExecutionPolicy Bypass -File dev\build-installer.ps1 -CertSha1 5A5AE6506A7649F1FFBD9856FB22E63E39D98C17`
    → `target\installer\openpacketmon-0.5.4-setup.exe`; `signtool verify /pa /all` für Installer und beide Programme. Als Update über
    0.5.2 installieren und einmal starten.
+   **Erledigt:** `openpacketmon-0.5.4-setup.exe`, 10 680 168 Bytes, SHA-256
+   `e6121b18f33ef281a0005454eda111777ba7855db0ee99eb0c199b3eec53a8e2`; Installer und beide Programme signiert (Certum, SHA-256,
+   RFC-3161-Zeitstempel), `signtool verify /pa /all` dreimal „Successfully verified“. Vom Nutzer als Update über 0.5.2 installiert und
+   gestartet, ohne Probleme.
 6. **Zum Release hinzufügen** (in Git Bash, Repo-Ordner, `gh` angemeldet): erst ohne `--publish` prüfen,
    `dev/release.sh --add-windows target/installer/openpacketmon-0.5.4-setup.exe`, dann mit `--publish`. Das Skript prüft Version im
    Dateinamen, Signatur und dass sich der Programmcode seit dem Tag nicht geändert hat, lädt hoch und schreibt `SHA256SUMS` neu.
    Danach im Release-Text den Absatz **Windows** ersetzen, Vorlage ist der Text von v0.5.2 (Windows 10 und 11, signiert durch Certum,
    Npcap nicht enthalten, „The program code is the same as for Linux at this tag.“), mit `openpacketmon-0.5.4-setup.exe`:
    `gh release edit v0.5.4 --notes-file <datei>` (vorher `gh release view v0.5.4 --json body -q .body > <datei>` und anpassen).
+   **Erledigt:** Probelauf ohne `--publish` ohne Befund, dann hochgeladen; `SHA256SUMS` neu, alle drei Dateien nach dem Hochladen „OK“.
+   Release-Text: Absatz **Windows** „(added on 2026-11-26)“ nach der Vorlage von v0.5.2.
 7. **Doku:** Ergebnisse (Tests, Prüfsumme, Signatur, Update) hier eintragen, in `PLAN.md` oben „Stand“, 5.10 und 5.11, in `CLAUDE.md`
    und in der Zeile von `~/Claude/Projekte/CLAUDE.md` (falls auf dem Windows-Rechner vorhanden); committen und pushen auf Ansage.
+   **Erledigt** (2026-11-26).
 
-**Aufbau (Paketdiagramm, `PLAN.md` 5.11, umgesetzt 2026-11-25 unter Linux, unter Windows noch nicht gebaut):** Auf der Seite Paket
+**Aufbau (Paketdiagramm, `PLAN.md` 5.11, umgesetzt 2026-11-25 unter Linux, unter Windows gebaut und geprüft 2026-11-26 in v0.5.4):** Auf der Seite Paket
 steht unter dem Hex-Dump die Karte „Aufbau“ mit den Kopfzeilen jeder Schicht in Zeilen zu 32 Bit. Neu sind nur Rust-Code und Texte
 (`src/view/diagram.rs`, `src/gui/pages/packet/diagram.rs`, Änderungen in `src/gui/pages/packet.rs`, `src/view/packets.rs`,
 `src/gui/tests.rs`, `locales/*/app.ftl`); kein Windows-spezifischer Code, keine neue Abhängigkeit, `Cargo.lock` und
@@ -62,7 +73,7 @@ Version 0.5.4 (Release unter Linux 2026-11-25, mit den Graphen aus 5.10 unten). 
 url 2.5.9 dazu (neue RustSec-Meldungen, beide bauen mit Rust 1.99.1); `THIRD-PARTY-LICENSES.txt` ist dafür neu erzeugt. Verwendet werden nur Funktionen der Standardbibliothek, die es in 1.99
 schon gibt (`Option::is_none_or`, `div_ceil`, `if let`-Ketten). Reihenfolge unter Windows:
 1. (Ablauf für 0.5.4 oben unter „v0.5.4“.) `git pull`, `$env:RUSTUP_TOOLCHAIN = '1.99.1'`, dann `cargo build --release --workspace`
-   (soll ohne Warnung bauen) und `cargo test --workspace -j 4`. Neue Tests: 11 in `view::diagram::tests`,
+   (soll ohne Warnung bauen) und `cargo test --workspace -j 4`. Neue Tests: 10 in `view::diagram::tests`,
    `gui::pages::packet::diagram::tests::a_field_of_the_drawing_chooses_the_smallest_field_around_it` und der GUI-Test
    `gui::tests::the_structure_of_a_packet_marks_its_fields`.
    Prüfen, dass der Helfer richtig importiert: `dumpbin /dependents target\release\openpacketmon-capture.exe` ohne `vertdll.dll`.
@@ -538,6 +549,6 @@ Update über eine ältere Version, Start ohne Npcap (Abschnitt 5 Punkt 8).
 **Beginn (Nutzer, 2026-11-02):** Windows wird **vor** dem ersten Release gemacht, weil andere Tester eine Windows-Fassung
 brauchen; MCP ist fertig. Der Haltepunkt aus `PLAN.md` 4.10 ist seit 2026-11-02 aufgehoben.
 
-**Noch offen (Stand 2026-11-25):** v0.5.4 unter Windows bauen, prüfen und den signierten Installer zum Release hinzufügen (oben unter „v0.5.4“), Rust 1.100 und `vertdll.dll` im Code beheben (oben), 0.5.2 am TAP prüfen, sobald einer verfügbar ist (oben unter „0.5.1 und 0.5.2“), Test von 0.5.0 unter Windows zu Ende führen (oben unter „v0.5.0“, Schritt 2; das Update von 0.4.0
+**Noch offen (Stand 2026-11-26):** Rust 1.100 und `vertdll.dll` im Code beheben (oben), 0.5.2 am TAP prüfen, sobald einer verfügbar ist (oben unter „0.5.1 und 0.5.2“), Test von 0.5.0 unter Windows zu Ende führen (oben unter „v0.5.0“, Schritt 2; das Update von 0.4.0
 mit dem Installer lief beim Nutzer reibungslos), CI-Job für Windows (Abschnitt 7), Test auf einem sauberen System (Deinstallation, Update über eine
 ältere Version, Start ohne Npcap), MCP-Einrichtung in `docs/windows-tester.md`, MCP-Integrationstests von den echten Einstellungen trennen.

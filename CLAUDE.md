@@ -101,13 +101,13 @@ Fassung bis 2026-11-09 (mit dem Verlauf der Browser-Oberfläche) steht in der Gi
 
 ## Stand und offene Punkte
 
-Maßgeblich ist `PLAN.md` (oben „Stand“, Abschnitt 5). Kurz (2026-11-25):
+Maßgeblich ist `PLAN.md` (oben „Stand“, Abschnitt 5). Kurz (2026-11-26):
 
-- **v0.5.4** ist released (2026-11-25, Linux) mit Aufbau und Graphen (unten). **Als Nächstes unter Windows:** bauen (Rust 1.99.1),
-  signierten Installer zum Release hinzufügen; Schritt für Schritt in `docs/windows.md` oben unter „v0.5.4“.
+- **v0.5.4** ist released (2026-11-25, Linux) mit Aufbau und Graphen (unten); der **signierte Windows-Installer** ist am 2026-11-26
+  hinzugefügt (Rust 1.99.1, Tests grün, Update über 0.5.2 beim Nutzer ohne Probleme; `docs/windows.md` oben unter „v0.5.4“).
 - **Aufbau (Paketdiagramm)** (`PLAN.md` 5.11, 2026-11-25): auf der Seite Paket rechts unter dem Hex-Dump die Kopfzeilen jeder
   Schicht in Zeilen zu 32 Bit wie in den RFCs, Felder bitgenau, Namen oder Werte, Markieren in drei Richtungen. Entwurf abgenommen,
-  umgesetzt (`src/view/diagram.rs`, `src/gui/pages/packet/diagram.rs`), in v0.5.4; offen Windows-Bau.
+  umgesetzt (`src/view/diagram.rs`, `src/gui/pages/packet/diagram.rs`), in v0.5.4, unter Windows geprüft.
 - **Graphen wie opennetmon 0.7.1** (`PLAN.md` 5.10, 2026-11-25): Linien durchgezogen, „Gesamt“ als graue Fläche, Legende zum
   Anklicken (je Graph, bis zum Programmende). In v0.5.4.
 - **v0.5.2** ist released (2026-11-12, Linux) mit Promiscuous Mode und dem Startknopf oben; der **signierte Windows-Installer** ist am
